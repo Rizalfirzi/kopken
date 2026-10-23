@@ -2,8 +2,7 @@
 /**
  * Kopi Kenangan - Real-time Outlet & Stock Application (PHP Native)
  * 
- * Runs without Laravel, Composer, or Node.js dependencies.
- * Compatible with PHP 7.4+, 8.0, 8.1, 8.2, 8.3, Apache, Nginx, XAMPP, and Laragon.
+ * 100% PHP Native, Zero Framework, Zero Database, 100% API-Driven.
  */
 
 require_once __DIR__ . '/config.php';
@@ -13,9 +12,13 @@ $api = new KopiKenanganApi();
 
 $storeName = config('store.name', 'Kopi Kenangan Live Store');
 $adminPhone = config('store.admin_phone', '6288298374458');
+$heroTag = config('store.hero_tag', '✨ Live Inventory Sync');
+$heroTitle = config('store.hero_title', 'Kenangan Hari Ini, Langsung dari Outlet');
+$heroDesc = config('store.hero_desc', 'Pilih outlet Kopi Kenangan terdekat untuk mengecek stok ketersediaan menu secara live dan order langsung via WhatsApp.');
+
 $defaultOutletCode = isset($_GET['outlet']) ? trim((string)$_GET['outlet']) : config('store.default_outlet', 'LA.CODEFIN');
 
-// Fetch initial outlets
+// Fetch initial outlets (with real-time operating hours evaluation)
 $outletsData = $api->getOutlets();
 $initialOutlets = $outletsData['outlets'] ?? [];
 
@@ -33,18 +36,18 @@ if (!$initialOutlet && !empty($initialOutlets)) {
     $defaultOutletCode = $initialOutlet['code'];
 }
 
-// Fetch initial menu & stock for selected outlet
+// Fetch initial menu & stock for selected outlet (with stock overrides & custom menus)
 $initialMenu = $api->getMenu($defaultOutletCode);
 
-// Include Header Template
+// Include Header Template (with dynamic colors & logo support)
 require_once __DIR__ . '/includes/header.php';
 ?>
 
-    <!-- Hero Banner -->
+    <!-- Hero Banner (Customizable via config.php) -->
     <div class="hero-banner">
-        <div class="hero-tag">✨ Live Inventory Sync</div>
-        <h2 class="hero-title">Kenangan Hari Ini, Langsung dari Outlet</h2>
-        <p class="hero-desc">Pilih outlet Kopi Kenangan terdekat untuk mengecek stok ketersediaan menu secara live dan order langsung.</p>
+        <div class="hero-tag"><?= htmlspecialchars($heroTag) ?></div>
+        <h2 class="hero-title"><?= htmlspecialchars($heroTitle) ?></h2>
+        <p class="hero-desc"><?= htmlspecialchars($heroDesc) ?></p>
         <div class="hero-stats">
             <div class="stat-item">
                 <b id="statTotalItems"><?= (int)($initialMenu['stats']['total'] ?? 0) ?></b>

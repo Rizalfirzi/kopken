@@ -1,8 +1,11 @@
 <?php
 /**
  * Kopi Kenangan Native API & Data Service
- * 100% API based, Zero Database dependency.
- * Designed for serverless environments like Vercel as well as traditional PHP hosts.
+ * 
+ * Fitur:
+ * 1. Menyesuaikan jam operasional di seluruh outlet (Otomatis WIB & Manual Override)
+ * 2. Menyesuaikan stok ketersediaan real-time dari APK Kopi Kenangan & Manual Override
+ * 3. Menyesuaikan harga per menu (Markup & Custom Price) & Menggabungkan menu baru custom
  */
 
 class KopiKenanganApi
@@ -16,7 +19,7 @@ class KopiKenanganApi
     {
         $this->baseUrl = rtrim((string) config('api_base_url', 'https://tixandcoffee.developerngantuk.my.id/api'), '/');
         $this->outletsTtl = (int) config('cache_ttl.outlets', 1800);
-        $this->stockTtl = (int) config('cache_ttl.menu', 60);
+        $this->stockTtl = (int) config('stock.ttl_seconds', config('cache_ttl.menu', 60));
         $this->cacheDir = defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kopken_cache';
 
         if (!is_dir($this->cacheDir)) {
@@ -25,12 +28,7 @@ class KopiKenanganApi
     }
 
     /**
-     * Fetch list of outlets with optional search term and geo-distance sorting.
-     *
-     * @param string|null $query
-     * @param float|null $lat
-     * @param float|null $lng
-     * @return array
+     * Fetch list of outlets with real-time hours evaluation, search, and distance sorting.
      */
     public function getOutlets(?string $query = null, ?float $lat = null, ?float $lng = null): array
     {
@@ -39,6 +37,11 @@ class KopiKenanganApi
         
         $cached = $this->getCache($cacheKey, $this->outletsTtl);
         if ($cached !== null) {
+            // Re-evaluate hours dynamically on cached outlets to reflect current clock minute
+            foreach ($cached['outlets'] as &$o) {
+                $o = $this->evaluateOutletHours($o);
+            }
+            unset($o);
             return $cached;
         }
 
@@ -57,7 +60,7 @@ class KopiKenanganApi
         if ($response && !empty($response['outlets'])) {
             $outlets = $response['outlets'];
 
-            // Calculate distance locally if user coordinates are provided
+            // 1. Calculate distance locally if user coordinates provided
             if ($lat !== null && $lng !== null) {
                 foreach ($outlets as &$outlet) {
                     if (!empty($outlet['lat']) && !empty($outlet['lng'])) {
@@ -78,6 +81,12 @@ class KopiKenanganApi
                 });
             }
 
+            // 2. Evaluate Operating Hours for each outlet (Point 1)
+            foreach ($outlets as &$outlet) {
+                $outlet = $this->evaluateOutletHours($outlet);
+            }
+            unset($outlet);
+
             $result = [
                 'success' => true,
                 'source' => 'live',
@@ -89,8 +98,13 @@ class KopiKenanganApi
             return $result;
         }
 
-        // Fallback to built-in offline outlets if remote API is unreachable
+        // Fallback to built-in outlets
         $fallback = $this->getFallbackOutlets($query, $lat, $lng);
+        foreach ($fallback as &$o) {
+            $o = $this->evaluateOutletHours($o);
+        }
+        unset($o);
+
         return [
             'success' => true,
             'source' => 'fallback',
@@ -100,11 +114,66 @@ class KopiKenanganApi
     }
 
     /**
-     * Fetch real-time menu and stock status for an outlet.
-     *
-     * @param string $outletCode
-     * @param bool $forceRefresh
-     * @return array
+     * Point 1: Evaluate Operating Hours based on current WIB time and config overrides.
+     */
+    public function evaluateOutletHours(array $outlet): array
+    {
+        $code = $outlet['code'] ?? '';
+
+        // 1. Check Manual Hours Override from config.php
+        $hoursOverrides = config('outlets.hours_override', []);
+        if (!empty($hoursOverrides[$code])) {
+            $outlet['hours'] = $hoursOverrides[$code];
+        }
+
+        // 2. Check Manual Force Status from config.php
+        $forceStatus = config('outlets.force_status', []);
+        if (isset($forceStatus[$code])) {
+            $forced = (bool) $forceStatus[$code];
+            $outlet['isOpen'] = $forced;
+            $outlet['canOrder'] = $forced;
+            $outlet['statusText'] = $forced ? 'Buka' : 'Tutup Sementara';
+            return $outlet;
+        }
+
+        // 3. Auto Time Check based on Current WIB Time (Asia/Jakarta)
+        $autoTimeCheck = (bool) config('outlets.auto_time_check', true);
+        if ($autoTimeCheck && !empty($outlet['hours'])) {
+            $hours = trim($outlet['hours']);
+
+            // Parse time range: e.g. "06:00 - 22:00" or "07.00 - 21.30"
+            if (preg_match('/(\d{1,2})[:.](\d{2})\s*-\s*(\d{1,2})[:.](\d{2})/', $hours, $m)) {
+                $openMinutes = (int) $m[1] * 60 + (int) $m[2];
+                $closeMinutes = (int) $m[3] * 60 + (int) $m[4];
+
+                $currentHour = (int) date('H');
+                $currentMin = (int) date('i');
+                $nowMinutes = $currentHour * 60 + $currentMin;
+
+                // Handle 24 hours (e.g. 00:01 - 23:19 or 00:00 - 23:59)
+                $is24Hours = ($openMinutes <= 1 && $closeMinutes >= 23 * 60);
+
+                if ($is24Hours) {
+                    $isOpen = true;
+                } elseif ($openMinutes <= $closeMinutes) {
+                    // Normal schedule within same day
+                    $isOpen = ($nowMinutes >= $openMinutes && $nowMinutes <= $closeMinutes);
+                } else {
+                    // Overnight schedule (e.g. 18:00 - 03:00)
+                    $isOpen = ($nowMinutes >= $openMinutes || $nowMinutes <= $closeMinutes);
+                }
+
+                $outlet['isOpen'] = $isOpen;
+                $outlet['canOrder'] = $isOpen;
+                $outlet['statusText'] = $isOpen ? 'Buka' : 'Tutup';
+            }
+        }
+
+        return $outlet;
+    }
+
+    /**
+     * Point 2 & 3: Fetch Real-time Menu, adjust stock, apply price overrides, and merge custom menus.
      */
     public function getMenu(string $outletCode, bool $forceRefresh = false): array
     {
@@ -117,31 +186,19 @@ class KopiKenanganApi
 
         if ($forceRefresh) {
             $this->deleteCache($cacheKey);
+            $cached = null;
         } else {
             $cached = $this->getCache($cacheKey, $this->stockTtl);
-            if ($cached !== null) {
-                return $cached;
-            }
+        }
+
+        if ($cached !== null) {
+            return $this->applyMenuCustomizations($cached, $outletCode);
         }
 
         $url = $this->baseUrl . '/kopken/menu';
         $response = $this->httpRequest($url, ['outlet' => $outletCode]);
 
         if ($response && isset($response['items'])) {
-            $items = $response['items'];
-            $totalCount = count($items);
-            $availableCount = 0;
-            $soldOutCount = 0;
-
-            foreach ($items as $item) {
-                $isSoldOut = !empty($item['isSoldOut']) || !empty($item['notCarried']);
-                if ($isSoldOut) {
-                    $soldOutCount++;
-                } else {
-                    $availableCount++;
-                }
-            }
-
             $result = [
                 'success' => true,
                 'live' => $response['live'] ?? true,
@@ -155,28 +212,119 @@ class KopiKenanganApi
                     ['id' => 'item-frappe', 'name' => 'Frappe', 'kind' => 'item'],
                     ['id' => 'item-food', 'name' => 'Food & Toast', 'kind' => 'item'],
                 ],
-                'items' => $items,
-                'stats' => [
-                    'total' => $totalCount,
-                    'available' => $availableCount,
-                    'soldOut' => $soldOutCount,
-                ],
+                'items' => $response['items'],
                 'updatedAt' => date('c'),
             ];
 
             $this->setCache($cacheKey, $result);
-            return $result;
+            return $this->applyMenuCustomizations($result, $outletCode);
         }
 
-        // Fallback to built-in offline menu
-        return $this->getFallbackMenu($outletCode);
+        // Fallback menu
+        $fallback = $this->getFallbackMenu($outletCode);
+        return $this->applyMenuCustomizations($fallback, $outletCode);
+    }
+
+    /**
+     * Apply User Customizations:
+     * - Stock Overrides (Point 2)
+     * - Price Adjustments & Markup (Point 3)
+     * - Custom New Menus (Point 3)
+     */
+    protected function applyMenuCustomizations(array $menuData, string $outletCode): array
+    {
+        $items = $menuData['items'] ?? [];
+        $stockOverrides = config('stock.overrides', []);
+        $priceOverrides = config('menu.price_overrides', []);
+        $markup = (float) config('menu.global_price_markup', 0);
+
+        // 1. Apply overrides & price adjustments on existing items
+        foreach ($items as &$item) {
+            $key = $item['key'] ?? $item['id'] ?? '';
+
+            // Stock Override (Point 2)
+            if (isset($stockOverrides[$key])) {
+                $item['isSoldOut'] = (bool) $stockOverrides[$key];
+            }
+
+            // Price Override (Point 3)
+            if (isset($priceOverrides[$key])) {
+                $item['price'] = (float) $priceOverrides[$key];
+            } elseif ($markup > 0) {
+                $item['price'] += $markup;
+                if (!empty($item['largePrice'])) {
+                    $item['largePrice'] += $markup;
+                }
+            }
+        }
+        unset($item);
+
+        // 2. Add New Custom Menus (Point 3)
+        $customItems = config('menu.custom_items', []);
+        if (!empty($customItems) && is_array($customItems)) {
+            $customFormatted = [];
+            foreach ($customItems as $c) {
+                $key = $c['key'] ?? ('custom_' . md5($c['name']));
+                $isSold = !empty($c['isSoldOut']);
+                if (isset($stockOverrides[$key])) {
+                    $isSold = (bool) $stockOverrides[$key];
+                }
+
+                $price = (float) ($c['price'] ?? 0);
+                if (isset($priceOverrides[$key])) {
+                    $price = (float) $priceOverrides[$key];
+                } elseif ($markup > 0) {
+                    $price += $markup;
+                }
+
+                $customFormatted[] = [
+                    'key' => $key,
+                    'id' => $key,
+                    'name' => $c['name'] ?? 'Menu Baru',
+                    'category' => $c['category'] ?? 'Coffee',
+                    'img' => $c['img'] ?? 'https://placehold.co/200x200?text=Menu+Baru',
+                    'desc' => $c['desc'] ?? '',
+                    'price' => $price,
+                    'normalPrice' => !empty($c['normalPrice']) ? (float) $c['normalPrice'] : null,
+                    'largePrice' => !empty($c['largePrice']) ? (float) $c['largePrice'] : null,
+                    'isSoldOut' => $isSold,
+                    'tag' => $c['tag'] ?? 'BARU',
+                    'options' => $c['options'] ?? [
+                        'sizes' => ['Regular', 'Large'],
+                        'temps' => ['Ice', 'Hot'],
+                    ],
+                ];
+            }
+
+            // Prepend custom items so they appear prominently at the top
+            $items = array_merge($customFormatted, $items);
+        }
+
+        // 3. Recalculate Live Stock Statistics (Point 2)
+        $totalCount = count($items);
+        $availableCount = 0;
+        $soldOutCount = 0;
+
+        foreach ($items as $it) {
+            if (!empty($it['isSoldOut']) || !empty($it['notCarried'])) {
+                $soldOutCount++;
+            } else {
+                $availableCount++;
+            }
+        }
+
+        $menuData['items'] = $items;
+        $menuData['stats'] = [
+            'total' => $totalCount,
+            'available' => $availableCount,
+            'soldOut' => $soldOutCount,
+        ];
+
+        return $menuData;
     }
 
     /**
      * Process order submission and generate WhatsApp checkout link (No Database).
-     *
-     * @param array $data
-     * @return array
      */
     public function saveOrder(array $data): array
     {
@@ -205,7 +353,9 @@ class KopiKenanganApi
 
         // Format WhatsApp message
         $adminPhone = (string) config('store.admin_phone', '6288298374458');
-        $waMessage = "*FORMAT ORDER KOPI KENANGAN*\n";
+        $storeTitle = (string) config('store.name', 'Kopi Kenangan');
+        
+        $waMessage = "*FORMAT ORDER " . strtoupper($storeTitle) . "*\n";
         $waMessage .= "--------------------------------------\n";
         $waMessage .= "Kode Pesanan: *" . $orderCode . "*\n";
         $waMessage .= "Outlet: *" . $order['outletName'] . "*\n";
@@ -255,9 +405,6 @@ class KopiKenanganApi
 
     /**
      * Find order tracking info by code.
-     *
-     * @param string $code
-     * @return array
      */
     public function findOrder(string $code): array
     {
@@ -295,10 +442,6 @@ class KopiKenanganApi
 
     /**
      * Helper to perform HTTP GET request with cURL and fallback.
-     *
-     * @param string $url
-     * @param array $params
-     * @return array|null
      */
     protected function httpRequest(string $url, array $params = []): ?array
     {
@@ -499,131 +642,6 @@ class KopiKenanganApi
      */
     protected function getFallbackMenu(string $outletCode): array
     {
-        $items = [
-            [
-                'key' => 'kopken_mantan',
-                'id' => 'kopken_mantan',
-                'name' => 'Kopi Kenangan Mantan',
-                'category' => 'Coffee',
-                'img' => 'https://cdn.kopikenangan.com/public/da484154-47b1-a756-54a4-8b3490fb0eae',
-                'desc' => 'Espresso berpadu dengan susu segar dan gula aren murni khas Kopi Kenangan yang creamy dan legit.',
-                'price' => 14500,
-                'normalPrice' => 19000,
-                'largePrice' => 19500,
-                'isSoldOut' => false,
-                'tag' => 'BEST SELLER',
-                'options' => [
-                    'sizes' => ['Regular', 'Large'],
-                    'temps' => ['Ice', 'Hot'],
-                    'ices' => ['Normal Ice', 'Less Ice'],
-                    'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
-                ],
-            ],
-            [
-                'key' => 'creamy_aren_latte',
-                'id' => 'creamy_aren_latte',
-                'name' => 'Creamy Aren Latte',
-                'category' => 'Coffee',
-                'img' => 'https://cdn.kopikenangan.com/public/8fed1c14-eb1f-dafe-8608-c438521ec78d',
-                'desc' => 'Sensasi kopi latte dengan tekstur extra creamy dan sentuhan manis gula aren alami.',
-                'price' => 16000,
-                'normalPrice' => 22000,
-                'largePrice' => 21000,
-                'isSoldOut' => false,
-                'tag' => 'FAVORIT',
-                'options' => [
-                    'sizes' => ['Regular', 'Large'],
-                    'temps' => ['Ice', 'Hot'],
-                    'ices' => ['Normal Ice', 'Less Ice'],
-                    'sugars' => ['Normal Sugar', 'Less Sugar (50%)'],
-                ],
-            ],
-            [
-                'key' => 'americano',
-                'id' => 'americano',
-                'name' => 'Americano (Black Coffee)',
-                'category' => 'Coffee',
-                'img' => 'https://cdn.kopikenangan.com/public/40c1585d-4909-e368-9e2f-7249fce6e551',
-                'desc' => 'Double shot espresso dari biji kopi arabika & robusta lokal dengan aroma kaya dan rasa seimbang.',
-                'price' => 12000,
-                'normalPrice' => 15000,
-                'largePrice' => 16000,
-                'isSoldOut' => false,
-                'options' => [
-                    'sizes' => ['Regular', 'Large'],
-                    'temps' => ['Ice', 'Hot'],
-                    'sugars' => ['No Sugar', 'Normal Sugar'],
-                ],
-            ],
-            [
-                'key' => 'matcha_latte',
-                'id' => 'matcha_latte',
-                'name' => 'Susu Matcha Kenangan',
-                'category' => 'Non Coffee',
-                'img' => 'https://cdn.kopikenangan.com/public/dc910c78-30c6-30e2-a9ab-0ffafe803344',
-                'desc' => 'Bubuk matcha murni asal Jepang diseduh dengan susu segar berkualitas tinggi, harum dan menenangkan.',
-                'price' => 18000,
-                'normalPrice' => 24000,
-                'largePrice' => 23000,
-                'isSoldOut' => false,
-                'tag' => 'POPULER',
-                'options' => [
-                    'sizes' => ['Regular', 'Large'],
-                    'temps' => ['Ice', 'Hot'],
-                    'ices' => ['Normal Ice', 'Less Ice'],
-                    'sugars' => ['Normal Sugar', 'Less Sugar (50%)'],
-                ],
-            ],
-            [
-                'key' => 'choco_hazelnut',
-                'id' => 'choco_hazelnut',
-                'name' => 'Cokelat Klasik Hazelnut',
-                'category' => 'Non Coffee',
-                'img' => 'https://cdn.kopikenangan.com/public/48d2b75c-329a-0216-6100-e475c6775430',
-                'desc' => 'Kombinasi pekat cokelat premium Belgia dengan wangi aroma hazelnut yang memikat.',
-                'price' => 17000,
-                'normalPrice' => 21000,
-                'largePrice' => 22000,
-                'isSoldOut' => false,
-                'options' => [
-                    'sizes' => ['Regular', 'Large'],
-                    'temps' => ['Ice', 'Hot'],
-                    'ices' => ['Normal Ice', 'Less Ice'],
-                    'sugars' => ['Normal Sugar', 'Less Sugar'],
-                ],
-            ],
-            [
-                'key' => 'frappe_caramel',
-                'id' => 'frappe_caramel',
-                'name' => 'Caramel Frappe with Whip',
-                'category' => 'Frappe',
-                'img' => 'https://cdn.kopikenangan.com/public/5fa5edac-9b48-7596-12a5-00c47632daeb',
-                'desc' => 'Minuman blender es lembut rasa kopi karamel dengan topping whipped cream dan saus karamel leleh.',
-                'price' => 24000,
-                'normalPrice' => 29000,
-                'largePrice' => 29000,
-                'isSoldOut' => false,
-                'tag' => 'SPESIAL',
-                'options' => [
-                    'sizes' => ['Regular', 'Large'],
-                    'sugars' => ['Normal Sugar', 'Less Sugar'],
-                ],
-            ],
-            [
-                'key' => 'toast_choco_cheese',
-                'id' => 'toast_choco_cheese',
-                'name' => 'Bambang Choco Cheese Toast',
-                'category' => 'Food',
-                'img' => 'https://cdn.kopikenangan.com/public/ceedcaa8-9c46-d366-799b-5bdd0e6386ac',
-                'desc' => 'Roti panggang empuk dengan isian cokelat lumer dan keju gurih melimpah. Cocok jadi teman ngopi.',
-                'price' => 8000,
-                'normalPrice' => 12000,
-                'largePrice' => null,
-                'isSoldOut' => false,
-                'options' => [],
-            ],
-        ];
-
         return [
             'success' => true,
             'live' => false,
@@ -637,12 +655,47 @@ class KopiKenanganApi
                 ['id' => 'item-frappe', 'name' => 'Frappe', 'kind' => 'item'],
                 ['id' => 'item-food', 'name' => 'Food & Toast', 'kind' => 'item'],
             ],
-            'items' => $items,
-            'stats' => [
-                'total' => count($items),
-                'available' => count($items),
-                'soldOut' => 0,
+            'items' => [
+                [
+                    'key' => 'kopken_mantan',
+                    'id' => 'kopken_mantan',
+                    'name' => 'Kopi Kenangan Mantan',
+                    'category' => 'Coffee',
+                    'img' => 'https://cdn.kopikenangan.com/public/da484154-47b1-a756-54a4-8b3490fb0eae',
+                    'desc' => 'Espresso berpadu dengan susu segar dan gula aren murni khas Kopi Kenangan yang creamy dan legit.',
+                    'price' => 14500,
+                    'normalPrice' => 19000,
+                    'largePrice' => 19500,
+                    'isSoldOut' => false,
+                    'tag' => 'BEST SELLER',
+                    'options' => [
+                        'sizes' => ['Regular', 'Large'],
+                        'temps' => ['Ice', 'Hot'],
+                        'ices' => ['Normal Ice', 'Less Ice'],
+                        'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
+                    ],
+                ],
+                [
+                    'key' => 'creamy_aren_latte',
+                    'id' => 'creamy_aren_latte',
+                    'name' => 'Creamy Aren Latte',
+                    'category' => 'Coffee',
+                    'img' => 'https://cdn.kopikenangan.com/public/8fed1c14-eb1f-dafe-8608-c438521ec78d',
+                    'desc' => 'Sensasi kopi latte dengan tekstur extra creamy dan sentuhan manis gula aren alami.',
+                    'price' => 16000,
+                    'normalPrice' => 22000,
+                    'largePrice' => 21000,
+                    'isSoldOut' => false,
+                    'tag' => 'FAVORIT',
+                    'options' => [
+                        'sizes' => ['Regular', 'Large'],
+                        'temps' => ['Ice', 'Hot'],
+                        'ices' => ['Normal Ice', 'Less Ice'],
+                        'sugars' => ['Normal Sugar', 'Less Sugar (50%)'],
+                    ],
+                ],
             ],
+            'stats' => ['total' => 2, 'available' => 2, 'soldOut' => 0],
             'updatedAt' => date('c'),
         ];
     }

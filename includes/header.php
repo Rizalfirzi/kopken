@@ -1,9 +1,24 @@
+<?php
+$storeTitle = config('store.name', 'Kopi Kenangan Live Store');
+$logoText = config('store.logo_text', 'KK');
+$logoImg = config('store.logo_image');
+
+// Dynamic theme colors from config.php
+$primaryColor = config('theme.primary_color', '#741213');
+$primaryDark = config('theme.primary_dark', '#530B0C');
+$primaryLight = config('theme.primary_light', '#9B1D1F');
+$accentColor = config('theme.accent_color', '#E11D48');
+$goldColor = config('theme.gold_color', '#D97706');
+$bgPage = config('theme.bg_page', '#FBF8F3');
+$bgCard = config('theme.bg_card', '#FFFFFF');
+$bgCardSubtle = config('theme.bg_card_subtle', '#F6F2EC');
+?>
 <!DOCTYPE html>
 <html lang="id" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title><?= htmlspecialchars($storeName ?? 'Kopi Kenangan Live Store') ?> — Cek Outlet & Stok Real-Time</title>
+    <title><?= htmlspecialchars($storeTitle) ?> — Cek Outlet & Stok Real-Time</title>
     <meta name="description" content="Aplikasi pemesanan dan monitoring stok real-time outlet Kopi Kenangan Indonesia. Cek ketersediaan menu, promo harga, dan pesan langsung via WhatsApp.">
 
     <!-- Google Fonts -->
@@ -13,6 +28,26 @@
 
     <!-- Native Stylesheet -->
     <link rel="stylesheet" href="assets/css/style.css">
+
+    <!-- Dynamic Theme Customization (from config.php) -->
+    <style>
+        :root {
+            --brand-primary: <?= htmlspecialchars($primaryColor) ?> !important;
+            --brand-primary-dark: <?= htmlspecialchars($primaryDark) ?> !important;
+            --brand-primary-light: <?= htmlspecialchars($primaryLight) ?> !important;
+            --brand-accent: <?= htmlspecialchars($accentColor) ?> !important;
+            --brand-gold: <?= htmlspecialchars($goldColor) ?> !important;
+            --bg-page: <?= htmlspecialchars($bgPage) ?> !important;
+            --bg-card: <?= htmlspecialchars($bgCard) ?> !important;
+            --bg-card-subtle: <?= htmlspecialchars($bgCardSubtle) ?> !important;
+        }
+        .custom-brand-logo {
+            max-height: 38px;
+            max-width: 120px;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+    </style>
 </head>
 <body>
 
@@ -21,9 +56,13 @@
     <header class="topnav">
         <div class="topnav-left">
             <a href="index.php" class="brand-logo-wrap">
-                <div class="brand-badge">KK</div>
+                <?php if (!empty($logoImg)): ?>
+                    <img class="custom-brand-logo" src="<?= htmlspecialchars($logoImg) ?>" alt="<?= htmlspecialchars($storeTitle) ?>">
+                <?php else: ?>
+                    <div class="brand-badge"><?= htmlspecialchars($logoText) ?></div>
+                <?php endif; ?>
                 <div class="brand-text">
-                    <h1>Kopi Kenangan</h1>
+                    <h1><?= htmlspecialchars($storeTitle) ?></h1>
                     <span><span class="live-dot"></span> Real-Time Outlet & Stok</span>
                 </div>
             </a>

@@ -19,6 +19,15 @@ const AppState = {
     selectedQty: 1,
 };
 
+// Global Outlet Store Map for Instant & Reliable Lookups
+const outletStore = new Map();
+if (AppState.outlet && AppState.outlet.code) {
+    outletStore.set(AppState.outlet.code, AppState.outlet);
+}
+(AppState.outlets || []).forEach(o => {
+    if (o && o.code) outletStore.set(o.code, o);
+});
+
 // Currency Formatting Helper
 const formatRp = (num) => 'Rp ' + Number(num || 0).toLocaleString('id-ID');
 
@@ -96,23 +105,111 @@ function renderOutletList(items) {
         return;
     }
 
-    container.innerHTML = items.map(o => `
-        <div class="outlet-item ${AppState.outlet?.code === o.code ? 'active' : ''}" onclick="selectOutlet('${o.code}')">
-            <img class="outlet-thumb" src="${o.img || 'https://cdn.kopikenangan.com/public/da484154-47b1-a756-54a4-8b3490fb0eae'}" alt="${o.name}" onerror="this.src='https://placehold.co/100x100?text=Kopi'">
-            <div class="outlet-item-body">
-                <div class="oib-title">
-                    <span>${o.name}</span>
-                    ${o.distanceKm ? `<span class="oib-distance">${o.distanceKm} km</span>` : ''}
+    // Cache all items into outletStore
+    items.forEach(o => {
+        if (o && o.code) outletStore.set(o.code, o);
+    });
+
+    container.innerHTML = items.map(o => {
+        const isActive = AppState.outlet && AppState.outlet.code === o.code;
+        const safeCode = (o.code || '').replace(/"/g, '&quot;');
+        const safeName = (o.name || '').replace(/"/g, '&quot;');
+        const safeStatus = (o.statusText || 'Buka').replace(/"/g, '&quot;');
+        const safeHours = (o.hours || '').replace(/"/g, '&quot;');
+        const safeImg = (o.img || 'https://cdn.kopikenangan.com/public/da484154-47b1-a756-54a4-8b3490fb0eae').replace(/"/g, '&quot;');
+
+        return `
+            <div class="outlet-item ${isActive ? 'active' : ''}" 
+                 data-code="${safeCode}"
+                 data-name="${safeName}"
+                 data-status="${safeStatus}"
+                 data-hours="${safeHours}"
+                 data-canorder="${o.canOrder ? 'true' : 'false'}"
+                 data-img="${safeImg}">
+                <img class="outlet-thumb" src="${safeImg}" alt="${safeName}" onerror="this.src='https://placehold.co/100x100?text=Kopi'">
+                <div class="outlet-item-body">
+                    <div class="oib-title">
+                        <span>${o.name}</span>
+                        ${o.distanceKm ? `<span class="oib-distance">${o.distanceKm} km</span>` : ''}
+                    </div>
+                    <div class="oib-address">${o.address || ''}</div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <span class="pill ${o.canOrder ? 'pill-open' : 'pill-closed'}">${o.statusText || 'Buka'}</span>
+                        <span style="font-size:11px;color:var(--text-muted)">${o.hours || ''}</span>
+                    </div>
                 </div>
-                <div class="oib-address">${o.address || ''}</div>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <span class="pill ${o.canOrder ? 'pill-open' : 'pill-closed'}">${o.statusText || 'Buka'}</span>
-                    <span style="font-size:11px;color:var(--text-muted)">${o.hours || ''}</span>
-                </div>
+                ${isActive ? '<div style="color:var(--brand-primary);font-weight:900;font-size:18px;display:flex;align-items:center;padding-left:4px;">✓</div>' : ''}
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
+
+// Event Delegation for Outlet Selection (Guarantees Clicks Always Fire)
+const outletListContainer = document.getElementById('outletListContainer');
+if (outletListContainer) {
+    outletListContainer.addEventListener('click', (e) => {
+        const item = e.target.closest('.outlet-item');
+        if (!item) return;
+        const code = item.dataset.code;
+        if (code) {
+            selectOutlet(code);
+        }
+    });
+}
+
+// Select Outlet & Trigger Live Menu Fetch
+window.selectOutlet = function(code) {
+    if (!code) return;
+
+    // 1. Look up outlet from memory store or AppState.outlets
+    let found = outletStore.get(code) || (AppState.outlets || []).find(o => o.code === code);
+
+    // 2. If not found in memory, construct directly from DOM dataset
+    if (!found) {
+        const el = document.querySelector(`.outlet-item[data-code="${code}"]`);
+        if (el) {
+            found = {
+                code: code,
+                name: el.dataset.name || code,
+                statusText: el.dataset.status || 'Buka',
+                canOrder: el.dataset.canorder === 'true',
+                hours: el.dataset.hours || 'Buka Setiap Hari',
+                img: el.dataset.img || ''
+            };
+            outletStore.set(code, found);
+        }
+    }
+
+    if (!found) {
+        console.warn('Outlet not found for code:', code);
+        return;
+    }
+
+    // 3. Update active outlet state
+    AppState.outlet = found;
+
+    // 4. Update Header UI
+    updateOutletHeader();
+
+    // 5. Visually update active highlight on list
+    document.querySelectorAll('.outlet-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.code === code);
+    });
+
+    // 6. Close the sheet
+    closeSheet('outletSheet');
+    showToast(`✓ Outlet aktif: ${found.name}`);
+
+    // 7. Update browser URL query string without reloading page
+    if (window.history && window.history.pushState) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('outlet', found.code);
+        window.history.pushState({ outlet: found.code }, '', url.toString());
+    }
+
+    // 8. Fetch real-time menu & stock for selected outlet
+    fetchMenu(found.code, false);
+};
 
 // Live Search Outlets via API
 let outletSearchTimer;
@@ -125,12 +222,14 @@ if (outletSearchInput) {
             fetch(`api/outlets.php?q=${encodeURIComponent(query)}`)
                 .then(res => res.json())
                 .then(data => {
-                    renderOutletList(data.outlets || []);
+                    const list = data.outlets || [];
+                    list.forEach(o => outletStore.set(o.code, o));
+                    renderOutletList(list);
                 })
                 .catch(() => {
                     showToast('Gagal mencari outlet.');
                 });
-        }, 280);
+        }, 250);
     });
 }
 
@@ -150,9 +249,11 @@ if (geoBtn) {
                 fetch(`api/outlets.php?lat=${lat}&lng=${lng}`)
                     .then(r => r.json())
                     .then(data => {
-                        geoBtn.innerHTML = '<span>✓ Lokasi Ditemukan (Urut Berdasarkan Terdekat)</span>';
-                        AppState.outlets = data.outlets;
-                        renderOutletList(data.outlets);
+                        geoBtn.innerHTML = '<span>✓ Lokasi Ditemukan (Urut Terdekat)</span>';
+                        const list = data.outlets || [];
+                        list.forEach(o => outletStore.set(o.code, o));
+                        AppState.outlets = list;
+                        renderOutletList(list);
                     })
                     .catch(() => {
                         geoBtn.innerHTML = '<span>✕ Gagal memuat outlet terdekat</span>';
@@ -167,19 +268,6 @@ if (geoBtn) {
         );
     });
 }
-
-// Select Outlet & Trigger Live Menu Fetch
-window.selectOutlet = function(code) {
-    const found = AppState.outlets.find(o => o.code === code);
-    if (!found) return;
-
-    AppState.outlet = found;
-    updateOutletHeader();
-    closeSheet('outletSheet');
-    showToast(`Memuat stok live untuk: ${found.name}...`);
-
-    fetchMenu(found.code, false);
-};
 
 // Fetch Menu API
 function fetchMenu(outletCode, forceRefresh = false) {
@@ -278,8 +366,9 @@ function renderMenu() {
         <div class="menu-grid">
             ${filtered.map(item => {
                 const isSold = item.isSoldOut || item.notCarried;
+                const safeKey = (item.key || item.id || '').replace(/"/g, '&quot;');
                 return `
-                    <div class="product-card ${isSold ? 'sold-out' : ''}" onclick="openProductDetail('${item.key || item.id}')">
+                    <div class="product-card ${isSold ? 'sold-out' : ''}" data-key="${safeKey}">
                         <div class="product-img-wrap">
                             <img src="${item.img || 'https://cdn.kopikenangan.com/public/da484154-47b1-a756-54a4-8b3490fb0eae'}" alt="${item.name}" loading="lazy" onerror="this.src='https://placehold.co/200x200?text=Kopi+Kenangan'">
                             <span class="stock-badge ${isSold ? 'empty' : 'ready'}">
@@ -301,6 +390,19 @@ function renderMenu() {
             }).join('')}
         </div>
     `;
+}
+
+// Product Card Click Delegation
+const menuContainer = document.getElementById('menuContainer');
+if (menuContainer) {
+    menuContainer.addEventListener('click', (e) => {
+        const card = e.target.closest('.product-card');
+        if (!card) return;
+        const key = card.dataset.key;
+        if (key) {
+            openProductDetail(key);
+        }
+    });
 }
 
 // Product Customization Modal
@@ -596,7 +698,7 @@ if (checkoutWaBtn) {
         })
         .finally(() => {
             checkoutWaBtn.innerHTML = `
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-.9-2.3c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7 6.3 6.3 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .8 2.5.7 3 .6a2.9 2.9 0 0 0 1.9-1.3 2.4 2.4 0 0 0 .2-1.3c-.1-.2-.3-.3-.6-.4zM12 21.8a9.8 9.8 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A9.8 9.8 0 1 1 12 21.8zm8.4-18.2A11.8 11.8 0 0 0 1.7 17.8L0 24l6.4-1.7a11.8 11.8 0 0 0 5.6 1.4A11.8 11.8 0 0 0 20.4 3.6z"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-.9-2.3c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .8 2.5.7 3 .6a2.9 2.9 0 0 0 1.9-1.3 2.4 2.4 0 0 0 .2-1.3c-.1-.2-.3-.3-.6-.4zM12 21.8a9.8 9.8 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A9.8 9.8 0 1 1 12 21.8zm8.4-18.2A11.8 11.8 0 0 0 1.7 17.8L0 24l6.4-1.7a11.8 11.8 0 0 0 5.6 1.4A11.8 11.8 0 0 0 20.4 3.6z"/></svg>
                 <span>Pesan via WhatsApp</span>
             `;
             checkoutWaBtn.disabled = false;
@@ -712,11 +814,29 @@ function performTrack(code) {
         });
 }
 
-// Initial Bootstrapping
+// Initial Bootstrapping: Always load fresh outlets when opening sheet
 const outletCardBtn = document.getElementById('outletCardBtn');
 if (outletCardBtn) {
     outletCardBtn.addEventListener('click', () => {
-        renderOutletList(AppState.outlets);
+        // Fetch latest live outlets from API if list is not fully loaded
+        if (!AppState.outlets || AppState.outlets.length <= 3) {
+            fetch('api/outlets.php')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.outlets && data.outlets.length) {
+                        AppState.outlets = data.outlets;
+                        data.outlets.forEach(o => outletStore.set(o.code, o));
+                        renderOutletList(data.outlets);
+                    } else {
+                        renderOutletList(AppState.outlets);
+                    }
+                })
+                .catch(() => {
+                    renderOutletList(AppState.outlets);
+                });
+        } else {
+            renderOutletList(AppState.outlets);
+        }
         openSheet('outletSheet');
     });
 }
