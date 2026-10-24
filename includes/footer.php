@@ -4,7 +4,7 @@
             <div class="fc-badge" id="cartTotalQty">0</div>
             <div class="fc-details">
                 <b id="cartBarTitle">0 Item di Keranjang</b>
-                <small id="cartBarOutletName"><?= htmlspecialchars($initialOutlet['name'] ?? 'Kopi Kenangan') ?></small>
+                <small id="cartBarOutletName"><?= htmlspecialchars($initialOutlet['name'] ?? 'Kedai Kyuti') ?></small>
             </div>
         </div>
         <div class="fc-right">
@@ -23,8 +23,11 @@ window.INITIAL_DATA = {
     outlet: <?= json_encode($initialOutlet ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
     outlets: <?= json_encode($initialOutlets ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
     menu: <?= json_encode($initialMenu ?? ['items' => [], 'stats' => []], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
-    storeName: <?= json_encode($storeName ?? 'Kopi Kenangan Live Store') ?>,
-    adminPhone: <?= json_encode($adminPhone ?? '6288298374458') ?>
+    storeName: <?= json_encode($storeName ?? 'Kedai Kyuti') ?>,
+    adminPhone: <?= json_encode($adminPhone ?? '6288298374458') ?>,
+    singleItemFee: <?= (int) config('fees.single_item_fee', 2000) ?>,
+    plasticBagFee: <?= (int) config('fees.plastic_bag_fee', 1000) ?>,
+    bundlingItems: <?= json_encode(config('bundling_items', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
 };
 </script>
 

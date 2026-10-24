@@ -1,14 +1,17 @@
 /**
- * Kopi Kenangan Native JavaScript Engine
- * Handles State, API Integration, Modals, Cart, Geolocation, and WhatsApp Checkout.
+ * Kedai Kyuti - Native JavaScript Application Engine
+ * Domain: kedaikyuti.my.id
+ * Handles State, API Integration, Modals, Bundling, Cart, Pickup Time & WhatsApp Checkout.
  */
 
 // Initialize Application State
 const AppState = {
+    view: 'hub', // 'hub' or 'store'
     outlet: window.INITIAL_DATA?.outlet || null,
     outlets: window.INITIAL_DATA?.outlets || [],
     menu: window.INITIAL_DATA?.menu || { items: [], stats: {} },
-    cart: JSON.parse(localStorage.getItem('kk_cart') || '[]'),
+    bundlingItems: window.INITIAL_DATA?.bundlingItems || [],
+    cart: JSON.parse(localStorage.getItem('kyuti_cart') || '[]'),
     activeCategory: 'all',
     searchQuery: '',
     selectedProduct: null,
@@ -17,9 +20,26 @@ const AppState = {
     selectedIce: 'Normal Ice',
     selectedSugar: 'Normal Sugar',
     selectedQty: 1,
+
+    // Fee & Addon Settings
+    singleItemFeeAmount: window.INITIAL_DATA?.singleItemFee || 2000,
+    plasticBagFeeAmount: window.INITIAL_DATA?.plasticBagFee || 1000,
+    hasPlasticBag: false,
+    pickupType: 'Sekarang', // 'Sekarang' or 'Atur Jam'
+    pickupTimezone: 'WIB',
+    pickupTime: '',
+
+    // Active Bundling Customization
+    activeBundle: null,
+    bundleSlotChoices: {},
+    bundleIce: 'Normal Ice',
+    bundleSugar: 'Normal Sugar',
+
+    // Pending Single Item for 1pcs Fee Modal
+    pendingCartItem: null,
 };
 
-// Global Outlet Store Map for Instant & Reliable Lookups
+// Global Outlet Store Map for Fast Lookups
 const outletStore = new Map();
 if (AppState.outlet && AppState.outlet.code) {
     outletStore.set(AppState.outlet.code, AppState.outlet);
@@ -35,27 +55,11 @@ const formatRp = (num) => 'Rp ' + Number(num || 0).toLocaleString('id-ID');
 function showToast(msg) {
     const wrap = document.getElementById('toastWrap');
     if (!wrap) return;
-    wrap.innerHTML = `<div class="toast"><span>☕</span><span>${msg}</span></div>`;
+    wrap.innerHTML = `<div class="toast"><span>🌸</span><span>${msg}</span></div>`;
     setTimeout(() => { wrap.innerHTML = ''; }, 3200);
 }
 
-// Theme Controller (Light / Dark)
-function initTheme() {
-    const saved = localStorage.getItem('kk_theme') || 'light';
-    document.documentElement.setAttribute('data-theme', saved);
-}
-
-const themeToggleBtn = document.getElementById('themeToggleBtn');
-if (themeToggleBtn) {
-    themeToggleBtn.addEventListener('click', () => {
-        const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', current);
-        localStorage.setItem('kk_theme', current);
-    });
-}
-initTheme();
-
-// Modal & Bottom Sheet Controllers
+// Modal Controllers
 function openSheet(id) {
     const el = document.getElementById(id);
     if (el) el.classList.add('active');
@@ -76,7 +80,122 @@ document.querySelectorAll('.sheet-backdrop').forEach(backdrop => {
     });
 });
 
-// Update Outlet Header Info
+// Theme Controller (Light / Dark)
+function initTheme() {
+    const saved = localStorage.getItem('kyuti_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+}
+
+const themeToggleBtn = document.getElementById('themeToggleBtn');
+if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', current);
+        localStorage.setItem('kyuti_theme', current);
+    });
+}
+initTheme();
+
+// =========================================================================
+// 1. WELCOME POPUP & BIO HUB NAVIGATION (Revisi Poin 4 & 5)
+// =========================================================================
+
+// Check whether to show Welcome Popup on first load
+function checkWelcomePopup() {
+    const hasSeen = sessionStorage.getItem('kyuti_seen_welcome');
+    if (!hasSeen) {
+        openSheet('welcomeModal');
+    }
+}
+
+const closeWelcomeModalBtn = document.getElementById('closeWelcomeModalBtn');
+if (closeWelcomeModalBtn) {
+    closeWelcomeModalBtn.addEventListener('click', () => {
+        closeSheet('welcomeModal');
+        sessionStorage.setItem('kyuti_seen_welcome', '1');
+        // If on Hub view, user can immediately choose to open outlet or view store
+        openStoreView();
+        openSheet('outletSheet');
+    });
+}
+
+const openWelcomeBtn = document.getElementById('openWelcomeBtn');
+if (openWelcomeBtn) {
+    openWelcomeBtn.addEventListener('click', () => {
+        openSheet('welcomeModal');
+    });
+}
+
+// Switch between Bio Hub View and Store View
+function openStoreView() {
+    AppState.view = 'store';
+    const hub = document.getElementById('bioHubView');
+    const store = document.getElementById('storeView');
+    if (hub) hub.style.display = 'none';
+    if (store) store.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function openHubView() {
+    AppState.view = 'hub';
+    const hub = document.getElementById('bioHubView');
+    const store = document.getElementById('storeView');
+    if (hub) hub.style.display = 'block';
+    if (store) store.style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+const openPricelistBtn = document.getElementById('openPricelistBtn');
+if (openPricelistBtn) {
+    openPricelistBtn.addEventListener('click', openStoreView);
+}
+
+const backToHubBtn = document.getElementById('backToHubBtn');
+if (backToHubBtn) {
+    backToHubBtn.addEventListener('click', openHubView);
+}
+
+const navHubToggleBtn = document.getElementById('navHubToggleBtn');
+if (navHubToggleBtn) {
+    navHubToggleBtn.addEventListener('click', () => {
+        if (AppState.view === 'store') {
+            openHubView();
+        } else {
+            openStoreView();
+        }
+    });
+}
+
+// =========================================================================
+// 2. OUTLET MANAGEMENT & PREMIUM OUTLET MODAL (Revisi Poin 9)
+// =========================================================================
+
+function isPremiumOutlet(outlet) {
+    if (!outlet) return false;
+    if (outlet.isPremium || outlet.premium) return true;
+    const cat = (outlet.category || '').toLowerCase();
+    const name = (outlet.name || '').toLowerCase();
+    const addr = (outlet.address || '').toLowerCase();
+    const keywords = ['mall', 'plaza', 'bandara', 'airport', 'stasiun', 'station', 'ciputra', 'tunjungan', 'grand'];
+    return keywords.some(k => cat.includes(k) || name.includes(k) || addr.includes(k));
+}
+
+function checkAndShowPremiumOutletAlert(outlet) {
+    if (isPremiumOutlet(outlet)) {
+        const nameEl = document.getElementById('premiumOutletNameText');
+        if (nameEl) nameEl.textContent = outlet.name;
+        openSheet('premiumOutletModal');
+    }
+}
+
+const premiumOutletOkBtn = document.getElementById('premiumOutletOkBtn');
+if (premiumOutletOkBtn) {
+    premiumOutletOkBtn.addEventListener('click', () => {
+        closeSheet('premiumOutletModal');
+    });
+}
+
+// Update Outlet Header UI
 function updateOutletHeader() {
     if (!AppState.outlet) return;
     const nameEl = document.getElementById('currentOutletName');
@@ -84,6 +203,7 @@ function updateOutletHeader() {
     const hoursEl = document.getElementById('currentOutletHours');
     const barOutletEl = document.getElementById('cartBarOutletName');
     const sheetOutletEl = document.getElementById('cartSheetOutletName');
+    const premiumBadge = document.getElementById('premiumOutletBadge');
 
     if (nameEl) nameEl.textContent = AppState.outlet.name;
     if (statusEl) {
@@ -93,9 +213,13 @@ function updateOutletHeader() {
     if (hoursEl) hoursEl.textContent = '• ' + (AppState.outlet.hours || 'Buka Setiap Hari');
     if (barOutletEl) barOutletEl.textContent = AppState.outlet.name;
     if (sheetOutletEl) sheetOutletEl.textContent = AppState.outlet.name;
+
+    if (premiumBadge) {
+        premiumBadge.style.display = isPremiumOutlet(AppState.outlet) ? 'inline-flex' : 'none';
+    }
 }
 
-// Render Outlets in Picker Sheet
+// Render Outlet Items in Picker Sheet
 function renderOutletList(items) {
     const container = document.getElementById('outletListContainer');
     if (!container) return;
@@ -105,7 +229,6 @@ function renderOutletList(items) {
         return;
     }
 
-    // Cache all items into outletStore
     items.forEach(o => {
         if (o && o.code) outletStore.set(o.code, o);
     });
@@ -117,6 +240,7 @@ function renderOutletList(items) {
         const safeStatus = (o.statusText || 'Buka').replace(/"/g, '&quot;');
         const safeHours = (o.hours || '').replace(/"/g, '&quot;');
         const safeImg = (o.img || 'https://cdn.kopikenangan.com/public/da484154-47b1-a756-54a4-8b3490fb0eae').replace(/"/g, '&quot;');
+        const isPrem = isPremiumOutlet(o);
 
         return `
             <div class="outlet-item ${isActive ? 'active' : ''}" 
@@ -133,38 +257,33 @@ function renderOutletList(items) {
                         ${o.distanceKm ? `<span class="oib-distance">${o.distanceKm} km</span>` : ''}
                     </div>
                     <div class="oib-address">${o.address || ''}</div>
-                    <div style="display:flex;gap:6px;align-items:center;">
+                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                         <span class="pill ${o.canOrder ? 'pill-open' : 'pill-closed'}">${o.statusText || 'Buka'}</span>
+                        ${isPrem ? '<span class="pill pill-premium">Outlet Premium</span>' : ''}
                         <span style="font-size:11px;color:var(--text-muted)">${o.hours || ''}</span>
                     </div>
                 </div>
-                ${isActive ? '<div style="color:var(--brand-primary);font-weight:900;font-size:18px;display:flex;align-items:center;padding-left:4px;">✓</div>' : ''}
+                ${isActive ? '<div style="color:var(--brand-primary-dark);font-weight:900;font-size:18px;display:flex;align-items:center;padding-left:4px;">✓</div>' : ''}
             </div>
         `;
     }).join('');
 }
 
-// Event Delegation for Outlet Selection (Guarantees Clicks Always Fire)
+// Event Delegation for Outlet Selection
 const outletListContainer = document.getElementById('outletListContainer');
 if (outletListContainer) {
     outletListContainer.addEventListener('click', (e) => {
         const item = e.target.closest('.outlet-item');
         if (!item) return;
         const code = item.dataset.code;
-        if (code) {
-            selectOutlet(code);
-        }
+        if (code) selectOutlet(code);
     });
 }
 
-// Select Outlet & Trigger Live Menu Fetch
 window.selectOutlet = function(code) {
     if (!code) return;
 
-    // 1. Look up outlet from memory store or AppState.outlets
     let found = outletStore.get(code) || (AppState.outlets || []).find(o => o.code === code);
-
-    // 2. If not found in memory, construct directly from DOM dataset
     if (!found) {
         const el = document.querySelector(`.outlet-item[data-code="${code}"]`);
         if (el) {
@@ -180,36 +299,37 @@ window.selectOutlet = function(code) {
         }
     }
 
-    if (!found) {
-        console.warn('Outlet not found for code:', code);
-        return;
-    }
+    if (!found) return;
 
-    // 3. Update active outlet state
     AppState.outlet = found;
-
-    // 4. Update Header UI
     updateOutletHeader();
 
-    // 5. Visually update active highlight on list
     document.querySelectorAll('.outlet-item').forEach(el => {
         el.classList.toggle('active', el.dataset.code === code);
     });
 
-    // 6. Close the sheet
     closeSheet('outletSheet');
     showToast(`✓ Outlet aktif: ${found.name}`);
 
-    // 7. Update browser URL query string without reloading page
+    // Check if selected outlet is Premium and show alert (Revisi Poin 9)
+    checkAndShowPremiumOutletAlert(found);
+
     if (window.history && window.history.pushState) {
         const url = new URL(window.location.href);
         url.searchParams.set('outlet', found.code);
         window.history.pushState({ outlet: found.code }, '', url.toString());
     }
 
-    // 8. Fetch real-time menu & stock for selected outlet
     fetchMenu(found.code, false);
 };
+
+const outletCardBtn = document.getElementById('outletCardBtn');
+if (outletCardBtn) {
+    outletCardBtn.addEventListener('click', () => {
+        renderOutletList(AppState.outlets);
+        openSheet('outletSheet');
+    });
+}
 
 // Live Search Outlets via API
 let outletSearchTimer;
@@ -262,14 +382,17 @@ if (geoBtn) {
             () => {
                 geoBtn.innerHTML = '<span>✕ Izin lokasi ditolak</span>';
                 setTimeout(() => {
-                    geoBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg><span>Pakai Lokasi Saya (Cari Outlet Terdekat)</span>';
+                    geoBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg><span>Pakai Lokasi Saya (Cari Outlet Terdekat)</span>';
                 }, 2000);
             }
         );
     });
 }
 
-// Fetch Menu API
+// =========================================================================
+// 3. MENU RENDERING & FETCHING (Revisi Poin 6, 7 & 12)
+// =========================================================================
+
 function fetchMenu(outletCode, forceRefresh = false) {
     const refreshBtn = document.getElementById('refreshStockBtn');
     if (refreshBtn) refreshBtn.classList.add('spinning');
@@ -278,8 +401,7 @@ function fetchMenu(outletCode, forceRefresh = false) {
         .then(res => res.json())
         .then(data => {
             AppState.menu = data;
-            
-            // Update Stats
+
             const totalEl = document.getElementById('statTotalItems');
             const readyEl = document.getElementById('statReadyItems');
             const soldEl = document.getElementById('statSoldItems');
@@ -303,7 +425,6 @@ function fetchMenu(outletCode, forceRefresh = false) {
         });
 }
 
-// Live Refresh Button
 const refreshStockBtn = document.getElementById('refreshStockBtn');
 if (refreshStockBtn) {
     refreshStockBtn.addEventListener('click', () => {
@@ -313,7 +434,7 @@ if (refreshStockBtn) {
     });
 }
 
-// Category Filtering
+// Category Filter
 document.querySelectorAll('.cat-pill').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
@@ -323,7 +444,7 @@ document.querySelectorAll('.cat-pill').forEach(btn => {
     });
 });
 
-// Search Filtering
+// Search Filter
 const menuSearchInput = document.getElementById('menuSearchInput');
 if (menuSearchInput) {
     menuSearchInput.addEventListener('input', (e) => {
@@ -339,7 +460,6 @@ function renderMenu() {
 
     const items = AppState.menu?.items || [];
     
-    // Filter by category & search query
     const filtered = items.filter(item => {
         const matchesCat = AppState.activeCategory === 'all' || item.category === AppState.activeCategory;
         const matchesSearch = !AppState.searchQuery || 
@@ -361,12 +481,14 @@ function renderMenu() {
 
     container.innerHTML = `
         <div class="sec-title">
-            <span>Menampilkan ${filtered.length} menu</span>
+            <span>Menampilkan ${filtered.length} menu (Diskon 50% + Fee Hemat)</span>
         </div>
         <div class="menu-grid">
             ${filtered.map(item => {
                 const isSold = item.isSoldOut || item.notCarried;
                 const safeKey = (item.key || item.id || '').replace(/"/g, '&quot;');
+                const isBundle = item.category === 'Bundling' || item.isBundling;
+
                 return `
                     <div class="product-card ${isSold ? 'sold-out' : ''}" data-key="${safeKey}">
                         <div class="product-img-wrap">
@@ -383,7 +505,7 @@ function renderMenu() {
                             ${item.normalPrice && item.normalPrice > item.price ? `<span class="product-normal-price">${formatRp(item.normalPrice)}</span>` : ''}
                         </div>
                         <button class="product-add-btn" type="button">
-                            ${isSold ? 'Stok Habis' : '+ Tambah'}
+                            ${isSold ? 'Stok Habis' : (isBundle ? 'Pilih Paket' : '+ Tambah')}
                         </button>
                     </div>
                 `;
@@ -392,455 +514,663 @@ function renderMenu() {
     `;
 }
 
-// Product Card Click Delegation
+// Card Click Delegation
 const menuContainer = document.getElementById('menuContainer');
 if (menuContainer) {
     menuContainer.addEventListener('click', (e) => {
         const card = e.target.closest('.product-card');
         if (!card) return;
         const key = card.dataset.key;
-        if (key) {
-            openProductDetail(key);
+        const item = (AppState.menu?.items || []).find(i => (i.key || i.id) === key);
+        if (!item) return;
+
+        if (item.isSoldOut || item.notCarried) {
+            showToast('Maaf, menu ini sedang habis di outlet ini.');
+            return;
+        }
+
+        if (item.category === 'Bundling' || item.isBundling) {
+            openBundlingModal(item);
+        } else {
+            openProductModal(item);
         }
     });
 }
 
-// Product Customization Modal
-window.openProductDetail = function(key) {
-    const item = (AppState.menu?.items || []).find(i => (i.key === key || i.id === key));
-    if (!item) return;
+// =========================================================================
+// 4. BUNDLING MODAL CONTROLLER (Revisi Poin 12)
+// =========================================================================
 
-    AppState.selectedProduct = item;
-    AppState.selectedSize = 'Regular';
-    AppState.selectedTemp = item.options?.temps?.[0] || 'Ice';
-    AppState.selectedIce = item.options?.ices?.[0] || 'Normal Ice';
-    AppState.selectedSugar = item.options?.sugars?.[0] || 'Normal Sugar';
-    AppState.selectedQty = 1;
+function openBundlingModal(bundle) {
+    AppState.activeBundle = bundle;
+    AppState.bundleSlotChoices = {};
 
-    document.getElementById('modalProductName').textContent = item.name;
-    document.getElementById('modalProductCat').textContent = item.category || 'Menu';
-    document.getElementById('modalProductImg').src = item.img || 'https://placehold.co/200x200?text=Kopi';
-    document.getElementById('modalProductDesc').textContent = item.desc || 'Dibuat dengan bahan pilihan dan racikan khas Kopi Kenangan.';
-    document.getElementById('modalProductPrice').textContent = formatRp(item.price);
-    document.getElementById('modalProductNormalPrice').textContent = item.normalPrice && item.normalPrice > item.price ? formatRp(item.normalPrice) : '';
-    document.getElementById('modalItemNote').value = '';
-    document.getElementById('qtyVal').textContent = '1';
+    const titleEl = document.getElementById('bundleModalTitle');
+    const descEl = document.getElementById('bundleModalDesc');
+    const priceEl = document.getElementById('bundleModalPrice');
+    const normalPriceEl = document.getElementById('bundleModalNormalPrice');
+    const imgEl = document.getElementById('bundleModalImg');
+    const slotsContainer = document.getElementById('bundleSlotsContainer');
 
-    const isSold = item.isSoldOut || item.notCarried;
-    const addBtn = document.getElementById('addToCartBtn');
-    if (isSold) {
-        document.getElementById('modalStockStatus').innerHTML = '<span class="pill pill-closed">✕ Stok Habis di Outlet Ini</span>';
-        addBtn.disabled = true;
-        addBtn.textContent = 'Menu Ini Sedang Habis di Outlet';
-        addBtn.style.opacity = '0.6';
-    } else {
-        document.getElementById('modalStockStatus').innerHTML = '<span class="pill pill-open">● Stok Ready / Tersedia</span>';
-        addBtn.disabled = false;
-        addBtn.textContent = 'Tambahkan ke Keranjang';
-        addBtn.style.opacity = '1';
+    if (titleEl) titleEl.textContent = bundle.name;
+    if (descEl) descEl.textContent = bundle.desc || 'Pilih kombinasi varian menu dalam paket bundling ini.';
+    if (priceEl) priceEl.textContent = formatRp(bundle.price);
+    if (normalPriceEl) normalPriceEl.textContent = bundle.normalPrice ? formatRp(bundle.normalPrice) : '';
+    if (imgEl) imgEl.src = bundle.img || 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?w=400';
+
+    // Render Slots Choices
+    if (slotsContainer) {
+        slotsContainer.innerHTML = (bundle.slots || []).map((slot, sIdx) => {
+            const firstChoice = slot.options && slot.options.length ? slot.options[0] : '';
+            AppState.bundleSlotChoices[sIdx] = firstChoice;
+
+            return `
+                <div class="bundle-slot-box">
+                    <div class="bundle-slot-label">
+                        <span>🎀</span>
+                        <span>${slot.label || `Pilihan ${sIdx + 1}`}</span>
+                    </div>
+                    <div class="bundle-choices-grid" data-slot="${sIdx}">
+                        ${(slot.options || []).map((opt, oIdx) => `
+                            <div class="bundle-choice-card ${oIdx === 0 ? 'selected' : ''}" data-slot="${sIdx}" data-val="${opt}">
+                                ${opt}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
-    // Render Options
-    renderOptionGroup('optGroupSize', 'optPillsSize', item.options?.sizes || ['Regular', 'Large'], AppState.selectedSize, (val) => {
+    openSheet('bundlingSheet');
+}
+
+// Handle Slot Choice Click
+const bundleSlotsContainer = document.getElementById('bundleSlotsContainer');
+if (bundleSlotsContainer) {
+    bundleSlotsContainer.addEventListener('click', (e) => {
+        const choiceCard = e.target.closest('.bundle-choice-card');
+        if (!choiceCard) return;
+        const slotIdx = choiceCard.dataset.slot;
+        const val = choiceCard.dataset.val;
+
+        AppState.bundleSlotChoices[slotIdx] = val;
+
+        const parentGrid = choiceCard.closest('.bundle-choices-grid');
+        if (parentGrid) {
+            parentGrid.querySelectorAll('.bundle-choice-card').forEach(c => c.classList.remove('selected'));
+        }
+        choiceCard.classList.add('selected');
+    });
+}
+
+// Bundle Ice & Sugar Pills
+document.querySelectorAll('#bundleIcePills .og-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#bundleIcePills .og-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        AppState.bundleIce = btn.dataset.val;
+    });
+});
+
+document.querySelectorAll('#bundleSugarPills .og-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#bundleSugarPills .og-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        AppState.bundleSugar = btn.dataset.val;
+    });
+});
+
+const addBundleToCartBtn = document.getElementById('addBundleToCartBtn');
+if (addBundleToCartBtn) {
+    addBundleToCartBtn.addEventListener('click', () => {
+        if (!AppState.activeBundle) return;
+
+        const choicesList = Object.values(AppState.bundleSlotChoices).join(' + ');
+        const notes = document.getElementById('bundleNotes')?.value.trim() || '';
+
+        const itemToAdd = {
+            id: 'bundle_' + Date.now(),
+            key: AppState.activeBundle.key,
+            name: AppState.activeBundle.name,
+            price: AppState.activeBundle.price,
+            qty: 1,
+            size: '',
+            temp: 'Ice',
+            ice: AppState.bundleIce,
+            sugar: AppState.bundleSugar,
+            bundleChoices: choicesList,
+            note: notes,
+            img: AppState.activeBundle.img,
+            subtotal: AppState.activeBundle.price,
+            isBundling: true,
+        };
+
+        closeSheet('bundlingSheet');
+        triggerAddToCartWithFeeCheck(itemToAdd);
+    });
+}
+
+// =========================================================================
+// 5. PRODUCT MODAL & 1 PCS FEE CHECK (Revisi Poin 8)
+// =========================================================================
+
+function openProductModal(item) {
+    AppState.selectedProduct = item;
+    AppState.selectedSize = 'Regular';
+    AppState.selectedTemp = 'Ice';
+    AppState.selectedIce = 'Normal Ice';
+    AppState.selectedSugar = 'Normal Sugar';
+    AppState.selectedQty = 1;
+
+    const nameEl = document.getElementById('modalProductName');
+    const catEl = document.getElementById('modalProductCat');
+    const descEl = document.getElementById('modalProductDesc');
+    const priceEl = document.getElementById('modalProductPrice');
+    const normalPriceEl = document.getElementById('modalProductNormalPrice');
+    const imgEl = document.getElementById('modalProductImg');
+    const noteEl = document.getElementById('modalItemNote');
+    const qtyValEl = document.getElementById('qtyVal');
+
+    if (nameEl) nameEl.textContent = item.name;
+    if (catEl) catEl.textContent = item.category || 'Coffee';
+    if (descEl) descEl.textContent = item.desc || '';
+    if (priceEl) priceEl.textContent = formatRp(item.price);
+    if (normalPriceEl) normalPriceEl.textContent = item.normalPrice ? formatRp(item.normalPrice) : '';
+    if (imgEl) imgEl.src = item.img || 'https://cdn.kopikenangan.com/public/da484154-47b1-a756-54a4-8b3490fb0eae';
+    if (noteEl) noteEl.value = '';
+    if (qtyValEl) qtyValEl.textContent = '1';
+
+    // Build Option Pills
+    renderOptionPills('optGroupSize', 'optPillsSize', item.options?.sizes || ['Regular', 'Large'], AppState.selectedSize, (val) => {
         AppState.selectedSize = val;
         const currentPrice = val === 'Large' && item.largePrice ? item.largePrice : item.price;
-        document.getElementById('modalProductPrice').textContent = formatRp(currentPrice);
+        if (priceEl) priceEl.textContent = formatRp(currentPrice);
     });
 
-    renderOptionGroup('optGroupTemp', 'optPillsTemp', item.options?.temps || [], AppState.selectedTemp, (val) => {
+    renderOptionPills('optGroupTemp', 'optPillsTemp', item.options?.temps || ['Ice', 'Hot'], AppState.selectedTemp, (val) => {
         AppState.selectedTemp = val;
     });
 
-    renderOptionGroup('optGroupIce', 'optPillsIce', item.options?.ices || [], AppState.selectedIce, (val) => {
+    renderOptionPills('optGroupIce', 'optPillsIce', item.options?.ices || ['Normal Ice', 'Less Ice'], AppState.selectedIce, (val) => {
         AppState.selectedIce = val;
     });
 
-    renderOptionGroup('optGroupSugar', 'optPillsSugar', item.options?.sugars || [], AppState.selectedSugar, (val) => {
+    renderOptionPills('optGroupSugar', 'optPillsSugar', item.options?.sugars || ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'], AppState.selectedSugar, (val) => {
         AppState.selectedSugar = val;
     });
 
     openSheet('productSheet');
-};
+}
 
-function renderOptionGroup(groupId, pillsId, options, currentValue, onSelect) {
+function renderOptionPills(groupId, pillsId, options, currentVal, onSelect) {
     const groupEl = document.getElementById(groupId);
     const pillsEl = document.getElementById(pillsId);
+    if (!groupEl || !pillsEl) return;
+
     if (!options || !options.length) {
         groupEl.style.display = 'none';
         return;
     }
     groupEl.style.display = 'block';
+
     pillsEl.innerHTML = options.map(opt => `
-        <button class="opt-btn ${opt === currentValue ? 'active' : ''}" type="button" onclick="selectOption('${groupId}', '${pillsId}', '${opt}')">${opt}</button>
+        <button class="og-pill ${opt === currentVal ? 'active' : ''}" type="button" data-val="${opt}">${opt}</button>
     `).join('');
 
-    window[`callback_${pillsId}`] = onSelect;
-}
-
-window.selectOption = function(groupId, pillsId, value) {
-    document.querySelectorAll(`#${pillsId} .opt-btn`).forEach(b => {
-        b.classList.toggle('active', b.textContent.trim() === value);
-    });
-    if (window[`callback_${pillsId}`]) {
-        window[`callback_${pillsId}`](value);
-    }
-};
-
-// Quantity Steppers
-const qtyMinus = document.getElementById('qtyMinus');
-const qtyPlus = document.getElementById('qtyPlus');
-if (qtyMinus) {
-    qtyMinus.addEventListener('click', () => {
-        if (AppState.selectedQty > 1) {
-            AppState.selectedQty--;
-            document.getElementById('qtyVal').textContent = AppState.selectedQty;
-        }
-    });
-}
-if (qtyPlus) {
-    qtyPlus.addEventListener('click', () => {
-        AppState.selectedQty++;
-        document.getElementById('qtyVal').textContent = AppState.selectedQty;
-    });
-}
-
-// Add to Cart Action
-const addToCartBtn = document.getElementById('addToCartBtn');
-if (addToCartBtn) {
-    addToCartBtn.addEventListener('click', () => {
-        const item = AppState.selectedProduct;
-        if (!item) return;
-
-        const unitPrice = AppState.selectedSize === 'Large' && item.largePrice ? item.largePrice : item.price;
-        const note = document.getElementById('modalItemNote').value.trim();
-
-        const cartItem = {
-            id: (item.key || item.id) + '_' + Date.now(),
-            key: item.key || item.id,
-            name: item.name,
-            price: unitPrice,
-            qty: AppState.selectedQty,
-            size: item.options?.sizes?.length ? AppState.selectedSize : null,
-            temp: item.options?.temps?.length ? AppState.selectedTemp : null,
-            ice: item.options?.ices?.length ? AppState.selectedIce : null,
-            sugar: item.options?.sugars?.length ? AppState.selectedSugar : null,
-            note: note,
-            subtotal: unitPrice * AppState.selectedQty,
-        };
-
-        AppState.cart.push(cartItem);
-        saveCart();
-        closeSheet('productSheet');
-        showToast(`✓ Ditambahkan: ${item.name} (${AppState.selectedQty}x)`);
-    });
-}
-
-// Cart Storage & Calculations
-function saveCart() {
-    localStorage.setItem('kk_cart', JSON.stringify(AppState.cart));
-    updateCartUI();
-}
-
-function updateCartUI() {
-    const totalQty = AppState.cart.reduce((sum, i) => sum + i.qty, 0);
-    const subtotal = AppState.cart.reduce((sum, i) => sum + i.subtotal, 0);
-
-    const floating = document.getElementById('floatingCart');
-    if (totalQty > 0) {
-        if (floating) floating.classList.add('visible');
-        const qtyEl = document.getElementById('cartTotalQty');
-        const titleEl = document.getElementById('cartBarTitle');
-        const priceEl = document.getElementById('cartBarTotalPrice');
-        if (qtyEl) qtyEl.textContent = totalQty;
-        if (titleEl) titleEl.textContent = `${totalQty} Item Siap Dipesan`;
-        if (priceEl) priceEl.textContent = formatRp(subtotal);
-    } else {
-        if (floating) floating.classList.remove('visible');
-    }
-
-    renderCartItems();
-}
-
-function renderCartItems() {
-    const container = document.getElementById('cartItemsList');
-    if (!container) return;
-
-    if (!AppState.cart.length) {
-        container.innerHTML = '<div class="empty-box"><p>Keranjang kamu masih kosong.</p></div>';
-        const subtotalEl = document.getElementById('summarySubtotal');
-        const totalEl = document.getElementById('summaryTotal');
-        if (subtotalEl) subtotalEl.textContent = 'Rp 0';
-        if (totalEl) totalEl.textContent = 'Rp 0';
-        return;
-    }
-
-    container.innerHTML = AppState.cart.map((i, idx) => `
-        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-            <div>
-                <b style="font-size:13.5px;color:var(--text-main)">${i.name}</b>
-                <div style="font-size:11.5px;color:var(--text-muted)">
-                    ${[i.size, i.temp, i.ice, i.sugar].filter(Boolean).join(' • ')}
-                </div>
-                ${i.note ? `<div style="font-size:11px;color:var(--brand-primary);font-style:italic">"${i.note}"</div>` : ''}
-                <div style="font-size:12px;font-weight:700;color:var(--brand-primary);margin-top:2px">
-                    ${formatRp(i.price)} × ${i.qty} = ${formatRp(i.subtotal)}
-                </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px">
-                <button class="icon-btn" onclick="adjustCartQty(${idx}, -1)" style="width:28px;height:28px">-</button>
-                <span style="font-weight:700;font-size:13px;min-width:16px;text-align:center">${i.qty}</span>
-                <button class="icon-btn" onclick="adjustCartQty(${idx}, 1)" style="width:28px;height:28px">+</button>
-            </div>
-        </div>
-    `).join('');
-
-    const subtotal = AppState.cart.reduce((sum, i) => sum + i.subtotal, 0);
-    const subtotalEl = document.getElementById('summarySubtotal');
-    const totalEl = document.getElementById('summaryTotal');
-    if (subtotalEl) subtotalEl.textContent = formatRp(subtotal);
-    if (totalEl) totalEl.textContent = formatRp(subtotal);
-}
-
-window.adjustCartQty = function(index, delta) {
-    if (AppState.cart[index]) {
-        AppState.cart[index].qty += delta;
-        if (AppState.cart[index].qty <= 0) {
-            AppState.cart.splice(index, 1);
-        } else {
-            AppState.cart[index].subtotal = AppState.cart[index].price * AppState.cart[index].qty;
-        }
-        saveCart();
-    }
-};
-
-const clearCartBtn = document.getElementById('clearCartBtn');
-if (clearCartBtn) {
-    clearCartBtn.addEventListener('click', () => {
-        AppState.cart = [];
-        saveCart();
-        showToast('Keranjang dikosongkan.');
-    });
-}
-
-// Open Cart Sheet
-const floatingCart = document.getElementById('floatingCart');
-if (floatingCart) {
-    floatingCart.addEventListener('click', () => {
-        openSheet('cartSheet');
-    });
-}
-
-// Checkout via WhatsApp & Backend Submit
-const checkoutWaBtn = document.getElementById('checkoutWaBtn');
-if (checkoutWaBtn) {
-    checkoutWaBtn.addEventListener('click', () => {
-        const nameInput = document.getElementById('custName');
-        const name = nameInput ? nameInput.value.trim() : '';
-        if (!name) {
-            showToast('Mohon isi nama pemesan terlebih dahulu');
-            if (nameInput) nameInput.focus();
-            return;
-        }
-
-        if (!AppState.cart.length) {
-            showToast('Keranjang kamu masih kosong');
-            return;
-        }
-
-        const phoneInput = document.getElementById('custPhone');
-        const pickupInput = document.getElementById('pickupSelect');
-        const notesInput = document.getElementById('orderNotes');
-
-        const payload = {
-            customerName: name,
-            customerPhone: phoneInput ? phoneInput.value.trim() : '',
-            outletCode: AppState.outlet?.code || 'LA.CODEFIN',
-            outletName: AppState.outlet?.name || 'Kopi Kenangan',
-            pickupTime: pickupInput ? pickupInput.value : 'Sekarang',
-            notes: notesInput ? notesInput.value.trim() : '',
-            items: AppState.cart,
-            subtotal: AppState.cart.reduce((s, i) => s + i.subtotal, 0),
-            total: AppState.cart.reduce((s, i) => s + i.subtotal, 0),
-        };
-
-        checkoutWaBtn.textContent = 'Memproses...';
-        checkoutWaBtn.disabled = true;
-
-        fetch('api/order.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                // Save order history in localStorage (Zero Database Needed)
-                localStorage.setItem('kk_last_order', data.orderCode);
-                const orderHistory = JSON.parse(localStorage.getItem('kk_orders') || '[]');
-                orderHistory.unshift(data.order);
-                localStorage.setItem('kk_orders', JSON.stringify(orderHistory.slice(0, 30)));
-
-                AppState.cart = [];
-                saveCart();
-                closeSheet('cartSheet');
-
-                showToast(`✓ Pesanan dibuat: ${data.orderCode}`);
-                // Open WhatsApp directly in new window
-                window.open(data.waUrl, '_blank');
-            } else {
-                showToast(data.message || 'Gagal memproses pesanan.');
-            }
-        })
-        .catch(() => {
-            showToast('Terjadi kesalahan jaringan.');
-        })
-        .finally(() => {
-            checkoutWaBtn.innerHTML = `
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-.9-2.3c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .8 2.5.7 3 .6a2.9 2.9 0 0 0 1.9-1.3 2.4 2.4 0 0 0 .2-1.3c-.1-.2-.3-.3-.6-.4zM12 21.8a9.8 9.8 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A9.8 9.8 0 1 1 12 21.8zm8.4-18.2A11.8 11.8 0 0 0 1.7 17.8L0 24l6.4-1.7a11.8 11.8 0 0 0 5.6 1.4A11.8 11.8 0 0 0 20.4 3.6z"/></svg>
-                <span>Pesan via WhatsApp</span>
-            `;
-            checkoutWaBtn.disabled = false;
+    pillsEl.querySelectorAll('.og-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+            pillsEl.querySelectorAll('.og-pill').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            onSelect(btn.dataset.val);
         });
     });
 }
 
-// Order Tracking System (LocalStorage + API)
+// Stepper
+const qtyMinus = document.getElementById('qtyMinus');
+const qtyPlus = document.getElementById('qtyPlus');
+const qtyVal = document.getElementById('qtyVal');
+
+if (qtyMinus && qtyPlus && qtyVal) {
+    qtyMinus.addEventListener('click', () => {
+        if (AppState.selectedQty > 1) {
+            AppState.selectedQty--;
+            qtyVal.textContent = AppState.selectedQty;
+        }
+    });
+
+    qtyPlus.addEventListener('click', () => {
+        AppState.selectedQty++;
+        qtyVal.textContent = AppState.selectedQty;
+    });
+}
+
+// Add Single Item to Cart
+const addToCartBtn = document.getElementById('addToCartBtn');
+if (addToCartBtn) {
+    addToCartBtn.addEventListener('click', () => {
+        if (!AppState.selectedProduct) return;
+
+        const item = AppState.selectedProduct;
+        const price = (AppState.selectedSize === 'Large' && item.largePrice) ? item.largePrice : item.price;
+        const note = document.getElementById('modalItemNote')?.value.trim() || '';
+
+        const itemToAdd = {
+            id: 'item_' + Date.now(),
+            key: item.key || item.id,
+            name: item.name,
+            price: price,
+            qty: AppState.selectedQty,
+            size: AppState.selectedSize,
+            temp: AppState.selectedTemp,
+            ice: AppState.selectedIce,
+            sugar: AppState.selectedSugar,
+            note: note,
+            img: item.img,
+            subtotal: price * AppState.selectedQty,
+        };
+
+        closeSheet('productSheet');
+        triggerAddToCartWithFeeCheck(itemToAdd);
+    });
+}
+
+/**
+ * 1 PCS FEE CHECK CONTROLLER (Revisi Poin 8)
+ * Jika jumlah item di keranjang sebelum tambah adalah 0 dan item yang ditambah qty = 1,
+ * tampilkan popup "Ada Fee Tambahan +2.000" sebelum masuk ke keranjang!
+ */
+function triggerAddToCartWithFeeCheck(item) {
+    const currentTotalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
+
+    // If current cart is empty and this single item has qty 1, show Fee Warning Modal
+    if (currentTotalQty === 0 && item.qty === 1) {
+        AppState.pendingCartItem = item;
+        openSheet('singleItemFeeModal');
+        return;
+    }
+
+    // Otherwise, directly push to cart
+    commitItemToCart(item);
+}
+
+// Modal Fee 1pcs Buttons
+const feeContinueBtn = document.getElementById('feeContinueBtn');
+if (feeContinueBtn) {
+    feeContinueBtn.addEventListener('click', () => {
+        closeSheet('singleItemFeeModal');
+        if (AppState.pendingCartItem) {
+            commitItemToCart(AppState.pendingCartItem);
+            AppState.pendingCartItem = null;
+            showToast('✓ Pesanan satuan dimasukkan ke keranjang (+fee 2.000)');
+        }
+    });
+}
+
+const feeAddMoreBtn = document.getElementById('feeAddMoreBtn');
+if (feeAddMoreBtn) {
+    feeAddMoreBtn.addEventListener('click', () => {
+        closeSheet('singleItemFeeModal');
+        if (AppState.pendingCartItem) {
+            commitItemToCart(AppState.pendingCartItem);
+            AppState.pendingCartItem = null;
+            showToast('Yuk pilih 1 item lagi agar bebas fee 2.000! ♡');
+        }
+    });
+}
+
+function commitItemToCart(item) {
+    AppState.cart.push(item);
+    localStorage.setItem('kyuti_cart', JSON.stringify(AppState.cart));
+    updateCartUI();
+    showToast(`✓ Ditambahkan: ${item.name}`);
+}
+
+// =========================================================================
+// 6. CART MANAGEMENT, PLASTIC BAG (+1.000) & PICKUP TIME (Revisi Poin 10 & 11)
+// =========================================================================
+
+function updateCartUI() {
+    const totalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
+    const subtotal = AppState.cart.reduce((sum, i) => sum + (i.subtotal || 0), 0);
+
+    // Calculate Single Item Fee (+2.000 if total qty == 1)
+    const hasSingleFee = totalQty === 1;
+    const singleFee = hasSingleFee ? AppState.singleItemFeeAmount : 0;
+
+    // Calculate Plastic Bag Fee (+1.000 if checked)
+    const plasticFee = AppState.hasPlasticBag ? AppState.plasticBagFeeAmount : 0;
+
+    const grandTotal = subtotal + singleFee + plasticFee;
+
+    // Update Floating Cart Bar
+    const floatingCart = document.getElementById('floatingCart');
+    const cartTotalQty = document.getElementById('cartTotalQty');
+    const cartBarTitle = document.getElementById('cartBarTitle');
+    const cartBarTotalPrice = document.getElementById('cartBarTotalPrice');
+
+    if (floatingCart) {
+        if (totalQty > 0) {
+            floatingCart.classList.add('visible');
+            if (cartTotalQty) cartTotalQty.textContent = totalQty;
+            if (cartBarTitle) cartBarTitle.textContent = `${totalQty} Item di Keranjang`;
+            if (cartBarTotalPrice) cartBarTotalPrice.textContent = formatRp(grandTotal);
+        } else {
+            floatingCart.classList.remove('visible');
+        }
+    }
+
+    // Update Cart Sheet Summary
+    const subtotalEl = document.getElementById('summarySubtotal');
+    const totalEl = document.getElementById('summaryTotal');
+    const singleFeeRow = document.getElementById('singleFeeRow');
+    const freeFeeRow = document.getElementById('freeFeeRow');
+    const plasticFeeRow = document.getElementById('plasticFeeRow');
+
+    if (subtotalEl) subtotalEl.textContent = formatRp(subtotal);
+    if (totalEl) totalEl.textContent = formatRp(grandTotal);
+
+    if (singleFeeRow) singleFeeRow.style.display = hasSingleFee ? 'flex' : 'none';
+    if (freeFeeRow) freeFeeRow.style.display = totalQty > 1 ? 'flex' : 'none';
+    if (plasticFeeRow) plasticFeeRow.style.display = AppState.hasPlasticBag ? 'flex' : 'none';
+
+    renderCartItemsList();
+}
+
+function renderCartItemsList() {
+    const list = document.getElementById('cartItemsList');
+    if (!list) return;
+
+    if (!AppState.cart.length) {
+        list.innerHTML = `
+            <div class="empty-box" style="padding:20px 0">
+                <div class="empty-icon">🛒</div>
+                <p>Keranjang kamu masih kosong.</p>
+            </div>
+        `;
+        return;
+    }
+
+    list.innerHTML = AppState.cart.map((item, idx) => `
+        <div style="display:flex;align-items:center;gap:12px;background:var(--bg-page);border-radius:var(--radius-md);padding:10px 12px;border:1px solid var(--border-color)">
+            <img src="${item.img || 'https://placehold.co/80x80'}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;">
+            <div style="flex:1;overflow:hidden">
+                <div style="font-size:13px;font-weight:800;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
+                <div style="font-size:11px;color:var(--text-muted)">${item.size ? item.size + ' • ' : ''}${item.temp || 'Ice'}</div>
+                ${item.bundleChoices ? `<div style="font-size:10px;color:var(--brand-primary-dark);font-weight:700">${item.bundleChoices}</div>` : ''}
+                <div style="font-size:12px;font-weight:800;color:var(--brand-primary-dark);margin-top:2px">${formatRp(item.price)} x ${item.qty}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+                <button class="icon-btn" onclick="modifyCartQty(${idx}, -1)" style="width:28px;height:28px">-</button>
+                <b style="font-size:13px;min-width:16px;text-align:center">${item.qty}</b>
+                <button class="icon-btn" onclick="modifyCartQty(${idx}, 1)" style="width:28px;height:28px">+</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+window.modifyCartQty = function(idx, change) {
+    if (!AppState.cart[idx]) return;
+    AppState.cart[idx].qty += change;
+    if (AppState.cart[idx].qty <= 0) {
+        AppState.cart.splice(idx, 1);
+    } else {
+        AppState.cart[idx].subtotal = AppState.cart[idx].price * AppState.cart[idx].qty;
+    }
+    localStorage.setItem('kyuti_cart', JSON.stringify(AppState.cart));
+    updateCartUI();
+};
+
+const floatingCart = document.getElementById('floatingCart');
+if (floatingCart) {
+    floatingCart.addEventListener('click', () => {
+        updateCartUI();
+        openSheet('cartSheet');
+    });
+}
+
+const clearCartBtn = document.getElementById('clearCartBtn');
+if (clearCartBtn) {
+    clearCartBtn.addEventListener('click', () => {
+        if (confirm('Kosongkan keranjang belanja?')) {
+            AppState.cart = [];
+            localStorage.removeItem('kyuti_cart');
+            updateCartUI();
+            showToast('Keranjang telah dikosongkan.');
+        }
+    });
+}
+
+// Plastic Bag Checkbox Addon (Revisi Poin 10)
+const plasticBagCheckbox = document.getElementById('plasticBagCheckbox');
+if (plasticBagCheckbox) {
+    plasticBagCheckbox.addEventListener('change', (e) => {
+        AppState.hasPlasticBag = e.target.checked;
+        updateCartUI();
+    });
+}
+
+// Pickup Time & Timezone Handling (Revisi Poin 11: 15-Minute Intervals)
+const pickupNowBtn = document.getElementById('pickupNowBtn');
+const pickupCustomBtn = document.getElementById('pickupCustomBtn');
+const customPickupContainer = document.getElementById('customPickupContainer');
+const pickupTimeSelect = document.getElementById('pickupTimeSelect');
+
+function populate15MinPickupTimes() {
+    if (!pickupTimeSelect) return;
+    pickupTimeSelect.innerHTML = '';
+
+    const tz = AppState.pickupTimezone;
+    // Generate hours from 07:00 to 22:45
+    for (let h = 7; h <= 22; h++) {
+        for (let m = 0; m < 60; m += 15) {
+            const hh = String(h).padStart(2, '0');
+            const mm = String(m).padStart(2, '0');
+            const timeStr = `${hh}.${mm} ${tz}`;
+            const opt = document.createElement('option');
+            opt.value = timeStr;
+            opt.textContent = timeStr;
+            pickupTimeSelect.appendChild(opt);
+        }
+    }
+}
+
+if (pickupNowBtn && pickupCustomBtn && customPickupContainer) {
+    pickupNowBtn.addEventListener('click', () => {
+        pickupNowBtn.classList.add('active');
+        pickupCustomBtn.classList.remove('active');
+        customPickupContainer.style.display = 'none';
+        AppState.pickupType = 'Sekarang';
+    });
+
+    pickupCustomBtn.addEventListener('click', () => {
+        pickupCustomBtn.classList.add('active');
+        pickupNowBtn.classList.remove('active');
+        customPickupContainer.style.display = 'block';
+        AppState.pickupType = 'Atur Jam';
+        populate15MinPickupTimes();
+    });
+}
+
+// Timezone Pills
+document.querySelectorAll('.tz-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tz-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        AppState.pickupTimezone = btn.dataset.tz;
+        populate15MinPickupTimes();
+    });
+});
+
+// =========================================================================
+// 7. CHECKOUT VIA WHATSAPP (Revisi Poin 8, 10, 11)
+// =========================================================================
+
+const checkoutWaBtn = document.getElementById('checkoutWaBtn');
+if (checkoutWaBtn) {
+    checkoutWaBtn.addEventListener('click', () => {
+        if (!AppState.cart.length) {
+            showToast('Keranjang kamu masih kosong.');
+            return;
+        }
+
+        const custName = document.getElementById('custName')?.value.trim();
+        if (!custName) {
+            alert('Silakan masukkan nama pemesan terlebih dahulu.');
+            document.getElementById('custName')?.focus();
+            return;
+        }
+
+        const custPhone = document.getElementById('custPhone')?.value.trim() || '';
+        const notes = document.getElementById('orderNotes')?.value.trim() || '';
+
+        let pickupTime = 'Sekarang';
+        if (AppState.pickupType === 'Atur Jam' && pickupTimeSelect) {
+            pickupTime = pickupTimeSelect.value || 'Sekarang';
+        }
+
+        const totalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
+        const subtotal = AppState.cart.reduce((sum, i) => sum + (i.subtotal || 0), 0);
+        const hasSingleFee = totalQty === 1;
+
+        checkoutWaBtn.disabled = true;
+        checkoutWaBtn.innerHTML = '<span>Menyiapkan Pesanan...</span>';
+
+        const payload = {
+            customerName: custName,
+            customerPhone: custPhone,
+            outletCode: AppState.outlet?.code || 'LA.CODEFIN',
+            outletName: AppState.outlet?.name || 'Kopi Kenangan',
+            pickupTime: pickupTime,
+            pickupTimezone: AppState.pickupTimezone,
+            notes: notes,
+            plasticBag: AppState.hasPlasticBag,
+            hasSingleItemFee: hasSingleFee,
+            items: AppState.cart,
+            subtotal: subtotal
+        };
+
+        fetch('api/order.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success && res.waUrl) {
+                // Save Order into local history
+                const history = JSON.parse(localStorage.getItem('kyuti_orders') || '[]');
+                history.unshift(res.order);
+                localStorage.setItem('kyuti_orders', JSON.stringify(history.slice(0, 10)));
+
+                // Clear cart
+                AppState.cart = [];
+                localStorage.removeItem('kyuti_cart');
+                updateCartUI();
+                closeSheet('cartSheet');
+
+                showToast(`✓ Pesanan ${res.orderCode} berhasil dibuat! Membuka WhatsApp...`);
+
+                // Open WhatsApp
+                setTimeout(() => {
+                    window.open(res.waUrl, '_blank');
+                }, 400);
+            } else {
+                alert(res.message || 'Gagal memproses pesanan.');
+            }
+        })
+        .catch(() => {
+            alert('Terjadi kesalahan jaringan saat membuat pesanan.');
+        })
+        .finally(() => {
+            checkoutWaBtn.disabled = false;
+            checkoutWaBtn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-.9-2.3c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7 6.3 6.3 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .8 2.5.7 3 .6a2.9 2.9 0 0 0 1.9-1.3 2.4 2.4 0 0 0 .2-1.3c-.1-.2-.3-.3-.6-.4zM12 21.8a9.8 9.8 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A9.8 9.8 0 1 1 12 21.8zm8.4-18.2A11.8 11.8 0 0 0 1.7 17.8L0 24l6.4-1.7a11.8 11.8 0 0 0 5.6 1.4A11.8 11.8 0 0 0 20.4 3.6z"/></svg>
+                <span>Pesan via WhatsApp</span>
+            `;
+        });
+    });
+}
+
+// =========================================================================
+// 8. ORDER TRACKING CONTROLLER
+// =========================================================================
+
 const trackOrderBtn = document.getElementById('trackOrderBtn');
 if (trackOrderBtn) {
     trackOrderBtn.addEventListener('click', () => {
-        const last = localStorage.getItem('kk_last_order');
-        if (last) {
-            const input = document.getElementById('trackCodeInput');
-            if (input) input.value = last;
-            performTrack(last);
-        }
         openSheet('trackSheet');
     });
 }
 
 const trackSubmitBtn = document.getElementById('trackSubmitBtn');
-if (trackSubmitBtn) {
+const trackCodeInput = document.getElementById('trackCodeInput');
+const trackResultBox = document.getElementById('trackResultBox');
+
+if (trackSubmitBtn && trackCodeInput && trackResultBox) {
     trackSubmitBtn.addEventListener('click', () => {
-        const input = document.getElementById('trackCodeInput');
-        const code = input ? input.value.trim() : '';
+        const code = trackCodeInput.value.trim().toUpperCase();
         if (!code) {
-            showToast('Masukkan kode pesanan');
+            showToast('Silakan ketik kode pesanan.');
             return;
         }
-        performTrack(code);
-    });
-}
 
-function performTrack(code) {
-    const resultBox = document.getElementById('trackResultBox');
-    if (!resultBox) return;
+        trackSubmitBtn.disabled = true;
+        trackSubmitBtn.textContent = 'Mencari...';
 
-    resultBox.innerHTML = '<div class="empty-box"><p>Mencari status pesanan...</p></div>';
-
-    const renderCard = (o) => {
-        resultBox.innerHTML = `
-            <div style="background:var(--bg-card-subtle);border-radius:var(--radius-md);padding:16px;border:1px solid var(--border-color)">
-                <div class="track-stepper">
-                    <div class="step-line"></div>
-                    <div class="track-step active">
-                        <div class="step-circle">✓</div>
-                        <span class="step-label">Diterima</span>
-                    </div>
-                    <div class="track-step active">
-                        <div class="step-circle">☕</div>
-                        <span class="step-label">Diproses</span>
-                    </div>
-                    <div class="track-step">
-                        <div class="step-circle">🛍️</div>
-                        <span class="step-label">Siap Ambil</span>
-                    </div>
-                </div>
-
-                <div style="text-align:center;margin:16px 0 20px">
-                    <h4 style="font-size:16px;color:var(--brand-primary);font-weight:800">${o.statusText || 'Pesanan Sedang Disiapkan'}</h4>
-                    <p style="font-size:12px;color:var(--text-muted);margin-top:2px">${o.statusDesc || 'Barista sedang meracik pesanan kopimu dengan cinta.'}</p>
-                </div>
-
-                <div style="display:flex;flex-direction:column;gap:8px;font-size:12.5px;border-top:1px dashed var(--border-color);padding-top:12px">
-                    <div style="display:flex;justify-content:space-between">
-                        <span style="color:var(--text-muted)">Kode Pesanan</span>
-                        <b>${o.code || o.orderCode}</b>
-                    </div>
-                    <div style="display:flex;justify-content:space-between">
-                        <span style="color:var(--text-muted)">Outlet</span>
-                        <span>${o.outletName || 'Kopi Kenangan'}</span>
-                    </div>
-                    <div style="display:flex;justify-content:space-between">
-                        <span style="color:var(--text-muted)">Nama Pemesan</span>
-                        <span>${o.customerName || 'Sahabat Kenangan'}</span>
-                    </div>
-                    <div style="display:flex;justify-content:space-between">
-                        <span style="color:var(--text-muted)">Total Pembayaran</span>
-                        <b style="color:var(--brand-primary)">${formatRp(o.total)}</b>
-                    </div>
-                </div>
-            </div>
-        `;
-    };
-
-    // 1. Check local order history first
-    const localOrders = JSON.parse(localStorage.getItem('kk_orders') || '[]');
-    const localMatch = localOrders.find(o => (o.orderCode || o.code || '').toUpperCase() === code.toUpperCase());
-    if (localMatch) {
-        renderCard(localMatch);
-        return;
-    }
-
-    // 2. Fetch from tracking API
-    fetch(`api/track.php?code=${encodeURIComponent(code)}`)
-        .then(r => r.json())
-        .then(data => {
-            if (data.found && data.order) {
-                renderCard(data.order);
-            } else {
-                resultBox.innerHTML = `
+        fetch(`api/track.php?code=${encodeURIComponent(code)}`)
+            .then(res => res.json())
+            .then(res => {
+                if (res.success && res.order) {
+                    const ord = res.order;
+                    trackResultBox.innerHTML = `
+                        <div style="background:var(--bg-page);border-radius:var(--radius-lg);padding:16px;border:1px solid var(--border-color);animation:fadeIn 0.3s ease">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                                <b style="font-size:14px;color:var(--brand-primary-dark)">${ord.code}</b>
+                                <span class="pill pill-open">Sedang Disiapkan</span>
+                            </div>
+                            <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">${ord.statusDesc || 'Barista sedang meracik pesananmu.'}</div>
+                            <div style="border-top:1px dashed var(--border-color);padding-top:10px;font-size:12px">
+                                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                                    <span>Outlet:</span>
+                                    <b>${ord.outletName || 'Kopi Kenangan'}</b>
+                                </div>
+                                <div style="display:flex;justify-content:space-between">
+                                    <span>Waktu Pickup:</span>
+                                    <b>${ord.pickup || 'Sekarang'}</b>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    trackResultBox.innerHTML = `
+                        <div class="empty-box">
+                            <div class="empty-icon">✕</div>
+                            <p>${res.message || 'Pesanan tidak ditemukan.'}</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(() => {
+                trackResultBox.innerHTML = `
                     <div class="empty-box">
-                        <div class="empty-icon">✕</div>
-                        <h4>Pesanan Tidak Ditemukan</h4>
-                        <p>Pastikan kode pesanan <b>${code}</b> sudah benar.</p>
+                        <div class="empty-icon">⚠️</div>
+                        <p>Gagal menghubungi server pelacakan.</p>
                     </div>
                 `;
-            }
-        })
-        .catch(() => {
-            resultBox.innerHTML = '<div class="empty-box"><p>Gagal menghubungi server pelacakan.</p></div>';
-        });
-}
-
-// Initial Bootstrapping: Always load fresh outlets when opening sheet
-const outletCardBtn = document.getElementById('outletCardBtn');
-if (outletCardBtn) {
-    outletCardBtn.addEventListener('click', () => {
-        // Fetch latest live outlets from API if list is not fully loaded
-        if (!AppState.outlets || AppState.outlets.length <= 3) {
-            fetch('api/outlets.php')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.outlets && data.outlets.length) {
-                        AppState.outlets = data.outlets;
-                        data.outlets.forEach(o => outletStore.set(o.code, o));
-                        renderOutletList(data.outlets);
-                    } else {
-                        renderOutletList(AppState.outlets);
-                    }
-                })
-                .catch(() => {
-                    renderOutletList(AppState.outlets);
-                });
-        } else {
-            renderOutletList(AppState.outlets);
-        }
-        openSheet('outletSheet');
+            })
+            .finally(() => {
+                trackSubmitBtn.disabled = false;
+                trackSubmitBtn.textContent = 'Lacak';
+            });
     });
 }
 
-updateOutletHeader();
-renderMenu();
-updateCartUI();
+// Initial Boot
+document.addEventListener('DOMContentLoaded', () => {
+    updateOutletHeader();
+    renderMenu();
+    updateCartUI();
+    checkWelcomePopup();
+});

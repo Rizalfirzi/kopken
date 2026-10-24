@@ -1,13 +1,20 @@
 <?php
 /**
- * Kopi Kenangan - Central Application Configuration (PHP Native)
+ * Kedai Kyuti - Central Application Configuration (PHP Native)
+ * Domain: kedaikyuti.my.id
+ * Brand: Kedai Kyuti (JASDOR KOPI KENANGAN)
  * 
  * Pengaturan Lengkap:
- * 1. Jam Operasional Outlet (Otomatis hitung waktu WIB & Manual Override)
- * 2. Ketersediaan Stok Real-Time (Live Sync API & Manual Stock Override)
- * 3. Desain Tampilan (Warna, Logo Gambar/Teks, Judul/Banner Retext)
- * 4. Harga Menu (Markup Global & Ubah Harga per Item)
- * 5. Penambahan Menu Baru Custom
+ * 1. Branding, Nama Web, Logo & Bio Links
+ * 2. Warna Tema Pink Pastel / Rose Chic
+ * 3. Jam Operasional Outlet (Otomatis WIB & Manual Override)
+ * 4. Ketersediaan Stok Real-Time
+ * 5. Formula Harga: (Harga Asli - 50% + Fee)
+ *    - Fee default (+5.000)
+ *    - Fee per kategori (misal: Food +4.500, Minuman +5.000)
+ *    - Fee khusus per menu (misal: Kopi Kenangan Mantan +6.000)
+ * 6. Fee Pesanan Satuan 1 pcs (+2.000) & Kantung Belanja Plastik (+1.000)
+ * 7. Paket Menu Bundling & Menu Custom
  */
 
 // Set Timezone ke Waktu Indonesia Barat (WIB)
@@ -15,153 +22,232 @@ date_default_timezone_set('Asia/Jakarta');
 
 define('ROOT_PATH', __DIR__);
 
-// Cache directory (menggunakan system temp directory untuk kompatibilitas Vercel Serverless)
-$cacheDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kopken_cache';
+// Cache directory
+$cacheDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache';
 define('CACHE_PATH', $cacheDir);
 if (!is_dir(CACHE_PATH)) {
     @mkdir(CACHE_PATH, 0777, true);
 }
 
 $config = [
-    'app_name' => 'Kopi Kenangan Live Store',
+    'app_name' => 'Kedai Kyuti',
+    'app_domain' => 'kedaikyuti.my.id',
     'app_env' => 'production',
 
     // =========================================================================
-    // 1. BRANDING, LOGO & RETEXT (Point 3: Ubah Teks, Judul & Logo)
+    // 1. BRANDING, NAMA WEB & BIO PROFILE (Revisi Poin 1, 2, 5)
     // =========================================================================
     'store' => [
-        'name' => 'Kopi Kenangan Live Store',
-        'tagline' => 'Cek Outlet Terdekat & Stok Menu Real-Time',
+        'name' => 'Kedai Kyuti',
+        'domain' => 'kedaikyuti.my.id',
+        'tagline' => 'JASDOR KOPI KENANGAN',
         
+        // Teks Bio Header (Landing Hub View)
+        'bio_title' => '୨୧ Kedai Kyuti ୨୧',
+        'bio_badge' => '🌸 JASDOR KOPI KENANGAN 🌸',
+        'bio_quote' => '♡ your little corner for daily food & beverage deals.',
+        'bio_desc' => 'fast response, friendly prices, and service made with love ♡',
+
         // LOGO:
-        // - 'logo_text': Teks inisial jika tidak pakai gambar (contoh: 'KK')
-        // - 'logo_image': URL gambar logo Anda (contoh: 'https://domain.com/logo.png'). Isi null jika pakai logo_text
-        'logo_text' => 'KK',
+        'logo_text' => '୨୧',
         'logo_image' => null, 
 
-        // RETEXT HERO BANNER
+        // HERO BANNER DI HALAMAN MENU
         'hero_tag' => '✨ Live Inventory Sync',
-        'hero_title' => 'Kenangan Hari Ini, Langsung dari Outlet',
-        'hero_desc' => 'Pilih outlet Kopi Kenangan terdekat untuk mengecek stok ketersediaan menu secara live dan order langsung via WhatsApp.',
+        'hero_title' => 'Pricelist Kopi Kenangan',
+        'hero_desc' => 'Pilih outlet terdekat untuk cek stok menu real-time dan pesan langsung via WhatsApp dengan harga hemat!',
 
-        // KONTAK ORDER WHATSAPP (Format 62xxx tanpa tanda plus)
+        // KONTAK ORDER WHATSAPP & SOSIAL MEDIA (Poin 5)
         'admin_phone' => '6288298374458',
-        'order_prefix' => 'KK',
+        'order_prefix' => 'KYUTI',
         'default_outlet' => 'LA.CODEFIN',
+
+        'social_links' => [
+            'wa' => 'https://wa.me/6288298374458?text=Halo%20Kedai%20Kyuti%2C%20mau%20order%20dong%20%E2%99%A1',
+            'tele_testi' => 'https://t.me/testikedaikyuti',
+            'x_twitter' => 'https://x.com/kedaikyuti',
+            'wa_channel' => 'https://whatsapp.com/channel/kedaikyuti',
+        ],
     ],
 
     // =========================================================================
-    // 2. DESIGN & WARNA TEMA (Point 3: Kustomisasi Warna Tampilan)
+    // 2. DESIGN & WARNA TEMA PINK PASTEL (Revisi Poin 3)
     // =========================================================================
     'theme' => [
-        // Warna Utama (Brand Color - Default: Merah Burgundy khas Kopi Kenangan)
-        'primary_color' => '#741213',
-        'primary_dark' => '#530B0C',
-        'primary_light' => '#9B1D1F',
+        // Warna Utama: Pink Pastel Aesthetic & Rose Feminine
+        'primary_color' => '#F472B6',      // Pink Pastel Elegan
+        'primary_dark' => '#DB2777',       // Rose Pink Deep untuk teks/tombol
+        'primary_light' => '#FDF2F4',      // Soft Pink Tint
         
         // Warna Aksen & Badge
-        'accent_color' => '#E11D48',
-        'gold_color' => '#D97706',
-        'gold_light' => '#FDE68A',
+        'accent_color' => '#FB7185',       // Rose Accent
+        'gold_color' => '#F59E0B',
+        'gold_light' => '#FEF3C7',
         
         // Warna Background Halaman (Light Mode)
-        'bg_page' => '#FBF8F3',
-        'bg_card' => '#FFFFFF',
-        'bg_card_subtle' => '#F6F2EC',
+        'bg_page' => '#FFF5F7',            // Pastel Pink Soft Creamy
+        'bg_card' => '#FFFFFF',            // Kartu Putih Bersih
+        'bg_card_subtle' => '#FCE7F3',     // Kartu Aksen Pink Halus
+        'border_color' => '#FBCFE8',       // Garis Border Pastel
     ],
 
     // =========================================================================
-    // 3. PENGATURAN JAM OPERASIONAL OUTLET (Point 1)
+    // 3. PENGATURAN BIAYA TAMBAHAN (Revisi Poin 8 & 10)
     // =========================================================================
-    'outlets' => [
-        // Auto Time Check:
-        // Jika true, aplikasi secara cerdas membaca jam operasional outlet (contoh 06:00 - 22:00)
-        // dan mencocokkan dengan jam saat ini (WIB). Jika di luar jam operasional, status
-        // otomatis menjadi "Tutup" dan label berganti menjadi merah.
-        'auto_time_check' => true,
+    'fees' => [
+        // Fee jika pesanan hanya 1 pcs / satuan (Poin 8: +2.000)
+        'single_item_fee' => 2000,
 
-        // Manual Hours Override:
-        // Anda bisa mengubah / menyesuaikan jam buka-tutup outlet tertentu di sini jika jam di API berbeda.
-        // Format: 'KODE_OUTLET' => 'JAM_BUKA - JAM_TUTUP'
-        'hours_override' => [
-            // Contoh:
-            // 'LA.CODEFIN' => '07:00 - 22:00',
-            // 'KK.SBY.RKABNGAN' => '06:00 - 23:00',
-        ],
-
-        // Manual Force Status:
-        // Paksa buka/tutup outlet tertentu secara manual jika sedang libur atau renovasi
-        // Format: 'KODE_OUTLET' => true (selalu buka) atau false (tutup sementara)
-        'force_status' => [
-            // 'LA.CODEFIN' => true,
-        ],
+        // Pilihan kantung belanja plastik (Poin 10: +1.000)
+        'plastic_bag_fee' => 1000,
     ],
 
     // =========================================================================
-    // 4. PENGATURAN STOK MENU (Point 2: Stok Real-Time & Manual Override)
+    // 4. PENGATURAN HARGA & FEE FORMULA (Revisi Poin 7)
+    // Formula: (Harga Asli Kopken - 50% + Fee)
     // =========================================================================
-    'stock' => [
-        // Cache refresh rate (dalam detik). 60 detik memastikan stok dari aplikasi Kopi Kenangan selalu up-to-date
-        'ttl_seconds' => 60,
+    'pricing' => [
+        // Diskon persen dari harga asli outlet (contoh: 50%)
+        'discount_percent' => 50,
 
-        // Manual Stock Override:
-        // Anda bisa memaksa status ketersediaan menu tertentu:
-        // Format: 'key_menu' => true (Habis) / false (Tersedia)
-        'overrides' => [
-            // 'kopken_mantan' => false,      // false = Selalu Tersedia
-            // 'toast_choco_cheese' => true,  // true = Paksa Habis
+        // Fee default per item (contoh: +5.000)
+        'default_markup' => 5000,
+
+        // Fee per Kategori (Contoh: Food +4.500, Minuman +5.000)
+        'category_markups' => [
+            'Coffee' => 5000,
+            'Non Coffee' => 5000,
+            'Frappe' => 5000,
+            'Food' => 4500,
+            'Bundling' => 0,
         ],
-    ],
 
-    // =========================================================================
-    // 5. PENGATURAN HARGA & PENAMBAHAN MENU BARU (Point 3)
-    // =========================================================================
-    'menu' => [
-        // Kenaikan Harga Global (Contoh: isi 2000 untuk menaikkan harga semua menu Rp 2.000, atau 0 untuk harga asli)
-        'global_price_markup' => 0,
+        // Fee khusus per Menu (Contoh: Kopi Kenangan Mantan +6.000)
+        // Format: 'key_menu' => fee_tambahan
+        'item_markup_overrides' => [
+            'kopken_mantan' => 6000, // Kopi Kenangan Mantan +6.000
+        ],
 
-        // Ubah Harga Satuan per Menu (Price Override)
-        // Format: 'key_menu' => harga_baru (angka tanpa tanda titik)
+        // Override Harga Tetap Manual (jika ada menu yang ingin dipatok harga fix)
         'price_overrides' => [
-            // 'kopken_mantan' => 15000,      // Ubah harga Kopi Mantan jadi Rp 15.000
-            // 'creamy_aren_latte' => 17000,  // Ubah harga Aren Latte jadi Rp 17.000
+            // 'key_menu' => harga_fix
         ],
+    ],
 
-        // TAMBAH MENU BARU CUSTOM:
-        // Anda bisa menambahkan menu baru di sini. Menu baru ini akan otomatis muncul
-        // di kategori yang sesuai, bisa dicari di search bar, bisa dikustomisasi (es/gula),
-        // bisa masuk keranjang, dan tercetak di nota WhatsApp!
-        'custom_items' => [
-            [
-                'key' => 'custom_matcha_espresso',
-                'name' => 'Matcha Espresso Fusion',
-                'category' => 'Coffee', // Pilihan: Coffee, Non Coffee, Frappe, Food
-                'price' => 22000,
-                'normalPrice' => 26000,
-                'desc' => 'Kombinasi unik matcha Jepang murni dengan espresso arabika pilihan dan susu segar creamy legit.',
-                'img' => 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=400',
-                'isSoldOut' => false, // Ubah ke true jika stok menu ini sedang habis
-                'tag' => 'MENU BARU',
-                'options' => [
-                    'sizes' => ['Regular', 'Large'],
-                    'temps' => ['Ice', 'Hot'],
-                    'ices' => ['Normal Ice', 'Less Ice'],
-                    'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
+    // =========================================================================
+    // 5. MENU BUNDLING HEMAT (Revisi Poin 12)
+    // =========================================================================
+    'bundling_items' => [
+        [
+            'key' => 'bundle_duo_bestie',
+            'name' => 'Bundling Bestie Duo (2 Minuman)',
+            'category' => 'Bundling',
+            'price' => 26000,
+            'normalPrice' => 38000,
+            'desc' => 'Paket hemat 2 cup minuman reguler favorit untuk berdua! Bebas pilih varian minuman.',
+            'img' => 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?w=400',
+            'tag' => 'BEST SELLER BUNDLE',
+            'isSoldOut' => false,
+            'slots' => [
+                [
+                    'label' => 'Minuman 1 (Reguler)',
+                    'options' => [
+                        'Kopi Kenangan Mantan',
+                        'Creamy Aren Latte',
+                        'Spanish Latte',
+                        'Americano',
+                        'Taro Cloud Milk Tea',
+                        'Kenangan Milk Tea'
+                    ]
+                ],
+                [
+                    'label' => 'Minuman 2 (Reguler)',
+                    'options' => [
+                        'Kopi Kenangan Mantan',
+                        'Creamy Aren Latte',
+                        'Spanish Latte',
+                        'Americano',
+                        'Taro Cloud Milk Tea',
+                        'Kenangan Milk Tea'
+                    ]
                 ],
             ],
-            [
-                'key' => 'custom_croissant_butter',
-                'name' => 'Artisan Butter Croissant',
-                'category' => 'Food',
-                'price' => 14000,
-                'normalPrice' => 18000,
-                'desc' => 'Croissant panggang gurih berlapis mentega Prancis harum. Teman sempurna untuk secangkir kopi.',
-                'img' => 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400',
-                'isSoldOut' => false,
-                'tag' => 'FAVORIT',
-                'options' => [],
-            ],
+            'options' => [
+                'ices' => ['Normal Ice', 'Less Ice'],
+                'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
+            ]
         ],
+        [
+            'key' => 'bundle_trio_kenangan',
+            'name' => 'Bundling Trio Kenangan (3 Minuman)',
+            'category' => 'Bundling',
+            'price' => 39000,
+            'normalPrice' => 57000,
+            'desc' => 'Paket 3 cup minuman reguler terlaris. Cocok untuk teman nongkrong atau traktiran bestie!',
+            'img' => 'https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400',
+            'tag' => 'HEMAT BER-3',
+            'isSoldOut' => false,
+            'slots' => [
+                [
+                    'label' => 'Minuman 1 (Reguler)',
+                    'options' => ['Kopi Kenangan Mantan', 'Creamy Aren Latte', 'Spanish Latte', 'Taro Cloud Milk Tea']
+                ],
+                [
+                    'label' => 'Minuman 2 (Reguler)',
+                    'options' => ['Kopi Kenangan Mantan', 'Creamy Aren Latte', 'Spanish Latte', 'Taro Cloud Milk Tea']
+                ],
+                [
+                    'label' => 'Minuman 3 (Reguler)',
+                    'options' => ['Kopi Kenangan Mantan', 'Creamy Aren Latte', 'Spanish Latte', 'Taro Cloud Milk Tea']
+                ],
+            ],
+            'options' => [
+                'ices' => ['Normal Ice', 'Less Ice'],
+                'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
+            ]
+        ],
+        [
+            'key' => 'bundle_coffee_toast',
+            'name' => 'Bundling Coffee & Toast Combo',
+            'category' => 'Bundling',
+            'price' => 22000,
+            'normalPrice' => 32000,
+            'desc' => 'Kombinasi 1 Kopi Kenangan Mantan (Ice/Hot) + 1 Roti Coklat Klasik atau Toast hangat gurih.',
+            'img' => 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400',
+            'tag' => 'COMBO SARAPAN',
+            'isSoldOut' => false,
+            'slots' => [
+                [
+                    'label' => 'Pilihan Minuman',
+                    'options' => ['Kopi Kenangan Mantan', 'Creamy Aren Latte', 'Americano']
+                ],
+                [
+                    'label' => 'Pilihan Roti / Snack',
+                    'options' => ['Roti Coklat Klasik', 'Roti Keju Manis', 'Choco Chip Cookies', 'Donut Almond']
+                ],
+            ],
+            'options' => [
+                'ices' => ['Normal Ice', 'Less Ice'],
+                'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
+            ]
+        ],
+    ],
+
+    // =========================================================================
+    // 6. JAM OPERASIONAL OUTLET
+    // =========================================================================
+    'outlets' => [
+        'auto_time_check' => true,
+        'hours_override' => [],
+        'force_status' => [],
+    ],
+
+    // =========================================================================
+    // 7. PENGATURAN STOK MENU
+    // =========================================================================
+    'stock' => [
+        'ttl_seconds' => 60,
+        'overrides' => [],
     ],
 
     // External Live API Endpoint
@@ -175,10 +261,6 @@ $config = [
 
 /**
  * Helper function to retrieve configuration values using dot notation
- *
- * @param string $key e.g. 'store.admin_phone'
- * @param mixed $default
- * @return mixed
  */
 function config(string $key, $default = null)
 {

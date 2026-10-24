@@ -1,30 +1,33 @@
 <?php
-$storeTitle = config('store.name', 'Kopi Kenangan Live Store');
-$logoText = config('store.logo_text', 'KK');
+$storeTitle = config('store.name', 'Kedai Kyuti');
+$domainName = config('store.domain', 'kedaikyuti.my.id');
+$tagline = config('store.tagline', 'JASDOR KOPI KENANGAN');
+$logoText = config('store.logo_text', '୨୧');
 $logoImg = config('store.logo_image');
 
-// Dynamic theme colors from config.php
-$primaryColor = config('theme.primary_color', '#741213');
-$primaryDark = config('theme.primary_dark', '#530B0C');
-$primaryLight = config('theme.primary_light', '#9B1D1F');
-$accentColor = config('theme.accent_color', '#E11D48');
-$goldColor = config('theme.gold_color', '#D97706');
-$bgPage = config('theme.bg_page', '#FBF8F3');
+// Dynamic theme colors from config.php (Pink Pastel Theme)
+$primaryColor = config('theme.primary_color', '#F472B6');
+$primaryDark = config('theme.primary_dark', '#DB2777');
+$primaryLight = config('theme.primary_light', '#FDF2F4');
+$accentColor = config('theme.accent_color', '#FB7185');
+$goldColor = config('theme.gold_color', '#F59E0B');
+$bgPage = config('theme.bg_page', '#FFF5F7');
 $bgCard = config('theme.bg_card', '#FFFFFF');
-$bgCardSubtle = config('theme.bg_card_subtle', '#F6F2EC');
+$bgCardSubtle = config('theme.bg_card_subtle', '#FCE7F3');
+$borderColor = config('theme.border_color', '#FBCFE8');
 ?>
 <!DOCTYPE html>
 <html lang="id" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title><?= htmlspecialchars($storeTitle) ?> — Cek Outlet & Stok Real-Time</title>
-    <meta name="description" content="Aplikasi pemesanan dan monitoring stok real-time outlet Kopi Kenangan Indonesia. Cek ketersediaan menu, promo harga, dan pesan langsung via WhatsApp.">
+    <title><?= htmlspecialchars($storeTitle) ?> (<?= htmlspecialchars($domainName) ?>) — <?= htmlspecialchars($tagline) ?></title>
+    <meta name="description" content="Kedai Kyuti (kedaikyuti.my.id) - Jasa Titip Order (Jasdor) Kopi Kenangan Murah. Diskon 50% + fee hemat, stok real-time, pesan via WhatsApp.">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;1,700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
 
     <!-- Native Stylesheet -->
     <link rel="stylesheet" href="assets/css/style.css">
@@ -40,6 +43,7 @@ $bgCardSubtle = config('theme.bg_card_subtle', '#F6F2EC');
             --bg-page: <?= htmlspecialchars($bgPage) ?> !important;
             --bg-card: <?= htmlspecialchars($bgCard) ?> !important;
             --bg-card-subtle: <?= htmlspecialchars($bgCardSubtle) ?> !important;
+            --border-color: <?= htmlspecialchars($borderColor) ?> !important;
         }
         .custom-brand-logo {
             max-height: 38px;
@@ -52,22 +56,21 @@ $bgCardSubtle = config('theme.bg_card_subtle', '#F6F2EC');
 <body>
 
 <div class="app-container">
-    <!-- Top Navigation -->
+    <!-- Top Navigation Bar -->
     <header class="topnav">
         <div class="topnav-left">
-            <a href="index.php" class="brand-logo-wrap">
-                <?php if (!empty($logoImg)): ?>
-                    <img class="custom-brand-logo" src="<?= htmlspecialchars($logoImg) ?>" alt="<?= htmlspecialchars($storeTitle) ?>">
-                <?php else: ?>
-                    <div class="brand-badge"><?= htmlspecialchars($logoText) ?></div>
-                <?php endif; ?>
+            <button class="nav-hub-btn" id="navHubToggleBtn" type="button" title="Menu Utama / Hub">
+                <span class="brand-badge"><?= htmlspecialchars($logoText) ?></span>
                 <div class="brand-text">
                     <h1><?= htmlspecialchars($storeTitle) ?></h1>
-                    <span><span class="live-dot"></span> Real-Time Outlet & Stok</span>
+                    <span>🌸 <?= htmlspecialchars($tagline) ?></span>
                 </div>
-            </a>
+            </button>
         </div>
         <div class="topnav-actions">
+            <button class="icon-btn" id="openWelcomeBtn" title="Baca Informasi / Aturan Order" aria-label="Info Order">
+                <span style="font-size:16px;">🌷</span>
+            </button>
             <button class="icon-btn" id="trackOrderBtn" title="Lacak Pesanan" aria-label="Lacak Pesanan">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6a8.3 8.3 0 0 1-1.1-4.4A8.5 8.5 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg>
             </button>
