@@ -237,12 +237,67 @@ $config = [
     ],
 
     // =========================================================================
-    // 6. JAM OPERASIONAL OUTLET
+    // 6. JAM OPERASIONAL & DAFTAR OUTLET PREMIUM
     // =========================================================================
     'outlets' => [
         'auto_time_check' => true,
         'hours_override' => [],
         'force_status' => [],
+
+        // Daftar Outlet Premium yang dikonfirmasi Klien
+        'premium_list' => [
+            'buaran serpong',
+            'bintaro sektor 9',
+            'galuh mas karawang',
+            'gandaria kramat pela',
+            'matraman',
+            'sopo del',
+            'kota baru jogja',
+            'jemursari',
+            'ahmad yani surabaya',
+            'cikajang',
+            'sahid sudirman',
+            'sahid sudirmam',
+            'ahmad muksin tenggarong',
+            'danau semayang',
+            'ruko mangga berau',
+            'pecenongan',
+            'rawa belong',
+            'summarecon bogor',
+            'keprabon',
+            'summarecon digital center',
+            'cihampelas walk',
+            'pim 2',
+            'pim 3',
+            'teras kota',
+        ],
+
+        // Kode Outlet Premium terdaftar
+        'premium_codes' => [
+            'KK.KWG.GLHMAS',       // Galuh Mas Karawang
+            'KK.TNG.RKBARNSRPG',   // Buaran Serpong
+            'KK.TNG.BNTROSKTR9',   // Bintaro Sektor 9
+            'KK.JKT.GNDRKRMTPL',   // Gandaria Kramat Pela
+            'KK.JKT.RKMTRMNJT',    // Ruko Matraman Jakarta Timur
+            'SOPODEL',             // Sopo Del Tower
+            'KK.YYK.BNTRBDYA',     // Kota Baru Jogja
+            'KK.SBY.JMSRI',        // Jemursari Surabaya
+            'SBY.AHMDYNMJO',       // Ahmad Yani Surabaya
+            'KK.JKT.CKJNG',        // Cikajang
+            'SAHID',               // Sahid Sudirman
+            'KK.TRG.RKAMDMKSIN',   // Ruko Ahmad Muksin Tenggarong
+            'DOCOKK.TRG.DNUSMYNG', // Danau Semayang Tenggarong
+            'KK.TNR.RKMNGABRUKT',  // Ruko Mangga Berau
+            'KK.JKT.RKPCNGAN',     // Ruko Pecenongan Jakarta Pusat
+            'KK.JKT.RWBLNGJKT',    // Rawa Belong Jakarta
+            'KK.BGR.SMBGR',        // Summarecon Bogor
+            'KK.SKT.KPRABN',       // Keprabon Surakarta
+            'TGR.SDCSERPONG',      // Summarecon Digital Center (SDC Serpong)
+            'BDG.CHMPLSWK',        // Cihampelas Walk
+            'JKT.CFPIM2',          // PIM 2
+            'JKT.FCPIM3',          // Food Court PIM 3
+            'TGR.TERASKOTA',       // Teras Kota
+        ],
     ],
 
     // =========================================================================

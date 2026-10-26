@@ -129,13 +129,32 @@ class KopiKenanganApi
         $category = strtolower($outlet['category'] ?? '');
         $name = strtolower($outlet['name'] ?? '');
         $address = strtolower($outlet['address'] ?? '');
+        $code = strtoupper($outlet['code'] ?? '');
         $combined = $category . ' ' . $name . ' ' . $address;
 
-        // Gas stations / SPBU (Shell, Pertamina, BP, SPBU) are regular outlets, NOT premium
+        // 1. Check verified client premium outlet codes
+        $premiumCodes = config('outlets.premium_codes', []);
+        if (in_array($code, $premiumCodes, true)) {
+            return true;
+        }
+
+        // 2. Check verified client premium outlet names
+        $premiumList = config('outlets.premium_list', []);
+        foreach ($premiumList as $pName) {
+            $pLower = strtolower(trim($pName));
+            if ($pLower !== '' && str_contains($name, $pLower)) {
+                // If Shell Galuhmas, it's not the shop house Galuh Mas Karawang
+                if ($pLower === 'galuh mas karawang' && (str_contains($name, 'shell') || str_contains($category, 'gas station'))) {
+                    continue;
+                }
+                return true;
+            }
+        }
+
+        // 3. Gas stations / SPBU (Shell, Pertamina, BP, SPBU) are regular outlets, NOT premium
         $isGasStation = str_contains($category, 'gas station')
             || str_contains($combined, 'spbu')
             || str_contains($combined, 'pom bensin')
-            || str_contains($name, 'shell ')
             || str_starts_with($name, 'shell')
             || str_starts_with($name, 'pertamina')
             || str_starts_with($name, 'bp ');
@@ -144,12 +163,12 @@ class KopiKenanganApi
             return false;
         }
 
-        // Upstream explicit indicator (if provided and not gas station)
+        // 4. Upstream explicit indicator (if provided and not gas station)
         if (!empty($outlet['isPremium']) || !empty($outlet['premium'])) {
             return true;
         }
 
-        // Keywords for actual premium outlets (Mall, Bandara, Stasiun Kereta Api, etc.)
+        // 5. Keywords for actual premium outlets (Mall, Bandara, Stasiun Kereta Api, etc.)
         $premiumKeywords = [
             'mall', 'plaza', 'bandara', 'airport', 'stasiun', 'train station',
             'railway station', 'terminal bandara', 'grand indonesia', 'tunjungan plaza',
@@ -248,11 +267,16 @@ class KopiKenanganApi
         $response = $this->httpRequest($url, ['outlet' => $outletCode]);
 
         if ($response && isset($response['items'])) {
+            $isPremium = !empty($response['premium']);
+            if (!$isPremium) {
+                $isPremium = $this->checkIsPremiumOutlet(['code' => $outletCode, 'name' => $outletCode]);
+            }
+
             $result = [
                 'success' => true,
                 'live' => $response['live'] ?? true,
                 'isClosed' => $response['isClosed'] ?? false,
-                'premium' => $response['premium'] ?? false,
+                'premium' => $isPremium,
                 'brand' => 'kopken',
                 'outletCode' => $outletCode,
                 'categories' => $response['categories'] ?? [
@@ -345,9 +369,21 @@ class KopiKenanganApi
                 $fee = $defaultMarkup;
             }
 
-            // Apply Formula: (Harga Asli - 50% + Fee)
-            $discountedBase = $origPrice * (1 - ($discountPercent / 100));
-            $calculatedPrice = round($discountedBase + $fee);
+            // Fee difference from default markup (if user configures a custom fee per category or item)
+            $feeDelta = $fee - $defaultMarkup;
+
+            // Raw price from API
+            $rawApiPrice = isset($item['price']) ? (float)$item['price'] : 0;
+
+            if ($rawApiPrice > 0) {
+                // Upstream API provides the exact discounted jasdor price!
+                // If there is a fee override (e.g. +6.000 instead of default +5.000), apply the delta
+                $calculatedPrice = round($rawApiPrice + $feeDelta);
+            } else {
+                // Fallback Formula: (Harga Asli - 50% + Fee)
+                $discountedBase = $origPrice * (1 - ($discountPercent / 100));
+                $calculatedPrice = round($discountedBase + $fee);
+            }
 
             // Manual fixed price override if configured (by key or name)
             foreach ($priceOverrides as $pKey => $pPrice) {
@@ -361,11 +397,32 @@ class KopiKenanganApi
             $item['price'] = $calculatedPrice;
             $item['normalPrice'] = $origPrice;
 
-            // Handle Large Price if available
-            if (!empty($item['largePrice'])) {
-                $origLarge = (float) ($item['largeNormal'] ?? $item['largePrice']);
-                $item['largePrice'] = round(($origLarge * (1 - ($discountPercent / 100))) + $fee);
-                $item['largeNormal'] = $origLarge;
+            // Handle Large Price if available or if size options include Large
+            $hasLargeSize = !empty($item['largePrice']) || (isset($item['options']['sizes']) && in_array('Large', (array)$item['options']['sizes'], true));
+
+            if ($hasLargeSize) {
+                $rawApiLarge = !empty($item['largePrice']) ? (float)$item['largePrice'] : 0;
+                if ($rawApiLarge > 0) {
+                    // Upstream API provides the exact large price! Apply delta if fee is overridden
+                    $calcLarge = round($rawApiLarge + $feeDelta);
+                } else {
+                    $calcLarge = $calculatedPrice + 3500;
+                }
+
+                // Ensure large price is strictly higher than regular price
+                if ($calcLarge <= $calculatedPrice) {
+                    $calcLarge = $calculatedPrice + 3500;
+                }
+
+                $item['largePrice'] = $calcLarge;
+
+                // Calculate largeNormal for crossed-out price display
+                if (!empty($item['largeNormal'])) {
+                    $item['largeNormal'] = (float) $item['largeNormal'];
+                } else {
+                    $largeDelta = $calcLarge - $calculatedPrice;
+                    $item['largeNormal'] = round($origPrice + ($largeDelta * 2));
+                }
             }
 
             // Guarantee image fallback

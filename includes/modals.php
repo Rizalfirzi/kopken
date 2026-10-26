@@ -47,12 +47,11 @@
             <div class="wc-thankyou">
                 🩰 <i>𝒯𝒽𝒶𝓃𝓀 𝓎𝑜𝓊 𝒻𝑜𝓇 𝒸𝒽𝑜𝑜𝓈𝒾𝓃𝑔 𝓀𝑒𝒹𝒶𝒾 𝓀𝓎𝓊𝓉𝒾!</i> 🩰
             </div>
-            <p class="wc-sub-prompt">Okii, pilih outlet dulu ♡</p>
         </div>
 
         <div class="wc-action">
             <button class="btn btn-primary btn-block wc-btn" id="closeWelcomeModalBtn" type="button">
-                <span>Okii, pilih outlet dulu ♡</span>
+                <span>Yuk, lanjut order kyuties! ♡</span>
             </button>
         </div>
     </div>

@@ -27,7 +27,9 @@ window.INITIAL_DATA = {
     adminPhone: <?= json_encode($adminPhone ?? '6288298374458') ?>,
     singleItemFee: <?= (int) config('fees.single_item_fee', 2000) ?>,
     plasticBagFee: <?= (int) config('fees.plastic_bag_fee', 1000) ?>,
-    bundlingItems: <?= json_encode(config('bundling_items', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+    bundlingItems: <?= json_encode(config('bundling_items', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+    premiumList: <?= json_encode(config('outlets.premium_list', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+    premiumCodes: <?= json_encode(config('outlets.premium_codes', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
 };
 </script>
 

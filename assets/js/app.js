@@ -175,9 +175,10 @@ function isPremiumOutlet(outlet) {
     const cat = (outlet.category || '').toLowerCase();
     const name = (outlet.name || '').toLowerCase();
     const addr = (outlet.address || '').toLowerCase();
+    const code = (outlet.code || '').toUpperCase();
     const combined = `${cat} ${name} ${addr}`;
 
-    // Gas station / SPBU (Shell, Pertamina, BP, SPBU) are regular outlets, NEVER premium
+    // 1. Gas station / SPBU (Shell, Pertamina, BP, SPBU) are regular outlets, NEVER premium
     const isGasStation = cat.includes('gas station')
         || combined.includes('spbu')
         || combined.includes('pom bensin')
@@ -189,10 +190,41 @@ function isPremiumOutlet(outlet) {
         return false;
     }
 
-    if ((outlet.isPremium === true || outlet.premium === true) && !isGasStation) {
+    // 2. Check verified client premium outlet codes
+    const premiumCodes = window.INITIAL_DATA?.premiumCodes || [
+        'KK.KWG.GLHMAS', 'KK.TNG.RKBARNSRPG', 'KK.TNG.BNTROSKTR9', 'KK.JKT.GNDRKRMTPL',
+        'KK.JKT.RKMTRMNJT', 'SOPODEL', 'KK.YYK.BNTRBDYA', 'KK.SBY.JMSRI',
+        'SBY.AHMDYNMJO', 'KK.JKT.CKJNG', 'SAHID', 'KK.TRG.RKAMDMKSIN',
+        'DOCOKK.TRG.DNUSMYNG', 'KK.TNR.RKMNGABRUKT', 'KK.JKT.RKPCNGAN', 'KK.JKT.RWBLNGJKT',
+        'KK.BGR.SMBGR', 'KK.SKT.KPRABN', 'TGR.SDCSERPONG', 'BDG.CHMPLSWK',
+        'JKT.CFPIM2', 'JKT.FCPIM3', 'TGR.TERASKOTA'
+    ];
+    if (premiumCodes.includes(code)) {
         return true;
     }
 
+    // 3. Check verified client premium outlet names
+    const premiumList = window.INITIAL_DATA?.premiumList || [
+        'buaran serpong', 'bintaro sektor 9', 'galuh mas karawang', 'gandaria kramat pela',
+        'matraman', 'sopo del', 'kota baru jogja', 'jemursari', 'ahmad yani surabaya',
+        'cikajang', 'sahid sudirman', 'ahmad muksin tenggarong', 'danau semayang',
+        'ruko mangga berau', 'pecenongan', 'rawa belong', 'summarecon bogor',
+        'keprabon', 'summarecon digital center', 'cihampelas walk', 'pim 2', 'pim 3', 'teras kota'
+    ];
+    for (const pName of premiumList) {
+        const pLower = pName.toLowerCase();
+        if (name.includes(pLower) || combined.includes(pLower)) {
+            if (pLower.includes('galuh mas') && isGasStation) continue;
+            return true;
+        }
+    }
+
+    // 4. API explicit indicator
+    if (outlet.isPremium === true || outlet.premium === true) {
+        return true;
+    }
+
+    // 5. Mall / Airport / Railway keywords
     const keywords = [
         'mall', 'plaza', 'bandara', 'airport', 'stasiun', 'train station',
         'railway station', 'terminal bandara', 'grand indonesia', 'tunjungan plaza',
@@ -430,6 +462,13 @@ function fetchMenu(outletCode, forceRefresh = false) {
         .then(res => res.json())
         .then(data => {
             AppState.menu = data;
+
+            // Sync outlet premium status from API response
+            if (typeof data.premium !== 'undefined' && AppState.outlet) {
+                AppState.outlet.isPremium = Boolean(data.premium);
+                AppState.outlet.premium = Boolean(data.premium);
+                updateOutletHeader();
+            }
 
             const totalEl = document.getElementById('statTotalItems');
             const readyEl = document.getElementById('statReadyItems');
@@ -704,17 +743,36 @@ function openProductModal(item) {
     if (nameEl) nameEl.textContent = item.name;
     if (catEl) catEl.textContent = item.category || 'Coffee';
     if (descEl) descEl.textContent = item.desc || '';
-    if (priceEl) priceEl.textContent = formatRp(item.price);
-    if (normalPriceEl) normalPriceEl.textContent = item.normalPrice ? formatRp(item.normalPrice) : '';
     if (imgEl) imgEl.src = item.img || 'https://cdn.kopikenangan.com/public/da484154-47b1-a756-54a4-8b3490fb0eae';
     if (noteEl) noteEl.value = '';
     if (qtyValEl) qtyValEl.textContent = '1';
 
+    // Helper to dynamically update regular vs large price & crossed-out normal price (Revisi PDF)
+    const updateModalPrice = (sizeVal) => {
+        const isLarge = sizeVal === 'Large';
+        let currentPrice, currentNormal;
+
+        if (isLarge) {
+            currentPrice = item.largePrice ? item.largePrice : (item.price + 3500);
+            currentNormal = item.largeNormal ? item.largeNormal : (item.normalPrice ? item.normalPrice + 7000 : 0);
+        } else {
+            currentPrice = item.price;
+            currentNormal = item.normalPrice || 0;
+        }
+
+        if (priceEl) priceEl.textContent = formatRp(currentPrice);
+        if (normalPriceEl) {
+            normalPriceEl.textContent = currentNormal && currentNormal > currentPrice ? formatRp(currentNormal) : '';
+        }
+    };
+
+    // Initialize price display with selected size
+    updateModalPrice(AppState.selectedSize);
+
     // Build Option Pills
     renderOptionPills('optGroupSize', 'optPillsSize', item.options?.sizes || ['Regular', 'Large'], AppState.selectedSize, (val) => {
         AppState.selectedSize = val;
-        const currentPrice = val === 'Large' && item.largePrice ? item.largePrice : item.price;
-        if (priceEl) priceEl.textContent = formatRp(currentPrice);
+        updateModalPrice(val);
     });
 
     renderOptionPills('optGroupTemp', 'optPillsTemp', item.options?.temps || ['Ice', 'Hot'], AppState.selectedTemp, (val) => {
@@ -782,7 +840,8 @@ if (addToCartBtn) {
         if (!AppState.selectedProduct) return;
 
         const item = AppState.selectedProduct;
-        const price = (AppState.selectedSize === 'Large' && item.largePrice) ? item.largePrice : item.price;
+        const isLarge = AppState.selectedSize === 'Large';
+        const price = isLarge ? (item.largePrice ? item.largePrice : (item.price + 3500)) : item.price;
         const note = document.getElementById('modalItemNote')?.value.trim() || '';
 
         const itemToAdd = {
