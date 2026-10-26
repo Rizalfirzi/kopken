@@ -19,6 +19,10 @@
       "dest": "/api/outlets.php"
     },
     {
+      "src": "/api/kopken/item/?",
+      "dest": "/api/item.php"
+    },
+    {
       "src": "/api/kopken/menu/([^/]+)/?",
       "dest": "/api/menu.php?outlet=$1"
     },

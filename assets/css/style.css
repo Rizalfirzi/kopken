@@ -1383,6 +1383,97 @@ body {
     border-color: var(--brand-primary-dark);
 }
 
+/* Dynamic Options & Addons (Topping & Syrup) */
+.opt-group {
+    margin-bottom: 14px;
+}
+
+.opt-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.opt-hint {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.opt-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.opt-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border-radius: var(--radius-full);
+    border: 1.5px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-main);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.opt-pill:hover {
+    border-color: var(--brand-primary);
+    background: var(--bg-card-subtle);
+}
+
+.opt-pill.active {
+    background: var(--brand-primary-dark);
+    color: #FFFFFF;
+    border-color: var(--brand-primary-dark);
+    box-shadow: 0 2px 8px rgba(225, 29, 72, 0.22);
+}
+
+.opt-pill small {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-muted);
+}
+
+.opt-pill.active small {
+    color: #FFE4E6;
+}
+
+.opt-pill.addon {
+    border-style: dashed;
+}
+
+.opt-pill.addon.active {
+    border-style: solid;
+}
+
+.opt-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 8px 0;
+}
+
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--brand-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
 /* Bundling Slot Box (Revisi Poin 12) */
 .bundle-slot-box {
     background: var(--bg-page);

@@ -4,6 +4,7 @@
 
     # API Routing Fallbacks
     RewriteRule ^api/kopken/outlets/?$ api/outlets.php [QSA,L]
+    RewriteRule ^api/kopken/item/?$ api/item.php [QSA,L]
     RewriteRule ^api/kopken/menu/([^/]+)/?$ api/menu.php?outlet=$1 [QSA,L]
     RewriteRule ^api/kopken/menu/?$ api/menu.php [QSA,L]
     RewriteRule ^api/kopken/track/([^/]+)/?$ api/track.php?code=$1 [QSA,L]

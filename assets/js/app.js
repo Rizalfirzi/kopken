@@ -35,6 +35,20 @@ const AppState = {
     bundleIce: 'Normal Ice',
     bundleSugar: 'Normal Sugar',
 
+    // Product Customization Sheet State (Addons & Options)
+    sheet: {
+        item: null,
+        groups: [],
+        prices: null,
+        normals: null,
+        sel: {},
+        qty: 1,
+        loading: false,
+        addons: [],
+        comboAddons: null,
+        picked: new Set(),
+    },
+
     // Pending Single Item for 1pcs Fee Modal
     pendingCartItem: null,
 };
@@ -48,8 +62,19 @@ if (AppState.outlet && AppState.outlet.code) {
     if (o && o.code) outletStore.set(o.code, o);
 });
 
-// Currency Formatting Helper
+// Currency & String Formatting Helpers
+const $ = (sel) => document.querySelector(sel);
 const formatRp = (num) => 'Rp ' + Number(num || 0).toLocaleString('id-ID');
+const esc = (str) => {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, s => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[s]));
+};
 
 // Toast Notification
 function showToast(msg) {
@@ -68,6 +93,15 @@ function openSheet(id) {
 function closeSheet(id) {
     const el = document.getElementById(id);
     if (el) el.classList.remove('active');
+    if (id === 'adminPricingSheet') {
+        if (typeof adminPricingState !== 'undefined') {
+            adminPricingState.activePasscode = '';
+        }
+        sessionStorage.removeItem('kyuti_admin_auth');
+        sessionStorage.removeItem('kyuti_admin_code');
+        const passInput = document.getElementById('adminPasscodeInput');
+        if (passInput) passInput.value = '';
+    }
 }
 
 document.querySelectorAll('[data-close]').forEach(btn => {
@@ -76,7 +110,7 @@ document.querySelectorAll('[data-close]').forEach(btn => {
 
 document.querySelectorAll('.sheet-backdrop').forEach(backdrop => {
     backdrop.addEventListener('click', (e) => {
-        if (e.target === backdrop) backdrop.classList.remove('active');
+        if (e.target === backdrop) closeSheet(backdrop.id);
     });
 });
 
@@ -172,6 +206,15 @@ if (navHubToggleBtn) {
 
 function isPremiumOutlet(outlet) {
     if (!outlet) return false;
+
+    // 0. If explicit verified boolean exists (from live menu Mantan price >= 22k), use it directly!
+    if (typeof outlet.isPremium === 'boolean') {
+        return outlet.isPremium;
+    }
+    if (typeof outlet.premium === 'boolean') {
+        return outlet.premium;
+    }
+
     const cat = (outlet.category || '').toLowerCase();
     const name = (outlet.name || '').toLowerCase();
     const addr = (outlet.address || '').toLowerCase();
@@ -224,18 +267,19 @@ function isPremiumOutlet(outlet) {
         return true;
     }
 
-    // 5. Mall / Airport / Railway keywords
+    // 5. Major Airport Terminals & verified transport hubs keywords
+    // Note: Generic 'mall' or 'plaza' are excluded because most malls have regular 19k price!
     const keywords = [
-        'mall', 'plaza', 'bandara', 'airport', 'stasiun', 'train station',
-        'railway station', 'terminal bandara', 'grand indonesia', 'tunjungan plaza',
-        'ciputra world', 'senayan city', 'pacific place', 'central park', 'pakuwon'
+        'terminal bandara', 'keberangkatan bandara', 'airport departure', 'bandara internasional',
+        'terminal 2d', 'terminal 2e', 'terminal 3 domestic', 'terminal 3 international',
+        'grand indonesia', 'senayan city', 'pacific place', 'tunjungan plaza 3', 'pim 3'
     ];
 
     return keywords.some(k => combined.includes(k));
 }
 
 function checkAndShowPremiumOutletAlert(outlet) {
-    if (isPremiumOutlet(outlet)) {
+    if (outlet?.isPremium) {
         const descEl = document.getElementById('premiumOutletDesc');
         if (descEl) {
             descEl.innerHTML = `Harga di <b id="premiumOutletNameText"></b> lebih mahal dari outlet biasa. Harga dan menu menyesuaikan. Untuk paket bundling tidak tersedia di outlet premium.`;
@@ -276,7 +320,7 @@ function updateOutletHeader() {
     if (sheetOutletEl) sheetOutletEl.textContent = AppState.outlet.name;
 
     if (premiumBadge) {
-        premiumBadge.style.display = isPremiumOutlet(AppState.outlet) ? 'inline-flex' : 'none';
+        premiumBadge.style.display = AppState.outlet?.isPremium ? 'inline-flex' : 'none';
     }
 }
 
@@ -291,7 +335,15 @@ function renderOutletList(items) {
     }
 
     items.forEach(o => {
-        if (o && o.code) outletStore.set(o.code, o);
+        if (o && o.code) {
+            const existing = outletStore.get(o.code);
+            if (existing && typeof existing.isPremium === 'boolean') {
+                o.isPremium = existing.isPremium;
+                o.premium = existing.isPremium;
+            } else {
+                outletStore.set(o.code, o);
+            }
+        }
     });
 
     container.innerHTML = items.map(o => {
@@ -372,8 +424,10 @@ window.selectOutlet = function(code) {
     closeSheet('outletSheet');
     showToast(`✓ Outlet aktif: ${found.name}`);
 
-    // Check if selected outlet is Premium and show alert (Revisi Poin 9)
-    checkAndShowPremiumOutletAlert(found);
+    // If already verified as Premium from previous menu fetch, show alert immediately
+    if (found.isPremium === true) {
+        checkAndShowPremiumOutletAlert(found);
+    }
 
     if (window.history && window.history.pushState) {
         const url = new URL(window.location.href);
@@ -463,11 +517,31 @@ function fetchMenu(outletCode, forceRefresh = false) {
         .then(data => {
             AppState.menu = data;
 
-            // Sync outlet premium status from API response
-            if (typeof data.premium !== 'undefined' && AppState.outlet) {
-                AppState.outlet.isPremium = Boolean(data.premium);
-                AppState.outlet.premium = Boolean(data.premium);
+            // Absolute Client Rule: Single source of truth is Kopi Kenangan Mantan normalPrice >= 22k
+            let isPrem = false;
+            if (Array.isArray(data.items)) {
+                const mantan = data.items.find(i => {
+                    const n = (i.name || '').toLowerCase();
+                    return n.includes('kenangan mantan') && !n.includes('oatside') && !n.includes('frappe') && !n.includes('bundl') && !n.includes('duo');
+                });
+                if (mantan) {
+                    const normalP = Number(mantan.normalPrice || mantan.outletPrice || 0);
+                    isPrem = normalP >= 22000;
+                } else {
+                    isPrem = Boolean(data.premium);
+                }
+            } else {
+                isPrem = Boolean(data.premium);
+            }
+
+            if (AppState.outlet) {
+                AppState.outlet.isPremium = isPrem;
+                AppState.outlet.premium = isPrem;
+                outletStore.set(AppState.outlet.code, AppState.outlet);
                 updateOutletHeader();
+                if (isPrem) {
+                    checkAndShowPremiumOutletAlert(AppState.outlet);
+                }
             }
 
             const totalEl = document.getElementById('statTotalItems');
@@ -483,6 +557,7 @@ function fetchMenu(outletCode, forceRefresh = false) {
             if (syncEl) syncEl.textContent = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
 
             renderMenu();
+            populateMenuDropdown();
             showToast(forceRefresh ? '✓ Stok outlet berhasil diperbarui!' : `Stok siap untuk ${AppState.outlet?.name}`);
         })
         .catch(() => {
@@ -720,22 +795,334 @@ if (addBundleToCartBtn) {
 }
 
 // =========================================================================
-// 5. PRODUCT MODAL & 1 PCS FEE CHECK (Revisi Poin 8)
+// 5. PRODUCT MODAL, ITEM OPTIONS & ADDONS (Topping & Syrup) (Revisi Poin 8)
 // =========================================================================
 
-function openProductModal(item) {
+function defaultAddons(item) {
+    const target = item || AppState.sheet?.item || AppState.selectedProduct;
+    if (target && (target.isFood || (target.category && target.category.toLowerCase().includes('food')))) {
+        return [];
+    }
+    if (window.INITIAL_DATA && Array.isArray(window.INITIAL_DATA.addons) && window.INITIAL_DATA.addons.length) {
+        return window.INITIAL_DATA.addons;
+    }
+    return [
+        {
+            id: '2905',
+            name: 'Topping',
+            hint: 'opsional, boleh lebih dari satu',
+            values: [
+                { id: '4099', text: 'Espresso Shot Kenangan Blend', price: 6000 },
+                { id: '4100', text: 'Boba', price: 5000 },
+                { id: '4101', text: 'Grass Jelly', price: 5000 },
+                { id: '4102', text: 'Coconut Jelly', price: 5000 },
+                { id: '4103', text: 'Coffee Jelly', price: 5000 },
+            ]
+        },
+        {
+            id: '2904',
+            name: 'Syrup',
+            hint: 'opsional, boleh lebih dari satu',
+            values: [
+                { id: '4079', text: 'Vanilla Syrup', price: 6000 },
+                { id: '4080', text: 'Hazelnut Syrup', price: 6000 },
+                { id: '4081', text: 'Caramel Syrup', price: 6000 },
+                { id: '4082', text: 'Salted Caramel Sauce', price: 6000 },
+                { id: '4083', text: 'Choco Sauce', price: 6000 },
+                { id: '4084', text: 'Butterscotch Sauce', price: 6000 },
+            ]
+        }
+    ];
+}
+
+function staticGroups(item) {
+    const o = item.options || {};
+    const isFood = item.isFood || (item.category && item.category.toLowerCase().includes('food'));
+    const groups = [];
+    const sizes = o.sizes?.length ? o.sizes : (!isFood ? ['Regular', 'Large'] : []);
+    if (sizes.length) {
+        groups.push({ id: 'size', key: 'size', name: 'Ukuran', values: sizes.map((v) => ({ id: v, text: v })), default: sizes[0], impact: true });
+    }
+    const temps = o.temps?.length ? o.temps : (!isFood ? ['Ice', 'Hot'] : []);
+    if (temps.length) {
+        groups.push({ id: 'temp', key: 'temp', name: 'Suhu', values: temps.map((v) => ({ id: v, text: v })), default: temps[0] });
+    }
+    const ices = o.ices?.length ? o.ices : (!isFood ? ['Normal Ice', 'Less Ice', 'No Ice'] : []);
+    if (ices.length) {
+        groups.push({ id: 'ice', key: 'ice', name: 'Level es', values: ices.map((v) => ({ id: v, text: v })), default: ices[0], hideWhen: { temp: 'Hot' } });
+    }
+    const sugars = o.sugars?.length ? o.sugars : (!isFood ? ['Normal Sugar', 'Less Sugar', 'No Sugar'] : []);
+    if (sugars.length) {
+        groups.push({ id: 'sugar', key: 'sugar', name: 'Level gula', values: sugars.map((v) => ({ id: v, text: v })), default: sugars[0] });
+    }
+    return groups;
+}
+
+function restoreSelection(choices = []) {
+    for (const c of choices || []) {
+        const g = AppState.sheet?.groups?.find((x) => x.name === c.group || x.key === c.group);
+        const v = g?.values.find((x) => x.text === c.value || x.id === c.value);
+        if (g && v) AppState.sheet.sel[g.id] = v.id;
+        const a = AppState.sheet?.addons?.find((x) => x.name === c.group || x.id === c.group);
+        const av = a?.values.find((x) => `+${x.text}` === c.value || x.text === c.value || x.id === c.value);
+        if (a && av) AppState.sheet.picked.add(`${a.id}:${av.id}`);
+    }
+}
+
+/** Add-on values the current variant allows (official add-ons depend on the combination). */
+function availableAddons() {
+    const sh = AppState.sheet;
+    if (!sh) return [];
+    const allowed = sh.comboAddons && sh.prices ? new Set(sh.comboAddons[comboKey(sh.sel)] || []) : null;
+    const list = (sh.addons && sh.addons.length) ? sh.addons : defaultAddons(sh.item);
+    return list
+        .map((a) => ({ ...a, values: a.id === 'extras' || !allowed ? a.values : a.values.filter((v) => allowed.has(v.id)) }))
+        .filter((a) => a.values && a.values.length);
+}
+
+function addonTotal() {
+    let t = 0;
+    for (const a of availableAddons()) {
+        for (const v of a.values) {
+            if (AppState.sheet?.picked?.has(`${a.id}:${v.id}`)) t += Number(v.price || 0);
+        }
+    }
+    return t;
+}
+
+const impactGroups = () => (AppState.sheet?.groups || []).filter((g) => g.impact && AppState.sheet?.prices);
+const comboKey = (sel) => impactGroups().map((g) => sel[g.id]).join('|');
+
+/** Price of the chosen variant, without add-ons. */
+function unitPrice(sel = AppState.sheet?.sel) {
+    const sh = AppState.sheet;
+    if (!sh || !sh.item) return 0;
+    const { item, prices } = sh;
+    if (prices) return prices[comboKey(sel)] ?? null;
+    if (sel?.size === 'Large' && item.largePrice) return item.largePrice;
+    return item.price;
+}
+
+/** Pre-discount price of the chosen variant (for the strike-through), or null. */
+function normalPrice(sel = AppState.sheet?.sel) {
+    const sh = AppState.sheet;
+    if (!sh || !sh.item) return null;
+    const { item, normals, prices } = sh;
+    if (prices) return normals ? normals[comboKey(sel)] ?? null : null;
+    if (sel?.size === 'Large' && item.largePrice) return item.largeNormal || null;
+    return item.normalPrice || null;
+}
+
+function ensureValidCombo(changedGroup) {
+    const sh = AppState.sheet;
+    if (!sh) return;
+    const { prices, sel } = sh;
+    if (!prices || prices[comboKey(sel)] != null) return;
+    // Pick the available combination closest to the current selection
+    const ids = impactGroups().map((g) => g.id);
+    let best = null;
+    let bestScore = -1;
+    for (const k of Object.keys(prices)) {
+        const vals = k.split('|');
+        if (changedGroup && vals[ids.indexOf(changedGroup)] !== sel[changedGroup]) continue;
+        const score = vals.reduce((a, v, i) => a + (sel[ids[i]] === v ? 1 : 0), 0);
+        if (score > bestScore) [best, bestScore] = [vals, score];
+    }
+    if (best) ids.forEach((id, i) => (sel[id] = best[i]));
+}
+
+function selectOption(gid, vid) {
+    if (!AppState.sheet) return;
+    AppState.sheet.sel[gid] = vid;
+    ensureValidCombo(gid);
+    renderOptions();
+}
+
+function isHidden(g, sel) {
+    return Object.entries(g.hideWhen || {}).some(([gid, vid]) => sel[gid] === vid);
+}
+
+const GROUP_LABELS = {
+    Temperature: 'Suhu',
+    Size: 'Ukuran',
+    Beans: 'Biji kopi',
+    'Milk Option': 'Susu',
+    'Sugar Level': 'Level gula',
+    'Ice Level': 'Level es'
+};
+
+function renderOptions() {
+    const sh = AppState.sheet;
+    if (!sh || !sh.item) return;
+
+    const base = unitPrice();
+    const html = (sh.groups || [])
+        .filter((g) => !isHidden(g, sh.sel))
+        .map((g) => {
+            const pills = g.values.map((v) => {
+                let extra = '';
+                let disabled = false;
+                if (g.impact) {
+                    const p = unitPrice({ ...sh.sel, [g.id]: v.id });
+                    if (sh.prices && p == null) {
+                        disabled = !Object.keys(sh.prices).some((k) => k.split('|')[impactGroups().findIndex((x) => x.id === g.id)] === v.id);
+                    } else if (p != null && base != null && p !== base && sh.sel[g.id] !== v.id) {
+                        extra = `<small>${p > base ? '+' : '−'}${formatRp(Math.abs(p - base))}</small>`;
+                    }
+                }
+                return `<button type="button" class="opt-pill ${sh.sel[g.id] === v.id ? 'active' : ''}" data-g="${esc(g.id)}" data-v="${esc(v.id)}" aria-pressed="${sh.sel[g.id] === v.id}" ${disabled ? 'disabled' : ''}>${esc(v.text)}${extra}</button>`;
+            });
+            return `<div class="opt-group" role="group" aria-label="${esc(GROUP_LABELS[g.name] || g.name)}"><div class="opt-title">${esc(GROUP_LABELS[g.name] || g.name)}</div><div class="opt-choices">${pills.join('')}</div></div>`;
+        })
+        .join('');
+
+    const addonHtml = availableAddons()
+        .map(
+            (a) => `<div class="opt-group" role="group" aria-label="${esc(a.name)}"><div class="opt-title">${esc(a.name)} <span class="opt-hint">opsional, boleh lebih dari satu</span></div><div class="opt-choices">${a.values
+                .map((v) => {
+                    const on = sh.picked.has(`${a.id}:${v.id}`);
+                    return `<button type="button" class="opt-pill addon ${on ? 'active' : ''}" data-addon="${esc(`${a.id}:${v.id}`)}" aria-pressed="${on}">${esc(v.text)}<small>+${formatRp(v.price)}</small></button>`;
+                })
+                .join('')}</div></div>`,
+        )
+        .join('');
+
+    const itemOptionsEl = document.getElementById('itemOptions');
+    if (itemOptionsEl) {
+        itemOptionsEl.innerHTML = html + addonHtml + (sh.loading ? `<div class="opt-loading"><span class="spinner"></span> Cek varian & stok di outlet…</div>` : '');
+    }
+
+    const extra = addonTotal();
+    const price = (base ?? sh.item.price) + extra;
+    const normal = normalPrice();
+
+    const priceEl = document.getElementById('modalProductPrice');
+    const normalPriceEl = document.getElementById('modalProductNormalPrice');
+    const addToCartBtn = document.getElementById('addToCartBtn');
+
+    if (priceEl) priceEl.textContent = formatRp(price);
+    if (normalPriceEl) {
+        normalPriceEl.textContent = normal && normal > (base ?? 0) ? formatRp(normal + extra) : '';
+    }
+
+    if (addToCartBtn) {
+        addToCartBtn.innerHTML = `<span>Tambahkan ke Keranjang • ${formatRp(price * sh.qty)}</span>`;
+        addToCartBtn.disabled = base == null;
+    }
+}
+
+async function loadItemDetail(item, line) {
+    const sheet = AppState.sheet;
+    if (!sheet) return;
+    sheet.loading = true;
+    renderOptions();
+    try {
+        const outletCode = AppState.outlet?.code || 'LA.CODEFIN';
+        const itemCode = item.code || '';
+        const itemKey = item.key || item.id || '';
+        const res = await fetch(`api/kopken/item?outlet=${encodeURIComponent(outletCode)}&code=${encodeURIComponent(itemCode)}&key=${encodeURIComponent(itemKey)}`);
+        const d = await res.json();
+        if (AppState.sheet !== sheet) return;
+        if (d.isSoldOut) {
+            closeSheet('productSheet');
+            item.isSoldOut = true;
+            showToast(`Maaf, ${item.name} sedang habis di outlet ini.`);
+            return;
+        }
+        if (d.groups?.length && d.prices && Object.keys(d.prices).length) {
+            sheet.groups = d.groups;
+            sheet.prices = d.prices;
+            sheet.normals = d.normals || null;
+            sheet.sel = {};
+            for (const g of d.groups) sheet.sel[g.id] = g.default;
+            sheet.addons = [...(d.addons || [])];
+            sheet.comboAddons = d.comboAddons && Object.keys(d.comboAddons).length ? d.comboAddons : null;
+            sheet.picked = new Set();
+            if (line) restoreSelection(line.choices);
+            ensureValidCombo();
+        } else if (d.addons && Array.isArray(d.addons) && d.addons.length) {
+            sheet.addons = d.addons;
+        }
+        if (d.desc && !item.desc) {
+            const descEl = document.getElementById('modalProductDesc');
+            if (descEl) descEl.textContent = d.desc;
+        }
+    } catch (err) {
+        console.warn('loadItemDetail error:', err);
+    } finally {
+        if (AppState.sheet === sheet) {
+            sheet.loading = false;
+            renderOptions();
+        }
+    }
+}
+
+function currentChoices(groups, sel) {
+    return (groups || []).filter((g) => !isHidden(g, sel)).map((g) => ({
+        group: g.name,
+        value: g.values.find((v) => v.id === sel[g.id])?.text || ''
+    }));
+}
+
+function pickedChoices() {
+    const out = [];
+    for (const a of availableAddons()) {
+        for (const v of a.values) {
+            if (AppState.sheet?.picked?.has(`${a.id}:${v.id}`)) {
+                out.push({
+                    id: `${a.id}:${v.id}`,
+                    group: a.name,
+                    name: v.text,
+                    value: `+${v.text}`,
+                    price: Number(v.price || 0)
+                });
+            }
+        }
+    }
+    return out;
+}
+
+function optionText(opts) {
+    if (!opts) return '';
+    if (Array.isArray(opts)) {
+        return opts
+            .map((c) => (typeof c === 'string' ? c : c && (c.value || c.text || c.name)))
+            .filter(Boolean)
+            .join(' • ');
+    }
+    const parts = [];
+    if (opts.temp) parts.push(opts.temp);
+    if (opts.size) parts.push(opts.size);
+    if (opts.ice && opts.temp !== 'Hot') parts.push(opts.ice);
+    if (opts.sugar) parts.push(opts.sugar);
+    return parts.join(' • ');
+}
+
+function openProductModal(item, editIndex = null) {
     AppState.selectedProduct = item;
-    AppState.selectedSize = 'Regular';
-    AppState.selectedTemp = 'Ice';
-    AppState.selectedIce = 'Normal Ice';
-    AppState.selectedSugar = 'Normal Sugar';
     AppState.selectedQty = 1;
+
+    const staticG = staticGroups(item);
+    AppState.sheet = {
+        item,
+        groups: staticG,
+        prices: null,
+        normals: null,
+        sel: {},
+        qty: 1,
+        editIndex,
+        loading: false,
+        addons: defaultAddons(item),
+        comboAddons: null,
+        picked: new Set(),
+    };
+    for (const g of AppState.sheet.groups) {
+        AppState.sheet.sel[g.id] = g.default;
+    }
 
     const nameEl = document.getElementById('modalProductName');
     const catEl = document.getElementById('modalProductCat');
     const descEl = document.getElementById('modalProductDesc');
-    const priceEl = document.getElementById('modalProductPrice');
-    const normalPriceEl = document.getElementById('modalProductNormalPrice');
     const imgEl = document.getElementById('modalProductImg');
     const noteEl = document.getElementById('modalItemNote');
     const qtyValEl = document.getElementById('qtyVal');
@@ -747,72 +1134,29 @@ function openProductModal(item) {
     if (noteEl) noteEl.value = '';
     if (qtyValEl) qtyValEl.textContent = '1';
 
-    // Helper to dynamically update regular vs large price & crossed-out normal price (Revisi PDF)
-    const updateModalPrice = (sizeVal) => {
-        const isLarge = sizeVal === 'Large';
-        let currentPrice, currentNormal;
-
-        if (isLarge) {
-            currentPrice = item.largePrice ? item.largePrice : (item.price + 3500);
-            currentNormal = item.largeNormal ? item.largeNormal : (item.normalPrice ? item.normalPrice + 7000 : 0);
-        } else {
-            currentPrice = item.price;
-            currentNormal = item.normalPrice || 0;
-        }
-
-        if (priceEl) priceEl.textContent = formatRp(currentPrice);
-        if (normalPriceEl) {
-            normalPriceEl.textContent = currentNormal && currentNormal > currentPrice ? formatRp(currentNormal) : '';
-        }
-    };
-
-    // Initialize price display with selected size
-    updateModalPrice(AppState.selectedSize);
-
-    // Build Option Pills
-    renderOptionPills('optGroupSize', 'optPillsSize', item.options?.sizes || ['Regular', 'Large'], AppState.selectedSize, (val) => {
-        AppState.selectedSize = val;
-        updateModalPrice(val);
-    });
-
-    renderOptionPills('optGroupTemp', 'optPillsTemp', item.options?.temps || ['Ice', 'Hot'], AppState.selectedTemp, (val) => {
-        AppState.selectedTemp = val;
-    });
-
-    renderOptionPills('optGroupIce', 'optPillsIce', item.options?.ices || ['Normal Ice', 'Less Ice'], AppState.selectedIce, (val) => {
-        AppState.selectedIce = val;
-    });
-
-    renderOptionPills('optGroupSugar', 'optPillsSugar', item.options?.sugars || ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'], AppState.selectedSugar, (val) => {
-        AppState.selectedSugar = val;
-    });
-
+    renderOptions();
     openSheet('productSheet');
-}
 
-function renderOptionPills(groupId, pillsId, options, currentVal, onSelect) {
-    const groupEl = document.getElementById(groupId);
-    const pillsEl = document.getElementById(pillsId);
-    if (!groupEl || !pillsEl) return;
-
-    if (!options || !options.length) {
-        groupEl.style.display = 'none';
-        return;
+    // Live variants, prices & addons straight from outlet
+    if (item.code && AppState.outlet?.code) {
+        loadItemDetail(item);
     }
-    groupEl.style.display = 'block';
-
-    pillsEl.innerHTML = options.map(opt => `
-        <button class="og-pill ${opt === currentVal ? 'active' : ''}" type="button" data-val="${opt}">${opt}</button>
-    `).join('');
-
-    pillsEl.querySelectorAll('.og-pill').forEach(btn => {
-        btn.addEventListener('click', () => {
-            pillsEl.querySelectorAll('.og-pill').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            onSelect(btn.dataset.val);
-        });
-    });
 }
+
+// Event delegation on #itemOptions matching client spec
+$('#itemOptions')?.addEventListener('click', (e) => {
+    const b = e.target.closest('.opt-pill');
+    if (!b || b.disabled) return;
+    if (b.dataset.addon) {
+        const k = b.dataset.addon;
+        const S = AppState;
+        if (S.sheet.picked.has(k)) S.sheet.picked.delete(k);
+        else S.sheet.picked.add(k);
+        renderOptions();
+    } else if (b.dataset.g && b.dataset.v) {
+        selectOption(b.dataset.g, b.dataset.v);
+    }
+});
 
 // Stepper
 const qtyMinus = document.getElementById('qtyMinus');
@@ -821,15 +1165,21 @@ const qtyVal = document.getElementById('qtyVal');
 
 if (qtyMinus && qtyPlus && qtyVal) {
     qtyMinus.addEventListener('click', () => {
-        if (AppState.selectedQty > 1) {
-            AppState.selectedQty--;
-            qtyVal.textContent = AppState.selectedQty;
+        if (AppState.sheet && AppState.sheet.qty > 1) {
+            AppState.sheet.qty--;
+            AppState.selectedQty = AppState.sheet.qty;
+            qtyVal.textContent = AppState.sheet.qty;
+            renderOptions();
         }
     });
 
     qtyPlus.addEventListener('click', () => {
-        AppState.selectedQty++;
-        qtyVal.textContent = AppState.selectedQty;
+        if (AppState.sheet) {
+            AppState.sheet.qty = Math.min(20, (AppState.sheet.qty || 1) + 1);
+            AppState.selectedQty = AppState.sheet.qty;
+            qtyVal.textContent = AppState.sheet.qty;
+            renderOptions();
+        }
     });
 }
 
@@ -837,26 +1187,42 @@ if (qtyMinus && qtyPlus && qtyVal) {
 const addToCartBtn = document.getElementById('addToCartBtn');
 if (addToCartBtn) {
     addToCartBtn.addEventListener('click', () => {
-        if (!AppState.selectedProduct) return;
+        const sh = AppState.sheet;
+        if (!sh || !sh.item) return;
 
-        const item = AppState.selectedProduct;
-        const isLarge = AppState.selectedSize === 'Large';
-        const price = isLarge ? (item.largePrice ? item.largePrice : (item.price + 3500)) : item.price;
+        const variant = unitPrice();
+        if (variant == null) return;
+        const addonsTotal = addonTotal();
+        const finalPrice = variant + addonsTotal;
         const note = document.getElementById('modalItemNote')?.value.trim() || '';
+        const choices = currentChoices(sh.groups, sh.sel);
+        const pickedAddons = pickedChoices();
+        const allChoices = [...choices, ...pickedAddons];
+
+        const sizeVal = choices.find(c => c.group.toLowerCase().includes('size') || c.group.toLowerCase().includes('ukuran'))?.value || 'Regular';
+        const tempVal = choices.find(c => c.group.toLowerCase().includes('temp') || c.group.toLowerCase().includes('suhu'))?.value || 'Ice';
+        const iceVal = choices.find(c => c.group.toLowerCase().includes('ice') || c.group.toLowerCase().includes('es'))?.value || '';
+        const sugarVal = choices.find(c => c.group.toLowerCase().includes('sugar') || c.group.toLowerCase().includes('gula'))?.value || '';
 
         const itemToAdd = {
-            id: 'item_' + Date.now(),
-            key: item.key || item.id,
-            name: item.name,
-            price: price,
-            qty: AppState.selectedQty,
-            size: AppState.selectedSize,
-            temp: AppState.selectedTemp,
-            ice: AppState.selectedIce,
-            sugar: AppState.selectedSugar,
+            id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            key: sh.item.key || sh.item.id,
+            name: sh.item.name,
+            price: finalPrice,
+            basePrice: variant,
+            qty: sh.qty,
+            size: sizeVal,
+            temp: tempVal,
+            ice: iceVal,
+            sugar: sugarVal,
+            choices: allChoices,
+            variantText: optionText(choices),
+            optionsText: optionText(allChoices),
+            addons: pickedAddons,
+            addonsTotal: addonsTotal,
             note: note,
-            img: item.img,
-            subtotal: price * AppState.selectedQty,
+            img: sh.item.img,
+            subtotal: finalPrice * sh.qty,
         };
 
         closeSheet('productSheet');
@@ -985,8 +1351,10 @@ function renderCartItemsList() {
             <img src="${item.img || 'https://placehold.co/80x80'}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;">
             <div style="flex:1;overflow:hidden">
                 <div style="font-size:13px;font-weight:800;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
-                <div style="font-size:11px;color:var(--text-muted)">${item.size ? item.size + ' • ' : ''}${item.temp || 'Ice'}</div>
+                <div style="font-size:11px;color:var(--text-muted)">${item.variantText || `${item.size ? item.size + ' • ' : ''}${item.temp || 'Ice'}${item.sugar ? ' • ' + item.sugar : ''}`}</div>
                 ${item.bundleChoices ? `<div style="font-size:10px;color:var(--brand-primary-dark);font-weight:700">${item.bundleChoices}</div>` : ''}
+                ${item.addons && item.addons.length ? `<div style="font-size:10px;color:var(--brand-primary-dark);font-weight:700;margin-top:2px">+ ${item.addons.map(a => `${a.name || a.text || a.value} (+${formatRp(a.price)})`).join(', ')}</div>` : ''}
+                ${item.note ? `<div style="font-size:10px;color:var(--text-muted);font-style:italic">"${item.note}"</div>` : ''}
                 <div style="font-size:12px;font-weight:800;color:var(--brand-primary-dark);margin-top:2px">${formatRp(item.price)} x ${item.qty}</div>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
@@ -1255,10 +1623,382 @@ if (trackSubmitBtn && trackCodeInput && trackResultBox) {
     });
 }
 
+// =========================================================================
+// 8. ADMIN PRICING & FEE MANAGEMENT CONTROLLER
+// =========================================================================
+
+let adminPricingState = {
+    activePasscode: '',
+    defaultMarkup: window.INITIAL_DATA?.pricing?.defaultMarkup || 5000,
+    categoryMarkups: window.INITIAL_DATA?.pricing?.categoryMarkups || {
+        Coffee: 5000,
+        'Non Coffee': 5000,
+        Frappe: 5000,
+        Food: 4500,
+        Minuman: 5000,
+        Makanan: 4500,
+    },
+    itemMarkupOverrides: window.INITIAL_DATA?.pricing?.itemMarkupOverrides || {
+        'Kopi Kenangan Mantan': 6000,
+    },
+    singleItemFee: window.INITIAL_DATA?.singleItemFee || 2000,
+    plasticBagFee: window.INITIAL_DATA?.plasticBagFee || 1000,
+};
+
+function initAdminPricingFeature() {
+    const adminTriggers = [
+        document.getElementById('openAdminPricingBtn'),
+        ...document.querySelectorAll('.open-admin-trigger-link')
+    ].filter(Boolean);
+
+    adminTriggers.forEach(btn => {
+        btn.addEventListener('click', () => {
+            adminPricingState.activePasscode = '';
+            sessionStorage.removeItem('kyuti_admin_auth');
+            sessionStorage.removeItem('kyuti_admin_code');
+            const passInput = document.getElementById('adminPasscodeInput');
+            const errBox = document.getElementById('adminPasscodeErr');
+            if (passInput) passInput.value = '';
+            if (errBox) errBox.style.display = 'none';
+            openSheet('adminPasscodeModal');
+        });
+    });
+
+    // Passcode Verification
+    const passSubmitBtn = document.getElementById('adminPasscodeSubmitBtn');
+    const passInput = document.getElementById('adminPasscodeInput');
+    const passErr = document.getElementById('adminPasscodeErr');
+
+    const handlePasscodeSubmit = () => {
+        const code = (passInput?.value || '').trim();
+        if (!code) {
+            if (passErr) {
+                passErr.textContent = 'Silakan masukkan passcode admin.';
+                passErr.style.display = 'block';
+            }
+            return;
+        }
+
+        if (passSubmitBtn) {
+            passSubmitBtn.disabled = true;
+            passSubmitBtn.textContent = 'Memverifikasi...';
+        }
+
+        fetch(`api/admin_pricing.php?code=${encodeURIComponent(code)}`)
+            .then(res => res.json())
+            .then(res => {
+                if (res.success && res.data) {
+                    adminPricingState.activePasscode = code;
+                    sessionStorage.setItem('kyuti_admin_auth', '1');
+                    sessionStorage.setItem('kyuti_admin_code', code);
+                    closeSheet('adminPasscodeModal');
+                    populateAdminPricingForm(res.data);
+                    openSheet('adminPricingSheet');
+                    showToast('✓ Akses admin berhasil terverifikasi!');
+                } else {
+                    if (passErr) {
+                        passErr.textContent = res.message || '✕ Kode redeem / passcode salah!';
+                        passErr.style.display = 'block';
+                    }
+                }
+            })
+            .catch(() => {
+                if (passErr) {
+                    passErr.textContent = '✕ Gagal menghubungi server verifikasi.';
+                    passErr.style.display = 'block';
+                }
+            })
+            .finally(() => {
+                if (passSubmitBtn) {
+                    passSubmitBtn.disabled = false;
+                    passSubmitBtn.textContent = 'Verifikasi & Masuk';
+                }
+            });
+    };
+
+    if (passSubmitBtn) passSubmitBtn.addEventListener('click', handlePasscodeSubmit);
+    if (passInput) {
+        passInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') handlePasscodeSubmit();
+        });
+    }
+
+    // Menu Dropdown Selection Handler
+    const menuSelect = document.getElementById('cfgMenuSelect');
+    const customWrap = document.getElementById('cfgCustomNameWrap');
+    const nameInput = document.getElementById('cfgNewItemName');
+    const feeInput = document.getElementById('cfgNewItemFee');
+
+    if (menuSelect) {
+        menuSelect.addEventListener('change', () => {
+            const val = menuSelect.value;
+            if (val === '__CUSTOM__') {
+                if (customWrap) customWrap.style.display = 'block';
+                if (nameInput) {
+                    nameInput.value = '';
+                    nameInput.focus();
+                }
+            } else {
+                if (customWrap) customWrap.style.display = 'none';
+                if (nameInput) nameInput.value = val;
+
+                // Pre-fill fee if already overridden, or suggest category/default fee
+                if (val && adminPricingState.itemMarkupOverrides?.[val] !== undefined) {
+                    if (feeInput) feeInput.value = adminPricingState.itemMarkupOverrides[val];
+                } else if (val) {
+                    const items = AppState.menu?.items || window.INITIAL_DATA?.menu?.items || [];
+                    const found = items.find(i => i.name === val);
+                    const cat = found?.category || 'Minuman';
+                    const catMarkup = adminPricingState.categoryMarkups?.[cat];
+                    const defaultFee = catMarkup !== undefined ? catMarkup : (adminPricingState.defaultMarkup || 5000);
+                    if (feeInput) feeInput.value = defaultFee;
+                }
+            }
+        });
+    }
+
+    // Add New Item Override Button
+    const addItemBtn = document.getElementById('cfgAddNewItemBtn');
+    if (addItemBtn) {
+        addItemBtn.addEventListener('click', () => {
+            let name = (menuSelect?.value || '').trim();
+            if (name === '__CUSTOM__' || !name) {
+                name = (nameInput?.value || '').trim();
+            }
+            const fee = parseInt(feeInput?.value || '0', 10);
+
+            if (!name) {
+                showToast('Silakan pilih menu dari daftar API terlebih dahulu');
+                return;
+            }
+            if (isNaN(fee) || fee < 0) {
+                showToast('Masukkan nominal fee tambahan yang valid');
+                return;
+            }
+
+            adminPricingState.itemMarkupOverrides[name] = fee;
+            renderItemOverridesList();
+            populateMenuDropdown();
+
+            if (menuSelect) menuSelect.value = '';
+            if (nameInput) nameInput.value = '';
+            if (feeInput) feeInput.value = '';
+            if (customWrap) customWrap.style.display = 'none';
+
+            showToast(`✓ Fee khusus untuk "${name}" diset +${formatRp(fee).replace('Rp ', '')}`);
+        });
+    }
+
+    // Save Admin Pricing Changes
+    const saveBtn = document.getElementById('saveAdminPricingBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            const code = adminPricingState.activePasscode || sessionStorage.getItem('kyuti_admin_code') || '';
+            if (!code) {
+                showToast('✕ Sesi admin telah berakhir. Silakan masukkan kode kembali.');
+                closeSheet('adminPricingSheet');
+                return;
+            }
+            const defMarkup = parseFloat(document.getElementById('cfgDefaultMarkup')?.value || '5000');
+            const drinkMarkup = parseFloat(document.getElementById('cfgCategoryDrinks')?.value || '5000');
+            const foodMarkup = parseFloat(document.getElementById('cfgCategoryFood')?.value || '4500');
+            const singleFee = parseFloat(document.getElementById('cfgSingleItemFee')?.value || '2000');
+            const plasticFee = parseFloat(document.getElementById('cfgPlasticBagFee')?.value || '1000');
+
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span>Menyimpan pengaturan...</span>';
+
+            const payload = {
+                code: code,
+                default_markup: defMarkup,
+                category_markups: {
+                    Coffee: drinkMarkup,
+                    'Non Coffee': drinkMarkup,
+                    Frappe: drinkMarkup,
+                    Food: foodMarkup,
+                    Minuman: drinkMarkup,
+                    Makanan: foodMarkup,
+                    Bundling: 0,
+                },
+                item_markup_overrides: adminPricingState.itemMarkupOverrides,
+                single_item_fee: singleFee,
+                plastic_bag_fee: plasticFee,
+            };
+
+            fetch('api/admin_pricing.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        AppState.singleItemFeeAmount = singleFee;
+                        AppState.plasticBagFeeAmount = plasticFee;
+                        updateCartUI();
+
+                        closeSheet('adminPricingSheet');
+                        adminPricingState.activePasscode = '';
+                        sessionStorage.removeItem('kyuti_admin_auth');
+                        sessionStorage.removeItem('kyuti_admin_code');
+                        showToast('✓ Pengaturan fee berhasil disimpan! Memperbarui harga...');
+
+                        // Refresh menu to immediately apply new fee formula
+                        if (AppState.outlet?.code) {
+                            fetchMenu(AppState.outlet.code, true);
+                        }
+                    } else {
+                        showToast(`✕ ${res.message || 'Gagal menyimpan fee'}`);
+                    }
+                })
+                .catch(() => {
+                    showToast('✕ Gagal menghubungi server.');
+                })
+                .finally(() => {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<span>💾 Simpan Perubahan Fee</span>';
+                });
+        });
+    }
+}
+
+function loadAndOpenAdminPanel(code) {
+    fetch(`api/admin_pricing.php?code=${encodeURIComponent(code)}`)
+        .then(res => res.json())
+        .then(res => {
+            if (res.success && res.data) {
+                populateAdminPricingForm(res.data);
+                openSheet('adminPricingSheet');
+            } else {
+                sessionStorage.removeItem('kyuti_admin_auth');
+                sessionStorage.removeItem('kyuti_admin_code');
+                openSheet('adminPasscodeModal');
+            }
+        })
+        .catch(() => {
+            openSheet('adminPasscodeModal');
+        });
+}
+
+function populateAdminPricingForm(data) {
+    if (!data) return;
+    const defInput = document.getElementById('cfgDefaultMarkup');
+    const drinksInput = document.getElementById('cfgCategoryDrinks');
+    const foodInput = document.getElementById('cfgCategoryFood');
+    const singleInput = document.getElementById('cfgSingleItemFee');
+    const plasticInput = document.getElementById('cfgPlasticBagFee');
+
+    if (defInput) defInput.value = data.default_markup ?? 5000;
+    if (drinksInput) drinksInput.value = data.category_markups?.Coffee ?? data.category_markups?.Minuman ?? 5000;
+    if (foodInput) foodInput.value = data.category_markups?.Food ?? data.category_markups?.Makanan ?? 4500;
+    if (singleInput) singleInput.value = data.single_item_fee ?? 2000;
+    if (plasticInput) plasticInput.value = data.plastic_bag_fee ?? 1000;
+
+    adminPricingState.itemMarkupOverrides = Object.assign({}, data.item_markup_overrides || {});
+    renderItemOverridesList();
+    populateMenuDropdown();
+}
+
+function renderItemOverridesList() {
+    const container = document.getElementById('cfgItemOverridesList');
+    if (!container) return;
+
+    const entries = Object.entries(adminPricingState.itemMarkupOverrides || {});
+    if (!entries.length) {
+        container.innerHTML = '<div style="font-size:12px;color:var(--text-muted);font-style:italic">Belum ada fee khusus per menu. Semua menu mengikuti fee kategori/default.</div>';
+        return;
+    }
+
+    container.innerHTML = entries.map(([name, fee]) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:8px 12px;">
+            <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:12px;font-weight:800;color:var(--text-main)">${name}</span>
+                <span class="fee-badge-pill" style="font-size:11px;padding:2px 8px">+Rp ${Number(fee).toLocaleString('id-ID')}</span>
+            </div>
+            <button type="button" class="btn-del-override" data-name="${name}" style="background:#FFE4E6;color:#E11D48;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:700">
+                Hapus ✕
+            </button>
+        </div>
+    `).join('');
+
+    container.querySelectorAll('.btn-del-override').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const itemName = btn.dataset.name;
+            if (itemName && adminPricingState.itemMarkupOverrides[itemName] !== undefined) {
+                delete adminPricingState.itemMarkupOverrides[itemName];
+                renderItemOverridesList();
+                populateMenuDropdown();
+                showToast(`Fee khusus "${itemName}" dihapus.`);
+            }
+        });
+    });
+}
+
+function populateMenuDropdown() {
+    const select = document.getElementById('cfgMenuSelect');
+    if (!select) return;
+
+    // Get live items from AppState.menu or initial data + bundling items
+    let items = (AppState.menu?.items || window.INITIAL_DATA?.menu?.items || []).slice();
+    if (Array.isArray(AppState.bundlingItems)) {
+        AppState.bundlingItems.forEach(b => {
+            if (b && b.name && !items.find(i => i.name === b.name)) {
+                items.push({ name: b.name, category: 'Bundling' });
+            }
+        });
+    }
+    
+    if (!items.length) {
+        select.innerHTML = '<option value="">-- Menu sedang dimuat dari API... --</option>';
+        return;
+    }
+
+    // Group items by category (Coffee, Non Coffee, Frappe, Food, Bundling, etc.)
+    const groups = {};
+    items.forEach(item => {
+        if (!item || !item.name) return;
+        const cat = item.category || 'Lainnya';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(item.name);
+    });
+
+    let html = '<option value="">-- 🔍 Pilih Menu dari API (Tinggal Klik) --</option>';
+    
+    // Sort categories: Coffee, Non Coffee, Frappe, Food, Bundling, etc.
+    const catKeys = Object.keys(groups).sort((a, b) => {
+        if (a === 'Coffee') return -1;
+        if (b === 'Coffee') return 1;
+        if (a === 'Non Coffee') return -1;
+        if (b === 'Non Coffee') return 1;
+        if (a === 'Frappe') return -1;
+        if (b === 'Frappe') return 1;
+        if (a === 'Food') return -1;
+        if (b === 'Food') return 1;
+        return a.localeCompare(b);
+    });
+
+    catKeys.forEach(cat => {
+        const uniqueNames = Array.from(new Set(groups[cat])).sort((a, b) => a.localeCompare(b));
+        const icon = cat === 'Coffee' ? '☕' : (cat === 'Non Coffee' ? '🍵' : (cat === 'Frappe' ? '🍦' : (cat === 'Food' ? '🥪' : (cat === 'Bundling' ? '🎀' : '📂'))));
+        html += `<optgroup label="${icon} ${cat}">`;
+        uniqueNames.forEach(name => {
+            const currentOverride = adminPricingState.itemMarkupOverrides?.[name];
+            const badge = currentOverride !== undefined ? ` ★ (+Rp ${Number(currentOverride).toLocaleString('id-ID')})` : '';
+            html += `<option value="${name.replace(/"/g, '&quot;')}">${name}${badge}</option>`;
+        });
+        html += `</optgroup>`;
+    });
+
+    html += '<option value="__CUSTOM__">✍️ Ketik Nama Manual...</option>';
+
+    select.innerHTML = html;
+}
+
 // Initial Boot
 document.addEventListener('DOMContentLoaded', () => {
     updateOutletHeader();
     renderMenu();
     updateCartUI();
     checkWelcomePopup();
+    initAdminPricingFeature();
 });

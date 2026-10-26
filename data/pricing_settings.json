@@ -1,0 +1,19 @@
+{
+    "default_markup": 5000,
+    "category_markups": {
+        "Coffee": 5000,
+        "Non Coffee": 5000,
+        "Frappe": 5000,
+        "Food": 4500,
+        "Minuman": 5000,
+        "Makanan": 4500,
+        "Bundling": 0
+    },
+    "item_markup_overrides": {
+        "Kopi Kenangan Mantan": 6000
+    },
+    "single_item_fee": 2000,
+    "plastic_bag_fee": 1000,
+    "admin_passcode": "KYUTI2026",
+    "updated_at": "2026-10-26T15:58:47+07:00"
+}

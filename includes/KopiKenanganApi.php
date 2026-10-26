@@ -126,6 +126,14 @@ class KopiKenanganApi
      */
     public function checkIsPremiumOutlet(array $outlet): bool
     {
+        // 0. If explicit verified boolean exists (from live menu Mantan price >= 22k), use it directly!
+        if (isset($outlet['isPremium']) && is_bool($outlet['isPremium'])) {
+            return $outlet['isPremium'];
+        }
+        if (isset($outlet['premium']) && is_bool($outlet['premium'])) {
+            return $outlet['premium'];
+        }
+
         $category = strtolower($outlet['category'] ?? '');
         $name = strtolower($outlet['name'] ?? '');
         $address = strtolower($outlet['address'] ?? '');
@@ -168,11 +176,12 @@ class KopiKenanganApi
             return true;
         }
 
-        // 5. Keywords for actual premium outlets (Mall, Bandara, Stasiun Kereta Api, etc.)
+        // 5. Keywords for verified premium locations (Airports, major international transport hubs)
+        // Note: Generic 'mall' or 'plaza' are excluded because most malls have regular 19k price!
         $premiumKeywords = [
-            'mall', 'plaza', 'bandara', 'airport', 'stasiun', 'train station',
-            'railway station', 'terminal bandara', 'grand indonesia', 'tunjungan plaza',
-            'ciputra world', 'senayan city', 'pacific place', 'central park', 'pakuwon'
+            'terminal bandara', 'keberangkatan bandara', 'airport departure', 'bandara internasional',
+            'terminal 2d', 'terminal 2e', 'terminal 3 domestic', 'terminal 3 international',
+            'grand indonesia', 'senayan city', 'pacific place', 'tunjungan plaza 3', 'pim 3'
         ];
 
         foreach ($premiumKeywords as $kw) {
@@ -267,9 +276,23 @@ class KopiKenanganApi
         $response = $this->httpRequest($url, ['outlet' => $outletCode]);
 
         if ($response && isset($response['items'])) {
-            $isPremium = !empty($response['premium']);
-            if (!$isPremium) {
-                $isPremium = $this->checkIsPremiumOutlet(['code' => $outletCode, 'name' => $outletCode]);
+            // Absolute Client Rule:
+            // "pokoknya kalau harga kopi kenangan mantan yang reguler naik jadi 22.000 berarti itu outlet premium ka"
+            $mantanPrice = null;
+            foreach ($response['items'] as $it) {
+                $itemName = strtolower($it['name'] ?? '');
+                if (str_contains($itemName, 'kenangan mantan') && !str_contains($itemName, 'oatside') && !str_contains($itemName, 'frappe') && !str_contains($itemName, 'duo') && !str_contains($itemName, 'bundl')) {
+                    $mantanPrice = (float)($it['normalPrice'] ?? $it['outletPrice'] ?? 0);
+                    break;
+                }
+            }
+
+            if ($mantanPrice !== null && $mantanPrice > 0) {
+                // If mantan regular is 22.000 or above, it is 100% Premium Outlet!
+                // If mantan regular is less than 22.000 (e.g. 19.000), it is 100% Regular Outlet!
+                $isPremium = ($mantanPrice >= 22000);
+            } else {
+                $isPremium = !empty($response['premium']) || $this->checkIsPremiumOutlet(['code' => $outletCode, 'name' => $outletCode]);
             }
 
             $result = [
@@ -311,6 +334,19 @@ class KopiKenanganApi
         $itemMarkupOverrides = config('pricing.item_markup_overrides', []);
         $categoryMarkups = config('pricing.category_markups', []);
         $defaultMarkup = (float) config('pricing.default_markup', 5000);
+        // Absolute Client Rule: "pokoknya kalau harga kopi kenangan mantan yang reguler naik jadi 22.000 berarti itu outlet premium ka"
+        $mantanPrice = null;
+        foreach ($items as $it) {
+            $itName = strtolower($it['name'] ?? '');
+            if (str_contains($itName, 'kenangan mantan') && !str_contains($itName, 'oatside') && !str_contains($itName, 'frappe') && !str_contains($itName, 'duo') && !str_contains($itName, 'bundl')) {
+                $mantanPrice = (float)($it['normalPrice'] ?? $it['outletPrice'] ?? 0);
+                break;
+            }
+        }
+        if ($mantanPrice !== null && $mantanPrice > 0) {
+            $menuData['premium'] = ($mantanPrice >= 22000);
+        }
+
         $discountPercent = (float) config('pricing.discount_percent', 50);
 
         // 1. Process API items
@@ -432,34 +468,58 @@ class KopiKenanganApi
         }
         unset($item);
 
-        // 2. Prepend Bundling Packages (Revisi Poin 12)
-        $bundlingItems = config('bundling_items', []);
-        $bundlingFormatted = [];
-        if (!empty($bundlingItems) && is_array($bundlingItems)) {
-            foreach ($bundlingItems as $b) {
-                $bundlingFormatted[] = [
-                    'key' => $b['key'],
-                    'id' => $b['key'],
-                    'name' => $b['name'],
-                    'category' => 'Bundling',
-                    'img' => $b['img'],
-                    'desc' => $b['desc'] ?? '',
-                    'price' => (float) $b['price'],
-                    'normalPrice' => (float) ($b['normalPrice'] ?? 0),
-                    'isSoldOut' => !empty($b['isSoldOut']),
-                    'tag' => $b['tag'] ?? 'BUNDLING',
-                    'isBundling' => true,
-                    'slots' => $b['slots'] ?? [],
-                    'options' => $b['options'] ?? [
-                        'ices' => ['Normal Ice', 'Less Ice'],
-                        'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
-                    ],
-                ];
+        // 2. Prepend Bundling Packages (Hanya untuk Outlet Regular, tidak tersedia di Outlet Premium per SOP Klien)
+        $categories = $menuData['categories'] ?? [];
+        if (empty($menuData['premium'])) {
+            $bundlingItems = config('bundling_items', []);
+            $bundlingFormatted = [];
+            if (!empty($bundlingItems) && is_array($bundlingItems)) {
+                foreach ($bundlingItems as $b) {
+                    $bundlingFormatted[] = [
+                        'key' => $b['key'],
+                        'id' => $b['key'],
+                        'name' => $b['name'],
+                        'category' => 'Bundling',
+                        'img' => $b['img'],
+                        'desc' => $b['desc'] ?? '',
+                        'price' => (float) $b['price'],
+                        'normalPrice' => (float) ($b['normalPrice'] ?? 0),
+                        'isSoldOut' => !empty($b['isSoldOut']),
+                        'tag' => $b['tag'] ?? 'BUNDLING',
+                        'isBundling' => true,
+                        'slots' => $b['slots'] ?? [],
+                        'options' => $b['options'] ?? [
+                            'ices' => ['Normal Ice', 'Less Ice'],
+                            'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
+                        ],
+                    ];
+                }
             }
-        }
 
-        // Merge Bundling items at the beginning
-        $items = array_merge($bundlingFormatted, $items);
+            // Merge Bundling items at the beginning
+            $items = array_merge($bundlingFormatted, $items);
+
+            // Ensure Bundling category is in categories list
+            $hasBundlingCat = false;
+            foreach ($categories as $cat) {
+                if (($cat['id'] ?? '') === 'item-bundling' || ($cat['name'] ?? '') === 'Bundling') {
+                    $hasBundlingCat = true;
+                    break;
+                }
+            }
+            if (!$hasBundlingCat) {
+                array_unshift($categories, [
+                    'id' => 'item-bundling',
+                    'name' => '🎀 Paket Bundling',
+                    'kind' => 'item',
+                ]);
+            }
+        } else {
+            // Remove bundling category if present in categories list for premium outlets
+            $categories = array_values(array_filter($categories, function($cat) {
+                return ($cat['id'] ?? '') !== 'item-bundling' && ($cat['name'] ?? '') !== 'Bundling';
+            }));
+        }
 
         // 3. Recalculate Live Stock Statistics
         $totalCount = count($items);
@@ -474,23 +534,6 @@ class KopiKenanganApi
             }
         }
 
-        // Ensure Bundling category is in categories list
-        $categories = $menuData['categories'] ?? [];
-        $hasBundlingCat = false;
-        foreach ($categories as $cat) {
-            if (($cat['id'] ?? '') === 'item-bundling' || ($cat['name'] ?? '') === 'Bundling') {
-                $hasBundlingCat = true;
-                break;
-            }
-        }
-        if (!$hasBundlingCat) {
-            array_unshift($categories, [
-                'id' => 'item-bundling',
-                'name' => '🎀 Paket Bundling',
-                'kind' => 'item',
-            ]);
-        }
-
         $menuData['categories'] = $categories;
         $menuData['items'] = $items;
         $menuData['stats'] = [
@@ -500,6 +543,84 @@ class KopiKenanganApi
         ];
 
         return $menuData;
+    }
+
+    /**
+     * Fetch Live Item Details (Addons, Groups, Modifiers, Prices) from Upstream API
+     * URL: https://tixandcoffee.developerngantuk.my.id/api/kopken/item?outlet={outlet}&code={code}&key={key}
+     */
+    public function getItemDetails(string $outletCode, string $itemCode = '', string $itemKey = ''): array
+    {
+        $outletCode = trim($outletCode);
+        if ($outletCode === '') {
+            $outletCode = config('store.default_outlet', 'LA.CODEFIN');
+        }
+
+        $cacheKey = 'item_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $outletCode . '_' . $itemCode . '_' . $itemKey);
+        $cached = $this->getCache($cacheKey, 120);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $url = $this->baseUrl . '/kopken/item';
+        $params = [
+            'outlet' => $outletCode,
+        ];
+        if (!empty($itemCode)) {
+            $params['code'] = $itemCode;
+        }
+        if (!empty($itemKey)) {
+            $params['key'] = $itemKey;
+        }
+
+        $response = $this->httpRequest($url, $params);
+
+        if ($response && is_array($response)) {
+            if (!empty($response['prices']) && is_array($response['prices'])) {
+                $menu = $this->getMenu($outletCode);
+                $matchedItem = null;
+                foreach ($menu['items'] ?? [] as $mi) {
+                    if (($itemKey !== '' && ($mi['key'] ?? '') === $itemKey) || ($itemCode !== '' && ($mi['code'] ?? '') === $itemCode)) {
+                        $matchedItem = $mi;
+                        break;
+                    }
+                }
+
+                $origBasePrice = (float)($matchedItem['normalPrice'] ?? $matchedItem['outletPrice'] ?? $response['price'] ?? 19000);
+                $calculatedBase = (float)($matchedItem['price'] ?? round($origBasePrice * 0.5 + 5000));
+                $largePrice = !empty($matchedItem['largePrice']) ? (float)$matchedItem['largePrice'] : ($calculatedBase + 3500);
+
+                foreach ($response['prices'] as $combo => &$p) {
+                    $rawP = (float)$p;
+                    if ($rawP > $origBasePrice || str_contains(strtolower($combo), 'large')) {
+                        $delta = max(0, $rawP - $origBasePrice);
+                        $p = ($delta > 0) ? ($calculatedBase + $delta) : $largePrice;
+                    } else {
+                        $p = $calculatedBase;
+                    }
+                }
+                unset($p);
+
+                if (empty($response['normals']) && !empty($response['prices'])) {
+                    $normals = [];
+                    foreach ($response['prices'] as $combo => $p) {
+                        $normals[$combo] = $origBasePrice;
+                    }
+                    $response['normals'] = $normals;
+                }
+            }
+
+            $this->setCache($cacheKey, $response);
+            return $response;
+        }
+
+        return [
+            'isSoldOut' => false,
+            'reason' => '',
+            'addons' => [],
+            'groups' => [],
+            'extras' => [],
+        ];
     }
 
     /**
@@ -587,6 +708,15 @@ class KopiKenanganApi
             $waMessage .= ($idx + 1) . ". *" . ($item['name'] ?? 'Item') . "* x" . ($item['qty'] ?? 1) . $optStr . "\n";
             if (!empty($item['bundleChoices'])) {
                 $waMessage .= "    Isi Paket: _" . $item['bundleChoices'] . "_\n";
+            }
+            if (!empty($item['addons']) && is_array($item['addons'])) {
+                $addonStrings = [];
+                foreach ($item['addons'] as $ad) {
+                    $addonStrings[] = ($ad['name'] ?? 'Addon') . ' (+Rp ' . number_format($ad['price'] ?? 0, 0, ',', '.') . ')';
+                }
+                if (!empty($addonStrings)) {
+                    $waMessage .= "    + Topping/Syrup: _" . implode(', ', $addonStrings) . "_\n";
+                }
             }
             $waMessage .= "    Harga: Rp " . $priceFormatted . " | Subtotal: Rp " . $subtotalFormatted . "\n";
             if (!empty($item['note'])) {

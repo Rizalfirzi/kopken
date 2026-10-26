@@ -237,6 +237,36 @@ $config = [
     ],
 
     // =========================================================================
+    // 5B. ADDONS OPSIONAL (TOPPING & SYRUP - Boleh Lebih Dari Satu)
+    // =========================================================================
+    'addons' => [
+        [
+            'id' => 'topping',
+            'name' => 'Topping',
+            'hint' => 'opsional, boleh lebih dari satu',
+            'values' => [
+                ['id' => 'boba', 'text' => 'Boba', 'price' => 4000],
+                ['id' => 'grass_jelly', 'text' => 'Grass Jelly', 'price' => 4000],
+                ['id' => 'coffee_jelly', 'text' => 'Coffee Jelly', 'price' => 4000],
+                ['id' => 'coconut_jelly', 'text' => 'Coconut Jelly', 'price' => 4000],
+                ['id' => 'extra_shot', 'text' => 'Extra Espresso Shot', 'price' => 5000],
+                ['id' => 'oat_milk', 'text' => 'Oat Milk (Substitusi)', 'price' => 6000],
+            ],
+        ],
+        [
+            'id' => 'syrup',
+            'name' => 'Syrup',
+            'hint' => 'opsional, boleh lebih dari satu',
+            'values' => [
+                ['id' => 'caramel', 'text' => 'Caramel Syrup', 'price' => 5000],
+                ['id' => 'vanilla', 'text' => 'Vanilla Syrup', 'price' => 5000],
+                ['id' => 'hazelnut', 'text' => 'Hazelnut Syrup', 'price' => 5000],
+                ['id' => 'aren', 'text' => 'Gula Aren Extra', 'price' => 3000],
+            ],
+        ],
+    ],
+
+    // =========================================================================
     // 6. JAM OPERASIONAL & DAFTAR OUTLET PREMIUM
     // =========================================================================
     'outlets' => [
@@ -315,7 +345,42 @@ $config = [
         'outlets' => 1800,
         'menu' => 60,
     ],
+
+    // =========================================================================
+    // 8. AKSES ADMIN / REDEEM CODE
+    // =========================================================================
+    'admin' => [
+        'passcode' => 'KYUTI2026', // Redeem Code / Passcode untuk akses Admin Fee di website
+    ],
 ];
+
+// =========================================================================
+// MERGE DYNAMIC PRICING DARI ADMIN PANEL (data/pricing_settings.json)
+// =========================================================================
+$dynamicPricingFile = __DIR__ . '/data/pricing_settings.json';
+if (file_exists($dynamicPricingFile)) {
+    $dynamicData = json_decode(@file_get_contents($dynamicPricingFile), true);
+    if (is_array($dynamicData)) {
+        if (isset($dynamicData['default_markup'])) {
+            $config['pricing']['default_markup'] = (float)$dynamicData['default_markup'];
+        }
+        if (isset($dynamicData['category_markups']) && is_array($dynamicData['category_markups'])) {
+            $config['pricing']['category_markups'] = array_merge($config['pricing']['category_markups'], $dynamicData['category_markups']);
+        }
+        if (isset($dynamicData['item_markup_overrides']) && is_array($dynamicData['item_markup_overrides'])) {
+            $config['pricing']['item_markup_overrides'] = array_merge($config['pricing']['item_markup_overrides'], $dynamicData['item_markup_overrides']);
+        }
+        if (isset($dynamicData['single_item_fee'])) {
+            $config['fees']['single_item_fee'] = (float)$dynamicData['single_item_fee'];
+        }
+        if (isset($dynamicData['plastic_bag_fee'])) {
+            $config['fees']['plastic_bag_fee'] = (float)$dynamicData['plastic_bag_fee'];
+        }
+        if (!empty($dynamicData['admin_passcode'])) {
+            $config['admin']['passcode'] = trim($dynamicData['admin_passcode']);
+        }
+    }
+}
 
 /**
  * Helper function to retrieve configuration values using dot notation

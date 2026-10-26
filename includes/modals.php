@@ -146,29 +146,8 @@
                 </div>
             </div>
 
-            <!-- Size Selector -->
-            <div class="option-group" id="optGroupSize">
-                <div class="og-label">Ukuran Cup</div>
-                <div class="og-pills" id="optPillsSize"></div>
-            </div>
-
-            <!-- Temperature Selector -->
-            <div class="option-group" id="optGroupTemp">
-                <div class="og-label">Suhu Minuman</div>
-                <div class="og-pills" id="optPillsTemp"></div>
-            </div>
-
-            <!-- Ice Level -->
-            <div class="option-group" id="optGroupIce">
-                <div class="og-label">Jumlah Es (Ice Level)</div>
-                <div class="og-pills" id="optPillsIce"></div>
-            </div>
-
-            <!-- Sugar Level -->
-            <div class="option-group" id="optGroupSugar">
-                <div class="og-label">Tingkat Manis (Sugar Level)</div>
-                <div class="og-pills" id="optPillsSugar"></div>
-            </div>
+            <!-- Dynamic Item Options & Addons (Ukuran, Suhu, Es, Manis, Topping, Syrup) -->
+            <div id="itemOptions"></div>
 
             <!-- Special Notes -->
             <div class="form-group">
@@ -372,6 +351,168 @@
                     <p>Masukkan kode pesanan untuk melihat status pesananmu.</p>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 9. ADMIN PASSCODE / REDEEM CODE MODAL                                     -->
+<!-- ========================================================================= -->
+<div class="sheet-backdrop alert-modal-backdrop" id="adminPasscodeModal">
+    <div class="alert-card" style="max-width:360px">
+        <div class="alert-icon-wrap" style="background:#FCE7F3;color:var(--brand-primary-dark)">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3 class="alert-title" style="margin-bottom:4px">Akses Khusus Admin</h3>
+        <p class="alert-desc" style="font-size:12px;margin-bottom:14px">
+            Masukkan <b>Redeem Code / Passcode Admin</b> untuk mengelola fee dan harga menu langsung di website:
+        </p>
+
+        <div style="margin-bottom:16px">
+            <input type="password" class="form-input" id="adminPasscodeInput" placeholder="Masukkan passcode..." style="text-align:center;font-size:15px;letter-spacing:2px;font-weight:700">
+            <div id="adminPasscodeErr" style="display:none;color:#E11D48;font-size:11px;font-weight:700;margin-top:6px;text-align:center"></div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary" data-close="adminPasscodeModal" type="button" style="flex:1">Batal</button>
+            <button class="btn btn-primary" id="adminPasscodeSubmitBtn" type="button" style="flex:2">Verifikasi &amp; Masuk</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 10. ADMIN PRICING & FEE MANAGEMENT SHEET                                  -->
+<!-- ========================================================================= -->
+<div class="sheet-backdrop" id="adminPricingSheet">
+    <div class="sheet" style="max-height:92vh">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <div class="sheet-title">
+                <h3>⚙️ Kelola Fee &amp; Harga (Admin)</h3>
+                <small>Ubah fee menu langsung di website tanpa coding</small>
+            </div>
+            <button class="sheet-close" data-close="adminPricingSheet" aria-label="Tutup">✕</button>
+        </div>
+        <div class="sheet-body" style="padding-bottom:90px">
+            <!-- Alert Info -->
+            <div style="background:var(--bg-card-subtle);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--text-main);line-height:1.4">
+                💡 <b>Formula Harga:</b> <code>(Harga Asli Kopken - 50%) + Fee</code>.<br>
+                Di sini kamu bisa atur fee default, fee per kategori makanan/minuman, hingga fee khusus untuk menu tertentu!
+            </div>
+
+            <!-- 1. Fee Global / Default -->
+            <div class="admin-setting-section" style="margin-bottom:18px">
+                <label style="font-size:13px;font-weight:800;color:var(--text-main);display:block;margin-bottom:6px">
+                    1. Fee Default Per Menu (Standar)
+                </label>
+                <div style="position:relative">
+                    <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--text-muted);font-size:13px">Rp +</span>
+                    <input type="number" class="form-input" id="cfgDefaultMarkup" placeholder="5000" style="padding-left:52px;font-weight:800;font-size:15px">
+                </div>
+                <small style="color:var(--text-muted);font-size:11px">Fee dasar jika menu tidak memiliki fee khusus kategori atau menu.</small>
+            </div>
+
+            <!-- 2. Fee Kategori Makanan & Minuman -->
+            <div class="admin-setting-section" style="margin-bottom:18px">
+                <label style="font-size:13px;font-weight:800;color:var(--text-main);display:block;margin-bottom:6px">
+                    2. Fee Berdasarkan Kategori
+                </label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px">
+                    <div>
+                        <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">☕ Minuman (Coffee, etc)</small>
+                        <div style="position:relative">
+                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--text-muted);font-size:12px">Rp +</span>
+                            <input type="number" class="form-input" id="cfgCategoryDrinks" placeholder="5000" style="padding-left:46px;font-weight:800">
+                        </div>
+                    </div>
+                    <div>
+                        <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">🥪 Makanan &amp; Toast</small>
+                        <div style="position:relative">
+                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--text-muted);font-size:12px">Rp +</span>
+                            <input type="number" class="form-input" id="cfgCategoryFood" placeholder="4500" style="padding-left:46px;font-weight:800">
+                        </div>
+                    </div>
+                </div>
+                <small style="color:var(--text-muted);font-size:11px">Contoh kemauan klien: Makanan semua +4.500, Minuman semua +5.000.</small>
+            </div>
+
+            <!-- 3. Fee Khusus Menu Tertentu (Item Markup Overrides) -->
+            <div class="admin-setting-section" style="margin-bottom:18px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <label style="font-size:13px;font-weight:800;color:var(--text-main)">
+                        3. Fee Khusus Menu Tertentu
+                    </label>
+                    <span class="pill pill-premium" style="font-size:10px">Prioritas Utama</span>
+                </div>
+                <small style="color:var(--text-muted);font-size:11px;display:block;margin-bottom:8px">
+                    Contoh: Klien ingin 1 menu <b>Kopi Kenangan Mantan +6.000</b> sedangkan menu lainnya tetap standar.
+                </small>
+
+                <!-- List of current active item overrides -->
+                <div id="cfgItemOverridesList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+                    <!-- Rendered dynamically by JS -->
+                </div>
+
+                <!-- Add new item override box with Live API Menu Selector -->
+                <div style="background:var(--bg-page);border:1.5px dashed var(--brand-primary);border-radius:var(--radius-md);padding:14px;margin-top:6px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <b style="font-size:12px;font-weight:800;color:var(--text-main)">+ Tambah Fee Khusus Menu:</b>
+                        <span style="font-size:10px;color:var(--brand-primary-dark);font-weight:700;background:var(--bg-card-subtle);padding:2px 8px;border-radius:10px;border:1px solid var(--border-color)">⚡ Live dari API</span>
+                    </div>
+
+                    <!-- Row 1: Dropdown Menu Selector + Fee Amount -->
+                    <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;margin-bottom:8px">
+                        <div>
+                            <select class="form-input" id="cfgMenuSelect" style="font-size:12.5px;font-weight:700;color:var(--text-main);background:var(--bg-card);border:1.5px solid var(--border-color);cursor:pointer;width:100%;text-overflow:ellipsis">
+                                <option value="">-- 🔍 Pilih Menu dari API --</option>
+                            </select>
+                        </div>
+                        <div style="position:relative">
+                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:800;color:var(--text-muted);font-size:12px">+</span>
+                            <input type="number" class="form-input" id="cfgNewItemFee" placeholder="6000" style="padding-left:26px;font-size:13px;font-weight:800;width:100%">
+                        </div>
+                    </div>
+
+                    <!-- Optional Fallback: Manual Name Input (if user specifically selects manual) -->
+                    <div id="cfgCustomNameWrap" style="display:none;margin-bottom:8px">
+                        <input type="text" class="form-input" id="cfgNewItemName" placeholder="Ketik nama menu manual..." style="font-size:12px">
+                    </div>
+
+                    <!-- Row 2: Add Button Full Width -->
+                    <button type="button" class="btn btn-primary btn-block" id="cfgAddNewItemBtn" style="font-size:13px;padding:10px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px">
+                        <span>+ Pasang Fee Khusus</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. Fee Satuan & Kantong Belanja -->
+            <div class="admin-setting-section" style="margin-bottom:20px">
+                <label style="font-size:13px;font-weight:800;color:var(--text-main);display:block;margin-bottom:6px">
+                    4. Biaya Tambahan Lainnya (Addon)
+                </label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div>
+                        <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Fee Order 1 Pcs</small>
+                        <div style="position:relative">
+                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--text-muted);font-size:12px">Rp +</span>
+                            <input type="number" class="form-input" id="cfgSingleItemFee" placeholder="2000" style="padding-left:46px;font-weight:800">
+                        </div>
+                    </div>
+                    <div>
+                        <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Kantong Plastik</small>
+                        <div style="position:relative">
+                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--text-muted);font-size:12px">Rp +</span>
+                            <input type="number" class="form-input" id="cfgPlasticBagFee" placeholder="1000" style="padding-left:46px;font-weight:800">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sheet-actions" style="border-top:1px solid var(--border-color);padding:14px 18px;background:var(--bg-card)">
+            <button class="btn btn-primary btn-block" id="saveAdminPricingBtn" type="button" style="font-weight:900">
+                <span>💾 Simpan Perubahan Fee</span>
+            </button>
         </div>
     </div>
 </div>

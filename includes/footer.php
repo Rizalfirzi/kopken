@@ -1,3 +1,4 @@
+
     <!-- Floating Cart Bar -->
     <div class="floating-cart" id="floatingCart">
         <div class="fc-left">
@@ -29,7 +30,13 @@ window.INITIAL_DATA = {
     plasticBagFee: <?= (int) config('fees.plastic_bag_fee', 1000) ?>,
     bundlingItems: <?= json_encode(config('bundling_items', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
     premiumList: <?= json_encode(config('outlets.premium_list', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
-    premiumCodes: <?= json_encode(config('outlets.premium_codes', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+    premiumCodes: <?= json_encode(config('outlets.premium_codes', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+    pricing: {
+        defaultMarkup: <?= (float) config('pricing.default_markup', 5000) ?>,
+        categoryMarkups: <?= json_encode(config('pricing.category_markups', []), JSON_UNESCAPED_UNICODE) ?>,
+        itemMarkupOverrides: <?= json_encode(config('pricing.item_markup_overrides', []), JSON_UNESCAPED_UNICODE) ?>,
+    },
+    addons: <?= json_encode(config('addons', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
 };
 </script>
 

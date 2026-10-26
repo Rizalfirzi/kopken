@@ -39,6 +39,12 @@ if (!$initialOutlet && !empty($initialOutlets)) {
 // Fetch initial menu & stock for selected outlet
 $initialMenu = $api->getMenu($defaultOutletCode);
 
+// Sync initialOutlet premium status with initialMenu (Single source of truth: Mantan 22k)
+if ($initialOutlet) {
+    $initialOutlet['isPremium'] = !empty($initialMenu['premium']);
+    $initialOutlet['premium'] = !empty($initialMenu['premium']);
+}
+
 // Include Header Template
 require_once __DIR__ . '/includes/header.php';
 ?>
@@ -146,6 +152,11 @@ require_once __DIR__ . '/includes/header.php';
             <div class="bio-footer">
                 <span>© <?= date('Y') ?> <?= strtoupper(htmlspecialchars($storeTitle)) ?>. ALL RIGHTS RESERVED.</span>
                 <small><?= htmlspecialchars($domainName) ?></small>
+                <div style="margin-top:8px">
+                    <button type="button" class="open-admin-trigger-link" id="openAdminPricingBtn" title="Kelola Fee &amp; Harga" aria-label="Kelola Fee &amp; Harga" style="background:transparent;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:4px;opacity:0.6;transition:var(--transition)">
+                        <span>⚙️</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
