@@ -58,15 +58,15 @@ $config = [
         'hero_desc' => 'Pilih outlet terdekat untuk cek stok menu real-time dan pesan langsung via WhatsApp dengan harga hemat!',
 
         // KONTAK ORDER WHATSAPP & SOSIAL MEDIA (Poin 5)
-        'admin_phone' => '6288298374458',
+        'admin_phone' => '08972276154',
         'order_prefix' => 'KYUTI',
         'default_outlet' => 'LA.CODEFIN',
 
         'social_links' => [
-            'wa' => 'https://wa.me/6288298374458?text=Halo%20Kedai%20Kyuti%2C%20mau%20order%20dong%20%E2%99%A1',
-            'tele_testi' => 'https://t.me/testikedaikyuti',
-            'x_twitter' => 'https://x.com/kedaikyuti',
-            'wa_channel' => 'https://whatsapp.com/channel/kedaikyuti',
+            'wa' => 'https://wa.me/628972276154',
+            'tele_testi' => 'https://t.me/kedaikyuti',
+            'x_twitter' => 'https://x.com/lolaloliyo?s=11',
+            'wa_channel' => 'https://whatsapp.com/channel/0029VbDgR1s6BIEb4d0JWl26',
         ],
     ],
 
@@ -107,30 +107,33 @@ $config = [
     // Formula: (Harga Asli Kopken - 50% + Fee)
     // =========================================================================
     'pricing' => [
-        // Diskon persen dari harga asli outlet (contoh: 50%)
+        // Diskon persen dari harga asli outlet (default: 50%)
         'discount_percent' => 50,
 
-        // Fee default per item (contoh: +5.000)
+        // Fee default per item jika tidak diatur di kategori/menu (contoh: +5.000)
         'default_markup' => 5000,
 
-        // Fee per Kategori (Contoh: Food +4.500, Minuman +5.000)
+        // Fee per Kategori (Contoh: Makanan/Food +4.500, Minuman +5.000)
         'category_markups' => [
             'Coffee' => 5000,
             'Non Coffee' => 5000,
             'Frappe' => 5000,
             'Food' => 4500,
+            'Minuman' => 5000,
+            'Makanan' => 4500,
             'Bundling' => 0,
         ],
 
         // Fee khusus per Menu (Contoh: Kopi Kenangan Mantan +6.000)
-        // Format: 'key_menu' => fee_tambahan
+        // Format: 'Nama Menu' atau 'key_menu' => fee_tambahan
         'item_markup_overrides' => [
-            'kopken_mantan' => 6000, // Kopi Kenangan Mantan +6.000
+            'Kopi Kenangan Mantan' => 6000,  // Kopi Kenangan Mantan +6.000
+            'kopikenanganmantan' => 6000,
         ],
 
         // Override Harga Tetap Manual (jika ada menu yang ingin dipatok harga fix)
         'price_overrides' => [
-            // 'key_menu' => harga_fix
+            // 'Kopi Kenangan Mantan' => 15000,
         ],
     ],
 

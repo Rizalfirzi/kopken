@@ -45,6 +45,7 @@ class KopiKenanganApi
         if ($cached !== null) {
             foreach ($cached['outlets'] as &$o) {
                 $o = $this->evaluateOutletHours($o);
+                $o['isPremium'] = $this->checkIsPremiumOutlet($o);
             }
             unset($o);
             return $cached;
@@ -125,21 +126,38 @@ class KopiKenanganApi
      */
     public function checkIsPremiumOutlet(array $outlet): bool
     {
+        $category = strtolower($outlet['category'] ?? '');
+        $name = strtolower($outlet['name'] ?? '');
+        $address = strtolower($outlet['address'] ?? '');
+        $combined = $category . ' ' . $name . ' ' . $address;
+
+        // Gas stations / SPBU (Shell, Pertamina, BP, SPBU) are regular outlets, NOT premium
+        $isGasStation = str_contains($category, 'gas station')
+            || str_contains($combined, 'spbu')
+            || str_contains($combined, 'pom bensin')
+            || str_contains($name, 'shell ')
+            || str_starts_with($name, 'shell')
+            || str_starts_with($name, 'pertamina')
+            || str_starts_with($name, 'bp ');
+
+        if ($isGasStation && !str_contains($combined, 'bandara') && !str_contains($combined, 'airport')) {
+            return false;
+        }
+
+        // Upstream explicit indicator (if provided and not gas station)
         if (!empty($outlet['isPremium']) || !empty($outlet['premium'])) {
             return true;
         }
 
-        $category = strtolower($outlet['category'] ?? '');
-        $name = strtolower($outlet['name'] ?? '');
-        $address = strtolower($outlet['address'] ?? '');
-
+        // Keywords for actual premium outlets (Mall, Bandara, Stasiun Kereta Api, etc.)
         $premiumKeywords = [
-            'mall', 'plaza', 'bandara', 'airport', 'stasiun', 'station',
-            'terminal', 'grand', 'resort', 'hospital', 'rs.', 'ciputra', 'tunjungan'
+            'mall', 'plaza', 'bandara', 'airport', 'stasiun', 'train station',
+            'railway station', 'terminal bandara', 'grand indonesia', 'tunjungan plaza',
+            'ciputra world', 'senayan city', 'pacific place', 'central park', 'pakuwon'
         ];
 
         foreach ($premiumKeywords as $kw) {
-            if (str_contains($category, $kw) || str_contains($name, $kw) || str_contains($address, $kw)) {
+            if (str_contains($combined, $kw)) {
                 return true;
             }
         }
@@ -287,12 +305,43 @@ class KopiKenanganApi
                 $origPrice = (float) ($item['price'] ?? 0);
             }
 
-            // Determine Markup Fee: Item override > Category markup > Default markup
-            if (isset($itemMarkupOverrides[$key])) {
-                $fee = (float) $itemMarkupOverrides[$key];
-            } elseif (isset($categoryMarkups[$category])) {
-                $fee = (float) $categoryMarkups[$category];
-            } else {
+            // Determine Markup Fee: Item override (by key or name) > Category markup > Default markup
+            $fee = null;
+            $name = $item['name'] ?? '';
+            $normKey = strtolower(str_replace([' ', '_', '-'], '', $key));
+            $normName = strtolower(str_replace([' ', '_', '-'], '', $name));
+
+            // 1. Check Item Markup Override by key or name
+            foreach ($itemMarkupOverrides as $oKey => $oFee) {
+                $normOK = strtolower(str_replace([' ', '_', '-'], '', (string)$oKey));
+                if ($oKey === $key || $oKey === $name || $normOK === $normKey || $normOK === $normName || str_contains($normName, $normOK) || str_contains($normKey, $normOK)) {
+                    $fee = (float) $oFee;
+                    break;
+                }
+            }
+
+            // 2. Check Category Markup
+            if ($fee === null) {
+                foreach ($categoryMarkups as $cKey => $cFee) {
+                    $cLower = strtolower($cKey);
+                    $catLower = strtolower($category);
+                    if ($cKey === $category || $cLower === $catLower) {
+                        $fee = (float) $cFee;
+                        break;
+                    }
+                    if (($cLower === 'food' || $cLower === 'makanan') && (!empty($item['isFood']) || $catLower === 'food')) {
+                        $fee = (float) $cFee;
+                        break;
+                    }
+                    if (($cLower === 'minuman' || $cLower === 'drinks' || $cLower === 'beverage') && empty($item['isFood']) && $catLower !== 'food') {
+                        $fee = (float) $cFee;
+                        break;
+                    }
+                }
+            }
+
+            // 3. Fallback to default markup
+            if ($fee === null) {
                 $fee = $defaultMarkup;
             }
 
@@ -300,9 +349,13 @@ class KopiKenanganApi
             $discountedBase = $origPrice * (1 - ($discountPercent / 100));
             $calculatedPrice = round($discountedBase + $fee);
 
-            // Manual fixed price override if configured
-            if (isset($priceOverrides[$key])) {
-                $calculatedPrice = (float) $priceOverrides[$key];
+            // Manual fixed price override if configured (by key or name)
+            foreach ($priceOverrides as $pKey => $pPrice) {
+                $normPK = strtolower(str_replace([' ', '_', '-'], '', (string)$pKey));
+                if ($pKey === $key || $pKey === $name || $normPK === $normKey || $normPK === $normName) {
+                    $calculatedPrice = (float) $pPrice;
+                    break;
+                }
             }
 
             $item['price'] = $calculatedPrice;
@@ -505,7 +558,13 @@ class KopiKenanganApi
         $waMessage .= "𝒯𝒽𝒶𝓃𝓀 𝓎𝑜𝓊 𝒻𝑜𝓇 𝒸𝒽𝑜𝑜𝓈𝒾𝓃𝑔 𝓀𝑒𝒹𝒶𝒾 𝓀𝓎𝓊𝓉𝒾! ୨୧ ♡\n";
         $waMessage .= "Mohon diproses ya min, terima kasih! 🌷✨";
 
-        $waUrl = 'https://wa.me/' . $adminPhone . '?text=' . rawurlencode($waMessage);
+        $waBaseLink = (string) config('store.social_links.wa', '');
+        if (!empty($waBaseLink) && str_contains($waBaseLink, 'wa.me')) {
+            $delim = str_contains($waBaseLink, '?') ? '&' : '?';
+            $waUrl = $waBaseLink . $delim . 'text=' . rawurlencode($waMessage);
+        } else {
+            $waUrl = 'https://wa.me/' . $adminPhone . '?text=' . rawurlencode($waMessage);
+        }
 
         return [
             'success' => true,

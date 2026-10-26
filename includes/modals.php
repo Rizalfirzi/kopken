@@ -28,10 +28,26 @@
                 <span class="wc-text">Delivery boleh tanya di WA dulu</span>
             </div>
 
+            <!-- Social Links Strip (Revisi Poin 4: Komunitas & Kontak di Halaman Awal/Welcome) -->
+            <div class="wc-social-strip">
+                <a href="<?= htmlspecialchars(config('store.social_links.wa', 'https://wa.me/message/7PJFBJ3DLCINJ1')) ?>" target="_blank" rel="noopener" class="wc-soc-pill" title="WhatsApp Admin">
+                    <span>💬 WA</span>
+                </a>
+                <a href="<?= htmlspecialchars(config('store.social_links.tele_testi', 'https://t.me/kedaikyuti')) ?>" target="_blank" rel="noopener" class="wc-soc-pill" title="Telegram @kedaikyuti">
+                    <span>✈️ Tele</span>
+                </a>
+                <a href="<?= htmlspecialchars(config('store.social_links.x_twitter', 'https://x.com/lolaloliyo?s=11')) ?>" target="_blank" rel="noopener" class="wc-soc-pill" title="X (Twitter) @lolaloliyo">
+                    <span>🐦 X</span>
+                </a>
+                <a href="<?= htmlspecialchars(config('store.social_links.wa_channel', 'https://whatsapp.com/channel/0029VbDgR1s6BIEb4d0JWl26')) ?>" target="_blank" rel="noopener" class="wc-soc-pill" title="Saluran WhatsApp JASDORTII">
+                    <span>📢 Saluran</span>
+                </a>
+            </div>
+
             <div class="wc-thankyou">
                 🩰 <i>𝒯𝒽𝒶𝓃𝓀 𝓎𝑜𝓊 𝒻𝑜𝓇 𝒸𝒽𝑜𝑜𝓈𝒾𝓃𝑔 𝓀𝑒𝒹𝒶𝒾 𝓀𝓎𝓊𝓉𝒾!</i> 🩰
             </div>
-            <p class="wc-sub-prompt">Yukk, lanjut order kyuties! 💕</p>
+            <p class="wc-sub-prompt">Okii, pilih outlet dulu ♡</p>
         </div>
 
         <div class="wc-action">
@@ -68,7 +84,7 @@
         </div>
         <h3 class="alert-title">Outlet premium</h3>
         <p class="alert-desc" id="premiumOutletDesc">
-            Harga di <b id="premiumOutletNameText">Outlet</b> lebih mahal dari outlet biasa (mis: mall, stasiun, bandara), jadi harga menu menyesuaikan. Satuan &amp; Bundling tidak berlaku di outlet ini.
+            Harga di <b id="premiumOutletNameText"><?= htmlspecialchars($initialOutlet['name'] ?? 'Outlet') ?></b> lebih mahal dari outlet biasa. Harga dan menu menyesuaikan. Untuk paket bundling tidak tersedia di outlet premium.
         </p>
         <div class="alert-action">
             <button class="btn btn-primary btn-block" id="premiumOutletOkBtn" type="button">Oke, lanjut</button>

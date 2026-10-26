@@ -60,6 +60,26 @@ require_once __DIR__ . '/includes/header.php';
                 <p class="bio-desc"><?= htmlspecialchars(config('store.bio_desc', 'fast response, friendly prices, and service made with love ♡')) ?></p>
             </div>
 
+            <!-- Deretan Icon Media Sosial (Revisi Poin 4: Komunitas & Kontak di Halaman Landing Pertama) -->
+            <div class="bio-social-bar">
+                <a href="<?= htmlspecialchars($socialLinks['wa'] ?? 'https://wa.me/message/7PJFBJ3DLCINJ1') ?>" target="_blank" rel="noopener" class="bio-social-icon-btn bio-soc-wa" title="WhatsApp Admin">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6a8.3 8.3 0 0 1-1.1-4.4A8.5 8.5 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg>
+                    <span>WA</span>
+                </a>
+                <a href="<?= htmlspecialchars($socialLinks['tele_testi'] ?? 'https://t.me/kedaikyuti') ?>" target="_blank" rel="noopener" class="bio-social-icon-btn bio-soc-tele" title="Telegram @kedaikyuti">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    <span>Tele</span>
+                </a>
+                <a href="<?= htmlspecialchars($socialLinks['x_twitter'] ?? 'https://x.com/lolaloliyo?s=11') ?>" target="_blank" rel="noopener" class="bio-social-icon-btn bio-soc-x" title="X (Twitter) @lolaloliyo">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    <span>X</span>
+                </a>
+                <a href="<?= htmlspecialchars($socialLinks['wa_channel'] ?? 'https://whatsapp.com/channel/0029VbDgR1s6BIEb4d0JWl26') ?>" target="_blank" rel="noopener" class="bio-social-icon-btn bio-soc-channel" title="Saluran WhatsApp JASDORTII">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    <span>Saluran</span>
+                </a>
+            </div>
+
             <div class="bio-links-grid">
                 <!-- 1. Pricelist Button (Main Call to Action) -->
                 <button class="bio-link-btn bio-btn-primary" id="openPricelistBtn" type="button">
@@ -75,7 +95,7 @@ require_once __DIR__ . '/includes/header.php';
                 </button>
 
                 <!-- 2. WhatsApp Admin -->
-                <a class="bio-link-btn" href="<?= htmlspecialchars($socialLinks['wa'] ?? 'https://wa.me/' . $adminPhone) ?>" target="_blank" rel="noopener">
+                <a class="bio-link-btn" href="<?= htmlspecialchars($socialLinks['wa'] ?? 'https://wa.me/message/7PJFBJ3DLCINJ1') ?>" target="_blank" rel="noopener">
                     <div class="bl-icon" style="color:#22C55E">💬</div>
                     <div class="bl-info">
                         <span class="bl-title">WhatsApp Admin</span>
@@ -87,10 +107,10 @@ require_once __DIR__ . '/includes/header.php';
                 </a>
 
                 <!-- 3. Testi Customer (Telegram) -->
-                <a class="bio-link-btn" href="<?= htmlspecialchars($socialLinks['tele_testi'] ?? 'https://t.me/testikedaikyuti') ?>" target="_blank" rel="noopener">
+                <a class="bio-link-btn" href="<?= htmlspecialchars($socialLinks['tele_testi'] ?? 'https://t.me/kedaikyuti') ?>" target="_blank" rel="noopener">
                     <div class="bl-icon" style="color:#38BDF8">📸</div>
                     <div class="bl-info">
-                        <span class="bl-title">Testi Customer (Telegram)</span>
+                        <span class="bl-title">Telegram @kedaikyuti</span>
                         <span class="bl-sub">Lihat ribuan bukti order sahabat kyuti</span>
                     </div>
                     <div class="bl-arrow">
@@ -99,10 +119,10 @@ require_once __DIR__ . '/includes/header.php';
                 </a>
 
                 <!-- 4. X (Twitter) -->
-                <a class="bio-link-btn" href="<?= htmlspecialchars($socialLinks['x_twitter'] ?? 'https://x.com/kedaikyuti') ?>" target="_blank" rel="noopener">
+                <a class="bio-link-btn" href="<?= htmlspecialchars($socialLinks['x_twitter'] ?? 'https://x.com/lolaloliyo?s=11') ?>" target="_blank" rel="noopener">
                     <div class="bl-icon" style="color:#111">🐦</div>
                     <div class="bl-info">
-                        <span class="bl-title">X (Twitter) @kedaikyuti</span>
+                        <span class="bl-title">X (Twitter) @lolaloliyo</span>
                         <span class="bl-sub">Update promo harian & giveaway</span>
                     </div>
                     <div class="bl-arrow">
@@ -111,11 +131,11 @@ require_once __DIR__ . '/includes/header.php';
                 </a>
 
                 <!-- 5. Saluran WhatsApp -->
-                <a class="bio-link-btn" href="<?= htmlspecialchars($socialLinks['wa_channel'] ?? 'https://whatsapp.com/channel/kedaikyuti') ?>" target="_blank" rel="noopener">
+                <a class="bio-link-btn" href="<?= htmlspecialchars($socialLinks['wa_channel'] ?? 'https://whatsapp.com/channel/0029VbDgR1s6BIEb4d0JWl26') ?>" target="_blank" rel="noopener">
                     <div class="bl-icon" style="color:#10B981">📢</div>
                     <div class="bl-info">
-                        <span class="bl-title">Saluran WhatsApp</span>
-                        <span class="bl-sub">Katalog menu & info promo terbatas</span>
+                        <span class="bl-title">Saluran WhatsApp JASDORTII</span>
+                        <span class="bl-sub">Ikuti saluran JASDORTII di WhatsApp</span>
                     </div>
                     <div class="bl-arrow">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
@@ -213,14 +233,7 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <!-- Live Stock Indicator Strip -->
-        <div class="stock-live-strip">
-            <div>
-                <span>Status Data: </span>
-                <b id="liveSourceText"><?= (!empty($initialMenu['live']) ? 'Stok Live dari Outlet Terpilih' : 'Mode Offline / Fallback') ?></b>
-            </div>
-            <div id="lastSyncTime" style="font-size:10px">Baru saja diperbarui</div>
-        </div>
+
 
         <!-- Menu Grid Container -->
         <main class="menu-section" id="menuContainer">

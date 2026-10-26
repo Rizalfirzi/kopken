@@ -172,18 +172,47 @@ if (navHubToggleBtn) {
 
 function isPremiumOutlet(outlet) {
     if (!outlet) return false;
-    if (outlet.isPremium || outlet.premium) return true;
     const cat = (outlet.category || '').toLowerCase();
     const name = (outlet.name || '').toLowerCase();
     const addr = (outlet.address || '').toLowerCase();
-    const keywords = ['mall', 'plaza', 'bandara', 'airport', 'stasiun', 'station', 'ciputra', 'tunjungan', 'grand'];
-    return keywords.some(k => cat.includes(k) || name.includes(k) || addr.includes(k));
+    const combined = `${cat} ${name} ${addr}`;
+
+    // Gas station / SPBU (Shell, Pertamina, BP, SPBU) are regular outlets, NEVER premium
+    const isGasStation = cat.includes('gas station')
+        || combined.includes('spbu')
+        || combined.includes('pom bensin')
+        || name.startsWith('shell')
+        || name.startsWith('pertamina')
+        || name.startsWith('bp ');
+
+    if (isGasStation && !combined.includes('bandara') && !combined.includes('airport')) {
+        return false;
+    }
+
+    if ((outlet.isPremium === true || outlet.premium === true) && !isGasStation) {
+        return true;
+    }
+
+    const keywords = [
+        'mall', 'plaza', 'bandara', 'airport', 'stasiun', 'train station',
+        'railway station', 'terminal bandara', 'grand indonesia', 'tunjungan plaza',
+        'ciputra world', 'senayan city', 'pacific place', 'central park', 'pakuwon'
+    ];
+
+    return keywords.some(k => combined.includes(k));
 }
 
 function checkAndShowPremiumOutletAlert(outlet) {
     if (isPremiumOutlet(outlet)) {
-        const nameEl = document.getElementById('premiumOutletNameText');
-        if (nameEl) nameEl.textContent = outlet.name;
+        const descEl = document.getElementById('premiumOutletDesc');
+        if (descEl) {
+            descEl.innerHTML = `Harga di <b id="premiumOutletNameText"></b> lebih mahal dari outlet biasa. Harga dan menu menyesuaikan. Untuk paket bundling tidak tersedia di outlet premium.`;
+            const nameEl = descEl.querySelector('#premiumOutletNameText');
+            if (nameEl) nameEl.textContent = outlet.name || 'Outlet';
+        } else {
+            const nameEl = document.getElementById('premiumOutletNameText');
+            if (nameEl) nameEl.textContent = outlet.name || 'Outlet';
+        }
         openSheet('premiumOutletModal');
     }
 }
