@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/KopiKenanganApi.php';
 
-$validPasscode = trim((string)config('admin.passcode', 'KYUTI2026'));
+$validPasscode = trim((string)config('admin.passcode', 'WHOSUTII26'));
 $dataPath = __DIR__ . '/../data/pricing_settings.json';
 
 // Function to get current merged pricing configuration
@@ -36,7 +36,7 @@ function getCurrentPricing($dataPath) {
         ]),
         'single_item_fee' => (float) config('fees.single_item_fee', 2000),
         'plastic_bag_fee' => (float) config('fees.plastic_bag_fee', 1000),
-        'admin_passcode' => (string) config('admin.passcode', 'KYUTI2026'),
+        'admin_passcode' => (string) config('admin.passcode', 'WHOSUTII26'),
     ];
 
     if (file_exists($dataPath)) {
