@@ -355,30 +355,91 @@ $config = [
 ];
 
 // =========================================================================
-// MERGE DYNAMIC PRICING DARI ADMIN PANEL (data/pricing_settings.json)
+// MERGE DYNAMIC PRICING DARI ADMIN PANEL (data/pricing_settings.json, /tmp cache, & Cookie fallback)
 // =========================================================================
-$dynamicPricingFile = __DIR__ . '/data/pricing_settings.json';
-if (file_exists($dynamicPricingFile)) {
-    $dynamicData = json_decode(@file_get_contents($dynamicPricingFile), true);
-    if (is_array($dynamicData)) {
-        if (isset($dynamicData['default_markup'])) {
-            $config['pricing']['default_markup'] = (float)$dynamicData['default_markup'];
+// 1. Check Cloud Database (Vercel KV / Upstash Redis REST API) if configured in Vercel Environment Variables
+$kvUrl = getenv('KV_REST_API_URL') ?: getenv('UPSTASH_REDIS_REST_URL') ?: null;
+$kvToken = getenv('KV_REST_API_TOKEN') ?: getenv('UPSTASH_REDIS_REST_TOKEN') ?: null;
+
+$dynamicData = null;
+if (!empty($kvUrl) && !empty($kvToken)) {
+    $tempKvCache = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'kv_pricing_cache.json';
+    if (file_exists($tempKvCache) && (time() - filemtime($tempKvCache)) < 10) {
+        $dynamicData = json_decode(@file_get_contents($tempKvCache), true);
+    } else {
+        $ch = curl_init(rtrim($kvUrl, '/') . '/get/pricing_settings');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ["Authorization: Bearer {$kvToken}"],
+            CURLOPT_TIMEOUT => 2,
+            CURLOPT_SSL_VERIFYPEER => false,
+        ]);
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        if ($resp) {
+            $kvJson = json_decode($resp, true);
+            if (!empty($kvJson['result'])) {
+                $rawResult = is_string($kvJson['result']) ? json_decode($kvJson['result'], true) : $kvJson['result'];
+                if (is_array($rawResult)) {
+                    $dynamicData = $rawResult;
+                    @file_put_contents($tempKvCache, json_encode($dynamicData));
+                }
+            }
         }
-        if (isset($dynamicData['category_markups']) && is_array($dynamicData['category_markups'])) {
-            $config['pricing']['category_markups'] = array_merge($config['pricing']['category_markups'], $dynamicData['category_markups']);
+    }
+}
+
+// 2. Fallback to Local Files (/tmp cache on Vercel or data/pricing_settings.json)
+if ($dynamicData === null) {
+    $dynamicPricingCandidates = [
+        (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'pricing_settings.json',
+        __DIR__ . '/data/pricing_settings.json',
+    ];
+
+    foreach ($dynamicPricingCandidates as $dynFile) {
+        if (file_exists($dynFile)) {
+            $parsed = json_decode(@file_get_contents($dynFile), true);
+            if (is_array($parsed)) {
+                $dynamicData = $parsed;
+                break;
+            }
         }
-        if (isset($dynamicData['item_markup_overrides']) && is_array($dynamicData['item_markup_overrides'])) {
-            $config['pricing']['item_markup_overrides'] = array_merge($config['pricing']['item_markup_overrides'], $dynamicData['item_markup_overrides']);
-        }
-        if (isset($dynamicData['single_item_fee'])) {
-            $config['fees']['single_item_fee'] = (float)$dynamicData['single_item_fee'];
-        }
-        if (isset($dynamicData['plastic_bag_fee'])) {
-            $config['fees']['plastic_bag_fee'] = (float)$dynamicData['plastic_bag_fee'];
-        }
-        if (!empty($dynamicData['admin_passcode'])) {
-            $config['admin']['passcode'] = trim($dynamicData['admin_passcode']);
-        }
+    }
+}
+
+// Fallback to Cookie if present (ensures seamless instant sync on serverless platforms like Vercel)
+if ($dynamicData === null && !empty($_COOKIE['kyuti_custom_pricing'])) {
+    $rawCookie = $_COOKIE['kyuti_custom_pricing'];
+    $parsedCookie = json_decode(urldecode($rawCookie), true);
+    if (!is_array($parsedCookie)) {
+        $parsedCookie = json_decode($rawCookie, true);
+    }
+    if (is_array($parsedCookie)) {
+        $dynamicData = $parsedCookie;
+    }
+}
+
+if (is_array($dynamicData)) {
+    if (isset($dynamicData['default_markup'])) {
+        $config['pricing']['default_markup'] = max(0, (float)$dynamicData['default_markup']);
+    }
+    if (isset($dynamicData['category_markups']) && is_array($dynamicData['category_markups'])) {
+        $config['pricing']['category_markups'] = $dynamicData['category_markups'];
+    }
+    // CRITICAL BUGFIX: Direct assignment, NOT array_merge!
+    // When an admin deletes an item override, $dynamicData['item_markup_overrides'] is [] (empty).
+    // array_merge with the default array would wrongly restore the deleted item override.
+    if (isset($dynamicData['item_markup_overrides']) && is_array($dynamicData['item_markup_overrides'])) {
+        $config['pricing']['item_markup_overrides'] = $dynamicData['item_markup_overrides'];
+    }
+    if (isset($dynamicData['single_item_fee'])) {
+        $config['fees']['single_item_fee'] = max(0, (float)$dynamicData['single_item_fee']);
+    }
+    if (isset($dynamicData['plastic_bag_fee'])) {
+        $config['fees']['plastic_bag_fee'] = max(0, (float)$dynamicData['plastic_bag_fee']);
+    }
+    if (!empty($dynamicData['admin_passcode'])) {
+        $config['admin']['passcode'] = trim((string)$dynamicData['admin_passcode']);
     }
 }
 

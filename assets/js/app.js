@@ -539,7 +539,7 @@ function fetchMenu(outletCode, forceRefresh = false) {
     const refreshBtn = document.getElementById('refreshStockBtn');
     if (refreshBtn) refreshBtn.classList.add('spinning');
 
-    fetch(`api/menu.php?outlet=${encodeURIComponent(outletCode)}&refresh=${forceRefresh ? 1 : 0}`)
+    fetch(`api/menu.php?outlet=${encodeURIComponent(outletCode)}&refresh=${forceRefresh ? 1 : 0}${forceRefresh ? `&_t=${Date.now()}` : ''}`)
         .then(res => res.json())
         .then(data => {
             AppState.menu = data;
@@ -1866,9 +1866,9 @@ let adminPricingState = {
         Minuman: 5000,
         Makanan: 4500,
     },
-    itemMarkupOverrides: window.INITIAL_DATA?.pricing?.itemMarkupOverrides || {
-        'Kopi Kenangan Mantan': 6000,
-    },
+    itemMarkupOverrides: (window.INITIAL_DATA?.pricing?.itemMarkupOverrides && typeof window.INITIAL_DATA.pricing.itemMarkupOverrides === 'object' && !Array.isArray(window.INITIAL_DATA.pricing.itemMarkupOverrides))
+        ? Object.assign({}, window.INITIAL_DATA.pricing.itemMarkupOverrides)
+        : {},
     singleItemFee: window.INITIAL_DATA?.singleItemFee || 2000,
     plasticBagFee: window.INITIAL_DATA?.plasticBagFee || 1000,
 };
@@ -2063,6 +2063,30 @@ function initAdminPricingFeature() {
                     if (res.success) {
                         AppState.singleItemFeeAmount = singleFee;
                         AppState.plasticBagFeeAmount = plasticFee;
+
+                        // Synchronize in-memory admin pricing state & initial data
+                        if (res.data) {
+                            adminPricingState.itemMarkupOverrides = Object.assign({}, res.data.item_markup_overrides || {});
+                            if (window.INITIAL_DATA?.pricing) {
+                                window.INITIAL_DATA.pricing.itemMarkupOverrides = Object.assign({}, res.data.item_markup_overrides || {});
+                                window.INITIAL_DATA.pricing.defaultMarkup = res.data.default_markup ?? defMarkup;
+                                window.INITIAL_DATA.pricing.categoryMarkups = Object.assign({}, res.data.category_markups || {});
+                            }
+                        } else {
+                            adminPricingState.itemMarkupOverrides = Object.assign({}, payload.item_markup_overrides || {});
+                        }
+
+                        // Save to localStorage for instant client-side persistence across reloads
+                        try {
+                            localStorage.setItem('kyuti_custom_pricing', JSON.stringify(res.data || payload));
+                        } catch (e) {}
+
+                        // Also set a 1-year Cookie so EVERY request (including menu & checkout) sends this pricing to Vercel PHP backend
+                        try {
+                            const cookieData = encodeURIComponent(JSON.stringify(res.data || payload));
+                            document.cookie = `kyuti_custom_pricing=${cookieData}; path=/; max-age=31536000; SameSite=Lax`;
+                        } catch (e) {}
+
                         updateCartUI();
 
                         closeSheet('adminPricingSheet');
