@@ -1778,11 +1778,33 @@ body {
     margin-bottom: 12px;
 }
 
+.bundle-slot-box {
+    margin-bottom: 16px;
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px;
+}
+
 .bundle-slot-label {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 800;
     color: var(--brand-primary-dark);
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bundle-subgroup-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 12px 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed var(--border-color);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1791,26 +1813,78 @@ body {
 .bundle-choices-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
+    gap: 8px;
+}
+
+.bundle-choices-grid.single-col {
+    grid-template-columns: 1fr;
 }
 
 .bundle-choice-card {
-    padding: 8px;
+    position: relative;
+    padding: 10px 12px;
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border-color);
-    background: var(--bg-card);
-    font-size: 11px;
-    font-weight: 700;
+    border: 1.5px solid var(--border-color);
+    background: #FFFFFF;
+    font-size: 11.5px;
+    font-weight: 600;
     cursor: pointer;
-    text-align: center;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
     transition: var(--transition);
+    user-select: none;
+}
+
+.bundle-choice-card:hover:not(.sold-out) {
+    border-color: var(--brand-primary);
+    background: #FFF5F7;
 }
 
 .bundle-choice-card.selected {
-    background: var(--brand-primary-light);
+    background: #FFF0F5;
     border-color: var(--brand-primary-dark);
     color: var(--brand-primary-dark);
     font-weight: 800;
+    box-shadow: 0 0 0 1px var(--brand-primary-dark);
+}
+
+.bundle-choice-card .bundle-opt-name {
+    flex: 1;
+    line-height: 1.35;
+}
+
+.bundle-choice-card .bundle-opt-price {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--brand-primary-dark);
+    white-space: nowrap;
+    padding: 2px 6px;
+    background: rgba(219, 39, 119, 0.08);
+    border-radius: 4px;
+}
+
+.bundle-choice-card.sold-out {
+    opacity: 0.55;
+    background: #F3F4F6 !important;
+    border-color: #E5E7EB !important;
+    color: #9CA3AF !important;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.bundle-opt-badge-sold {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 800;
+    color: #DC2626;
+    background: #FEE2E2;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
 }
 
 /* Floating Cart */

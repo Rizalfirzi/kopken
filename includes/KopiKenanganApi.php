@@ -518,9 +518,11 @@ class KopiKenanganApi
                         'img' => $b['img'],
                         'desc' => $b['desc'] ?? '',
                         'price' => (float) $b['price'],
+                        'priceLabel' => $b['priceLabel'] ?? '',
                         'normalPrice' => (float) ($b['normalPrice'] ?? 0),
                         'isSoldOut' => !empty($b['isSoldOut']),
                         'tag' => $b['tag'] ?? 'BUNDLING',
+                        'size' => $b['size'] ?? '',
                         'isBundling' => true,
                         'slots' => $b['slots'] ?? [],
                         'options' => $b['options'] ?? [

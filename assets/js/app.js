@@ -735,7 +735,7 @@ function renderMenu() {
                         <h4 class="product-name">${item.name}</h4>
                         <div class="product-cat">${item.category || 'Minuman'}</div>
                         <div class="product-price-row">
-                            <span class="product-price">${formatRp(item.price)}</span>
+                            <span class="product-price">${item.priceLabel ? item.priceLabel : formatRp(item.price)}</span>
                             ${item.normalPrice && item.normalPrice > item.price ? `<span class="product-normal-price">${formatRp(item.normalPrice)}</span>` : ''}
                         </div>
                         <button class="product-add-btn" type="button" ${btnDisabled ? 'disabled aria-disabled="true"' : ''}>
@@ -779,8 +779,88 @@ if (menuContainer) {
 }
 
 // =========================================================================
-// 4. BUNDLING MODAL CONTROLLER (Revisi Poin 12)
+// 4. BUNDLING MODAL CONTROLLER (Live Outlet Stock Check & Dynamic Pricing)
 // =========================================================================
+
+function normBundleStr(str) {
+    return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const BUNDLE_ITEM_ALIASES = {
+    'chocochipcookie': ['chocochipcookie', 'chocochipcookies'],
+    'bananachocosoftbake': ['bananachocosoftbakedcookie', 'bananachocosoftbake', 'bananachoco'],
+    'sweethoneysoftbake': ['sweethoneysoftbakedcookie', 'sweethoneysoftbake'],
+    'oatmealraisinsoftbake': ['oatmealraisinsoftbakedcookie', 'oatmealraisinsoftbake'],
+    'dutchchocokenangan': ['dutchchocokenanganfrappe', 'dutchchocolate', 'dutchchocokenangan'],
+    'butterscotchkenangan': ['butterscotchkenanganfrappe', 'butterscotchkenangan'],
+};
+
+function isSingleItemSoldOut(name) {
+    const menuItems = AppState.menu?.items || [];
+    if (!menuItems.length) return false;
+
+    const n = normBundleStr(name);
+    const targets = BUNDLE_ITEM_ALIASES[n] || [n];
+
+    // 1. Direct exact normalized match
+    for (const it of menuItems) {
+        const itN = normBundleStr(it.name);
+        for (const t of targets) {
+            if (itN === t) {
+                return Boolean(it.isSoldOut || it.notCarried);
+            }
+        }
+    }
+
+    // 2. Substring startsWith match for longer names (>= 6 chars)
+    for (const it of menuItems) {
+        const itN = normBundleStr(it.name);
+        for (const t of targets) {
+            if (t.length >= 6 && (itN.startsWith(t) || t.startsWith(itN))) {
+                return Boolean(it.isSoldOut || it.notCarried);
+            }
+        }
+    }
+
+    // 3. Not found in current outlet's menu -> outlet doesn't carry it -> Habis!
+    return true;
+}
+
+function isBundleOptionSoldOut(opt) {
+    let optName = typeof opt === 'string' ? opt : (opt?.name || '');
+    if (optName.includes('+')) {
+        const parts = optName.split('+').map(p => p.trim());
+        for (const p of parts) {
+            if (isSingleItemSoldOut(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    return isSingleItemSoldOut(optName);
+}
+
+function updateBundleModalPrice() {
+    if (!AppState.activeBundle) return;
+    const priceEl = document.getElementById('bundleModalPrice');
+    const addBtn = document.getElementById('addBundleToCartBtn');
+
+    let finalPrice = AppState.activeBundle.price;
+
+    // If options have dynamic price (e.g. Frappe bundle or Promo), take from selected choice
+    const selectedChoices = Object.values(AppState.bundleSlotChoices || {});
+    const customPrices = selectedChoices.map(c => c?.price).filter(p => typeof p === 'number' && p > 0);
+
+    if (customPrices.length > 0) {
+        finalPrice = customPrices[0];
+    }
+
+    AppState.activeBundle.currentPrice = finalPrice;
+    if (priceEl) priceEl.textContent = formatRp(finalPrice);
+    if (addBtn && !addBtn.disabled) {
+        addBtn.textContent = `Tambahkan ke Keranjang • ${formatRp(finalPrice)}`;
+    }
+}
 
 function openBundlingModal(bundle) {
     if (isOutletClosed()) {
@@ -790,6 +870,8 @@ function openBundlingModal(bundle) {
     }
     AppState.activeBundle = bundle;
     AppState.bundleSlotChoices = {};
+    AppState.bundleIce = 'Normal Ice';
+    AppState.bundleSugar = 'Normal Sugar';
 
     const titleEl = document.getElementById('bundleModalTitle');
     const descEl = document.getElementById('bundleModalDesc');
@@ -797,35 +879,118 @@ function openBundlingModal(bundle) {
     const normalPriceEl = document.getElementById('bundleModalNormalPrice');
     const imgEl = document.getElementById('bundleModalImg');
     const slotsContainer = document.getElementById('bundleSlotsContainer');
+    const noticeEl = document.getElementById('bundleStockNotice');
+    const addBtn = document.getElementById('addBundleToCartBtn');
 
     if (titleEl) titleEl.textContent = bundle.name;
     if (descEl) descEl.textContent = bundle.desc || 'Pilih kombinasi varian menu dalam paket bundling ini.';
-    if (priceEl) priceEl.textContent = formatRp(bundle.price);
+    if (priceEl) priceEl.textContent = bundle.priceLabel ? bundle.priceLabel : formatRp(bundle.price);
     if (normalPriceEl) normalPriceEl.textContent = bundle.normalPrice ? formatRp(bundle.normalPrice) : '';
-    if (imgEl) imgEl.src = bundle.img || 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?w=400';
+    if (imgEl) imgEl.src = bundle.img || 'assets/img/bundling/PAKET BUNDLING 2 CUP LARGE.jpeg';
 
-    // Render Slots Choices
+    if (noticeEl) {
+        noticeEl.style.display = 'none';
+        noticeEl.innerHTML = '';
+    }
+
+    // Reset ice & sugar pills active state
+    document.querySelectorAll('#bundleIcePills .og-pill').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx === 0);
+    });
+    document.querySelectorAll('#bundleSugarPills .og-pill').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx === 0);
+    });
+
+    let hasUnavailableRequiredSlot = false;
+    const slots = bundle.slots || [];
+
     if (slotsContainer) {
-        slotsContainer.innerHTML = (bundle.slots || []).map((slot, sIdx) => {
-            const firstChoice = slot.options && slot.options.length ? slot.options[0] : '';
-            AppState.bundleSlotChoices[sIdx] = firstChoice;
+        slotsContainer.innerHTML = slots.map((slot, sIdx) => {
+            let optionsHtml = '';
+            let selectedOptForSlot = null;
+
+            // Helper to render an option card
+            const renderCard = (opt) => {
+                const optName = typeof opt === 'string' ? opt : (opt?.name || '');
+                const optPrice = (typeof opt === 'object' && opt?.price) ? opt.price : null;
+                const isSoldOut = isBundleOptionSoldOut(opt);
+
+                let isSelected = false;
+                if (!isSoldOut && !selectedOptForSlot) {
+                    selectedOptForSlot = { name: optName, price: optPrice };
+                    isSelected = true;
+                }
+
+                const priceBadge = optPrice ? `<span class="bundle-opt-price">${formatRp(optPrice)}</span>` : '';
+                const soldBadge = isSoldOut ? `<span class="bundle-opt-badge-sold">✕ Habis</span>` : '';
+                const singleColClass = optName.length > 25 ? 'style="grid-column: 1 / -1;"' : '';
+
+                return `
+                    <div class="bundle-choice-card ${isSelected ? 'selected' : ''} ${isSoldOut ? 'sold-out' : ''}" 
+                         data-slot="${sIdx}" 
+                         data-val="${esc(optName)}" 
+                         ${optPrice ? `data-price="${optPrice}"` : ''}
+                         ${isSoldOut ? 'aria-disabled="true"' : ''}
+                         ${singleColClass}>
+                        <span class="bundle-opt-name">${esc(optName)}</span>
+                        ${soldBadge}
+                        ${priceBadge}
+                    </div>
+                `;
+            };
+
+            // Categorized groups (e.g. Minuman vs Makanan in Paket Hemat 3 Item)
+            if (slot.groups && typeof slot.groups === 'object') {
+                for (const [groupTitle, groupItems] of Object.entries(slot.groups)) {
+                    optionsHtml += `
+                        <div class="bundle-subgroup-title">${esc(groupTitle)}</div>
+                        <div class="bundle-choices-grid" data-slot="${sIdx}">
+                            ${groupItems.map(renderCard).join('')}
+                        </div>
+                    `;
+                }
+            } else {
+                // Regular or variant list
+                const isSingleCol = (slot.options || []).some(o => (typeof o === 'string' ? o : o.name || '').length > 28);
+                optionsHtml = `
+                    <div class="bundle-choices-grid ${isSingleCol ? 'single-col' : ''}" data-slot="${sIdx}">
+                        ${(slot.options || []).map(renderCard).join('')}
+                    </div>
+                `;
+            }
+
+            if (selectedOptForSlot) {
+                AppState.bundleSlotChoices[sIdx] = selectedOptForSlot;
+            } else {
+                hasUnavailableRequiredSlot = true;
+            }
 
             return `
-                <div class="bundle-slot-box">
+                <div class="bundle-slot-box" data-slot-box="${sIdx}">
                     <div class="bundle-slot-label">
                         <span>🎀</span>
                         <span>${slot.label || `Pilihan ${sIdx + 1}`}</span>
                     </div>
-                    <div class="bundle-choices-grid" data-slot="${sIdx}">
-                        ${(slot.options || []).map((opt, oIdx) => `
-                            <div class="bundle-choice-card ${oIdx === 0 ? 'selected' : ''}" data-slot="${sIdx}" data-val="${opt}">
-                                ${opt}
-                            </div>
-                        `).join('')}
-                    </div>
+                    ${optionsHtml}
                 </div>
             `;
         }).join('');
+    }
+
+    if (hasUnavailableRequiredSlot) {
+        if (noticeEl) {
+            noticeEl.style.display = 'block';
+            noticeEl.innerHTML = `⚠️ <b>Menu Paket Habis</b>: Beberapa pilihan menu dalam paket ini sedang kosong di <b>${esc(AppState.outlet?.name || 'outlet ini')}</b>. Silakan coba paket lain atau ganti outlet.`;
+        }
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.textContent = 'Menu Paket Habis di Outlet Ini';
+        }
+    } else {
+        if (addBtn) {
+            addBtn.disabled = false;
+        }
+        updateBundleModalPrice();
     }
 
     openSheet('bundlingSheet');
@@ -837,16 +1002,28 @@ if (bundleSlotsContainer) {
     bundleSlotsContainer.addEventListener('click', (e) => {
         const choiceCard = e.target.closest('.bundle-choice-card');
         if (!choiceCard) return;
+
+        if (choiceCard.classList.contains('sold-out')) {
+            showToast('⚠️ Maaf, menu ini sedang habis / kosong di outlet ini.');
+            return;
+        }
+
         const slotIdx = choiceCard.dataset.slot;
         const val = choiceCard.dataset.val;
+        const price = choiceCard.dataset.price ? Number(choiceCard.dataset.price) : null;
 
-        AppState.bundleSlotChoices[slotIdx] = val;
+        AppState.bundleSlotChoices[slotIdx] = {
+            name: val,
+            price: price
+        };
 
-        const parentGrid = choiceCard.closest('.bundle-choices-grid');
-        if (parentGrid) {
-            parentGrid.querySelectorAll('.bundle-choice-card').forEach(c => c.classList.remove('selected'));
+        const parentSlotBox = choiceCard.closest('.bundle-slot-box');
+        if (parentSlotBox) {
+            parentSlotBox.querySelectorAll('.bundle-choice-card').forEach(c => c.classList.remove('selected'));
         }
         choiceCard.classList.add('selected');
+
+        updateBundleModalPrice();
     });
 }
 
@@ -872,23 +1049,32 @@ if (addBundleToCartBtn) {
     addBundleToCartBtn.addEventListener('click', () => {
         if (!AppState.activeBundle) return;
 
-        const choicesList = Object.values(AppState.bundleSlotChoices).join(' + ');
+        const slots = AppState.activeBundle.slots || [];
+        const selectedCount = Object.keys(AppState.bundleSlotChoices).length;
+        if (selectedCount < slots.length) {
+            showToast('Silakan pilih semua varian menu paket terlebih dahulu.');
+            return;
+        }
+
+        const choicesNames = Object.values(AppState.bundleSlotChoices).map(c => (typeof c === 'object' ? c.name : c)).filter(Boolean);
+        const choicesList = choicesNames.join(' + ');
         const notes = document.getElementById('bundleNotes')?.value.trim() || '';
+        const finalPrice = AppState.activeBundle.currentPrice || AppState.activeBundle.price;
 
         const itemToAdd = {
             id: 'bundle_' + Date.now(),
             key: AppState.activeBundle.key,
             name: AppState.activeBundle.name,
-            price: AppState.activeBundle.price,
+            price: finalPrice,
             qty: 1,
-            size: '',
+            size: AppState.activeBundle.size || '',
             temp: 'Ice',
-            ice: AppState.bundleIce,
-            sugar: AppState.bundleSugar,
+            ice: AppState.bundleIce || 'Normal Ice',
+            sugar: AppState.bundleSugar || 'Normal Sugar',
             bundleChoices: choicesList,
             note: notes,
             img: AppState.activeBundle.img,
-            subtotal: AppState.activeBundle.price,
+            subtotal: finalPrice,
             isBundling: true,
         };
 

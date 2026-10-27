@@ -138,40 +138,50 @@ $config = [
     ],
 
     // =========================================================================
-    // 5. MENU BUNDLING HEMAT (Revisi Poin 12)
+    // =========================================================================
+    // 5. MENU BUNDLING HEMAT (Revisi Paket Bundling Client)
     // =========================================================================
     'bundling_items' => [
         [
-            'key' => 'bundle_duo_bestie',
-            'name' => 'Bundling Bestie Duo (2 Minuman)',
+            'key' => 'bundle_2_cup_large',
+            'name' => 'PAKET BUNDLING 2 CUP LARGE',
             'category' => 'Bundling',
-            'price' => 26000,
-            'normalPrice' => 38000,
-            'desc' => 'Paket hemat 2 cup minuman reguler favorit untuk berdua! Bebas pilih varian minuman.',
-            'img' => 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?w=400',
-            'tag' => 'BEST SELLER BUNDLE',
+            'price' => 33000,
+            'normalPrice' => 50000,
+            'desc' => 'Pilih 2 menu bebas dari pilihan minuman size large yang tersedia di foto! ♡ Bisa mix rasa favoritmu sesuai selera🥤💗',
+            'img' => 'assets/img/bundling/PAKET BUNDLING 2 CUP LARGE.jpeg',
+            'tag' => '2 CUP LARGE',
+            'size' => 'Large',
             'isSoldOut' => false,
             'slots' => [
                 [
-                    'label' => 'Minuman 1 (Reguler)',
+                    'label' => 'Minuman 1 (Large)',
                     'options' => [
+                        'Kenangan Milk Tea',
+                        'Raspberry Hibiscus',
+                        'Thai Tea Loaded',
+                        'Butterscotch Aren Latte',
+                        'Banana Americano',
                         'Kopi Kenangan Mantan',
-                        'Creamy Aren Latte',
-                        'Spanish Latte',
-                        'Americano',
+                        'Taro Milk',
                         'Taro Cloud Milk Tea',
-                        'Kenangan Milk Tea'
+                        'Spanish Latte',
+                        'Pistachio Aren Latte'
                     ]
                 ],
                 [
-                    'label' => 'Minuman 2 (Reguler)',
+                    'label' => 'Minuman 2 (Large)',
                     'options' => [
+                        'Kenangan Milk Tea',
+                        'Raspberry Hibiscus',
+                        'Thai Tea Loaded',
+                        'Butterscotch Aren Latte',
+                        'Banana Americano',
                         'Kopi Kenangan Mantan',
-                        'Creamy Aren Latte',
-                        'Spanish Latte',
-                        'Americano',
+                        'Taro Milk',
                         'Taro Cloud Milk Tea',
-                        'Kenangan Milk Tea'
+                        'Spanish Latte',
+                        'Pistachio Aren Latte'
                     ]
                 ],
             ],
@@ -181,28 +191,32 @@ $config = [
             ]
         ],
         [
-            'key' => 'bundle_trio_kenangan',
-            'name' => 'Bundling Trio Kenangan (3 Minuman)',
+            'key' => 'bundle_2_frappe',
+            'name' => 'PAKET BUNDLING 2 FRAPPE',
             'category' => 'Bundling',
-            'price' => 39000,
-            'normalPrice' => 57000,
-            'desc' => 'Paket 3 cup minuman reguler terlaris. Cocok untuk teman nongkrong atau traktiran bestie!',
-            'img' => 'https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400',
-            'tag' => 'HEMAT BER-3',
+            'price' => 33000,
+            'priceLabel' => 'Mulai dari Rp33.000',
+            'normalPrice' => 56000,
+            'desc' => 'Pilih paket bundling frappe ukuran reguler sesuai kombinasi menu yang tersedia di foto! ♡ Tersedia 8 pilihan paket dengan perpaduan rasa favoritmu. Tinggal pilih paket yang paling kamu suka! 🍵💗',
+            'img' => 'assets/img/bundling/PAKET BUNDLING 2 FRAPPE.jpeg',
+            'tag' => '2 FRAPPE REGULER',
+            'size' => 'Reguler',
             'isSoldOut' => false,
             'slots' => [
                 [
-                    'label' => 'Minuman 1 (Reguler)',
-                    'options' => ['Kopi Kenangan Mantan', 'Creamy Aren Latte', 'Spanish Latte', 'Taro Cloud Milk Tea']
-                ],
-                [
-                    'label' => 'Minuman 2 (Reguler)',
-                    'options' => ['Kopi Kenangan Mantan', 'Creamy Aren Latte', 'Spanish Latte', 'Taro Cloud Milk Tea']
-                ],
-                [
-                    'label' => 'Minuman 3 (Reguler)',
-                    'options' => ['Kopi Kenangan Mantan', 'Creamy Aren Latte', 'Spanish Latte', 'Taro Cloud Milk Tea']
-                ],
+                    'label' => 'Pilih Paket Frappe (Reguler)',
+                    'type' => 'variant_price',
+                    'options' => [
+                        ['name' => 'Kopi Kenangan Mantan + Matcha Kenangan Frappe', 'price' => 36000],
+                        ['name' => 'Dutch Choco Kenangan + Butterscotch Kenangan', 'price' => 36000],
+                        ['name' => 'Dutch Choco Kenangan + Kopi Kenangan Mantan', 'price' => 35000],
+                        ['name' => 'Dutch Choco Kenangan + Vanilla Kenangan Frappe', 'price' => 36000],
+                        ['name' => 'Matcha Kenangan Frappe + Vanilla Kenangan Frappe', 'price' => 35000],
+                        ['name' => 'Kopi Kenangan Mantan + Butterscotch Kenangan', 'price' => 35000],
+                        ['name' => 'Kopi Kenangan Mantan + Vanilla Kenangan Frappe', 'price' => 33000],
+                        ['name' => 'Butterscotch Kenangan + Vanilla Kenangan Frappe', 'price' => 35000],
+                    ]
+                ]
             ],
             'options' => [
                 'ices' => ['Normal Ice', 'Less Ice'],
@@ -210,23 +224,111 @@ $config = [
             ]
         ],
         [
-            'key' => 'bundle_coffee_toast',
-            'name' => 'Bundling Coffee & Toast Combo',
+            'key' => 'promo_minuman_special',
+            'name' => 'PROMO MINUMAN SPECIAL',
             'category' => 'Bundling',
-            'price' => 22000,
-            'normalPrice' => 32000,
-            'desc' => 'Kombinasi 1 Kopi Kenangan Mantan (Ice/Hot) + 1 Roti Coklat Klasik atau Toast hangat gurih.',
-            'img' => 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400',
-            'tag' => 'COMBO SARAPAN',
+            'price' => 14000,
+            'priceLabel' => 'Mulai dari Rp14.000',
+            'normalPrice' => 24000,
+            'desc' => 'Lagi pengen minuman favorit dengan harga lebih hemat? ♡ Yuk, manfaatkan promo spesial ini! Hanya tersedia ukuran reguler. Pilih rasa favoritmu sebelum kehabisan 💖',
+            'img' => 'assets/img/bundling/PROMO MINUMAN SPECIAL.jpeg',
+            'tag' => 'PROMO SPESIAL',
+            'size' => 'Reguler',
             'isSoldOut' => false,
             'slots' => [
                 [
-                    'label' => 'Pilihan Minuman',
-                    'options' => ['Kopi Kenangan Mantan', 'Creamy Aren Latte', 'Americano']
+                    'label' => 'Pilih Minuman Promo (Reguler)',
+                    'type' => 'variant_price',
+                    'options' => [
+                        ['name' => 'Kopi Kenangan Mantan', 'price' => 14000],
+                        ['name' => 'Toffee Nut Latte', 'price' => 14000],
+                        ['name' => 'Spanish Latte', 'price' => 14000],
+                        ['name' => 'Pistachio Aren Latte', 'price' => 14000],
+                        ['name' => 'Banana Americano', 'price' => 14000],
+                        ['name' => 'Babyccino', 'price' => 14000],
+                        ['name' => 'OG Thai Tea', 'price' => 14000],
+                        ['name' => 'Taro Milk', 'price' => 14000],
+                        ['name' => 'Taro Cloud Milk Tea', 'price' => 14000],
+                        ['name' => 'Butterscotch Aren Latte', 'price' => 15000],
+                        ['name' => 'Raspberry Hibiscus', 'price' => 15000],
+                    ]
+                ]
+            ],
+            'options' => [
+                'ices' => ['Normal Ice', 'Less Ice'],
+                'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
+            ]
+        ],
+        [
+            'key' => 'bundle_hemat_3_item',
+            'name' => 'PAKET HEMAT 3 ITEM',
+            'category' => 'Bundling',
+            'price' => 35000,
+            'normalPrice' => 65000,
+            'desc' => 'Pilih 3 item bebas dari menu yang tersedia di foto! Bisa mix makanan dan minuman, atau pilih menu yang sama sesuai selera ♡',
+            'img' => 'assets/img/bundling/PAKET HEMAT 3 ITEM.jpeg',
+            'tag' => 'HEMAT 3 ITEM',
+            'isSoldOut' => false,
+            'slots' => [
+                [
+                    'label' => 'Item 1 (Minuman / Makanan)',
+                    'categorized' => true,
+                    'groups' => [
+                        '🥤 Minuman' => [
+                            'Americano', 'Fresh Lemonade', 'Raspberry Hibiscus', 'Lemon Black Tea',
+                            'OG Thai Tea', 'Taro Cloud Milk Tea', 'Spanish Latte', 'Babyccino',
+                            'Pistachio Aren Latte', 'Kopi Kenangan Mantan', 'Taro Milk'
+                        ],
+                        '🥐 Makanan' => [
+                            'Classic Peanut Butter Panini', 'Butter Croissant', 'Salt Bread Sausage',
+                            'Salt Bread Choco Butter', 'Friend Chip Cookie', 'Choco Chip Cookie',
+                            'Chocolate Croissant', 'Bananachoco Soft Bake', 'Sweet Honey Soft Bake',
+                            'Oatmeal Raisin Soft Bake', 'Chocolate Donut', 'Donut Almond',
+                            'Double Choco Bagel', 'Vanilla Choux Puff', 'Strawberry Choux Puff',
+                            'Chocolate Choux Puff', 'Bambang Choco Cheese Toast', 'Adam Ayam Toast',
+                            'Triple Cheese Bagel', 'Wahyu Sapi Toast', 'Roti Srikaya'
+                        ]
+                    ]
                 ],
                 [
-                    'label' => 'Pilihan Roti / Snack',
-                    'options' => ['Roti Coklat Klasik', 'Roti Keju Manis', 'Choco Chip Cookies', 'Donut Almond']
+                    'label' => 'Item 2 (Minuman / Makanan)',
+                    'categorized' => true,
+                    'groups' => [
+                        '🥤 Minuman' => [
+                            'Americano', 'Fresh Lemonade', 'Raspberry Hibiscus', 'Lemon Black Tea',
+                            'OG Thai Tea', 'Taro Cloud Milk Tea', 'Spanish Latte', 'Babyccino',
+                            'Pistachio Aren Latte', 'Kopi Kenangan Mantan', 'Taro Milk'
+                        ],
+                        '🥐 Makanan' => [
+                            'Classic Peanut Butter Panini', 'Butter Croissant', 'Salt Bread Sausage',
+                            'Salt Bread Choco Butter', 'Friend Chip Cookie', 'Choco Chip Cookie',
+                            'Chocolate Croissant', 'Bananachoco Soft Bake', 'Sweet Honey Soft Bake',
+                            'Oatmeal Raisin Soft Bake', 'Chocolate Donut', 'Donut Almond',
+                            'Double Choco Bagel', 'Vanilla Choux Puff', 'Strawberry Choux Puff',
+                            'Chocolate Choux Puff', 'Bambang Choco Cheese Toast', 'Adam Ayam Toast',
+                            'Triple Cheese Bagel', 'Wahyu Sapi Toast', 'Roti Srikaya'
+                        ]
+                    ]
+                ],
+                [
+                    'label' => 'Item 3 (Minuman / Makanan)',
+                    'categorized' => true,
+                    'groups' => [
+                        '🥤 Minuman' => [
+                            'Americano', 'Fresh Lemonade', 'Raspberry Hibiscus', 'Lemon Black Tea',
+                            'OG Thai Tea', 'Taro Cloud Milk Tea', 'Spanish Latte', 'Babyccino',
+                            'Pistachio Aren Latte', 'Kopi Kenangan Mantan', 'Taro Milk'
+                        ],
+                        '🥐 Makanan' => [
+                            'Classic Peanut Butter Panini', 'Butter Croissant', 'Salt Bread Sausage',
+                            'Salt Bread Choco Butter', 'Friend Chip Cookie', 'Choco Chip Cookie',
+                            'Chocolate Croissant', 'Bananachoco Soft Bake', 'Sweet Honey Soft Bake',
+                            'Oatmeal Raisin Soft Bake', 'Chocolate Donut', 'Donut Almond',
+                            'Double Choco Bagel', 'Vanilla Choux Puff', 'Strawberry Choux Puff',
+                            'Chocolate Choux Puff', 'Bambang Choco Cheese Toast', 'Adam Ayam Toast',
+                            'Triple Cheese Bagel', 'Wahyu Sapi Toast', 'Roti Srikaya'
+                        ]
+                    ]
                 ],
             ],
             'options' => [

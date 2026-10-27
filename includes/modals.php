@@ -195,6 +195,8 @@
                 </div>
             </div>
 
+            <div id="bundleStockNotice" style="display:none;margin-bottom:12px;padding:10px 12px;border-radius:8px;background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;font-size:12px;font-weight:700"></div>
+
             <!-- Bundling Slots Container (Rendered dynamically by JS) -->
             <div id="bundleSlotsContainer"></div>
 
