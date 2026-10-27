@@ -369,45 +369,24 @@ $config = [
 // =========================================================================
 // MERGE DYNAMIC PRICING DARI ADMIN PANEL (Vercel KV Cloud, data/pricing_settings.json, /tmp cache, & Cookie fallback)
 // =========================================================================
-// 1. Check Cloud Database (Vercel KV / Upstash Redis REST API / REDIS_URL)
-$kvUrl = getenv('KV_REST_API_URL') ?: getenv('UPSTASH_REDIS_REST_URL') ?: ($config['database']['kv_url'] ?? null);
-$kvToken = getenv('KV_REST_API_TOKEN') ?: getenv('UPSTASH_REDIS_REST_TOKEN') ?: ($config['database']['kv_token'] ?? null);
-
-// Auto-detect & parse REDIS_URL / KV_URL (e.g. rediss://default:token@host:port)
-$redisConnUrl = getenv('REDIS_URL') ?: getenv('KV_URL') ?: null;
-if (!empty($redisConnUrl) && (empty($kvUrl) || empty($kvToken))) {
-    $parsedRedis = parse_url($redisConnUrl);
-    if (!empty($parsedRedis['host']) && !empty($parsedRedis['pass'])) {
-        $kvUrl = 'https://' . $parsedRedis['host'];
-        $kvToken = $parsedRedis['pass'];
-    }
-}
+// 1. Check Cloud Database (Vercel KV / Upstash Redis via SimpleRedis: Socket & REST)
+require_once __DIR__ . '/includes/SimpleRedis.php';
+$simpleRedis = new SimpleRedis();
 
 $dynamicData = null;
-if (!empty($kvUrl) && !empty($kvToken)) {
+if ($simpleRedis->isConnected()) {
     $tempKvCache = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'kv_pricing_cache.json';
     if (file_exists($tempKvCache) && (time() - filemtime($tempKvCache)) < 5) {
         $dynamicData = json_decode(@file_get_contents($tempKvCache), true);
     } else {
-        $ch = curl_init(rtrim($kvUrl, '/') . '/get/pricing_settings');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => ["Authorization: Bearer {$kvToken}"],
-            CURLOPT_TIMEOUT => 2,
-            CURLOPT_SSL_VERIFYPEER => false,
-        ]);
-        $resp = curl_exec($ch);
-        curl_close($ch);
-        if ($resp) {
-            $kvJson = json_decode($resp, true);
-            if (!empty($kvJson['result'])) {
-                $rawResult = is_string($kvJson['result']) ? json_decode($kvJson['result'], true) : $kvJson['result'];
-                if (is_array($rawResult)) {
-                    $dynamicData = $rawResult;
-                    $tempDir = dirname($tempKvCache);
-                    if (!is_dir($tempDir)) @mkdir($tempDir, 0777, true);
-                    @file_put_contents($tempKvCache, json_encode($dynamicData));
-                }
+        $cachedVal = $simpleRedis->get('pricing_settings');
+        if (!empty($cachedVal)) {
+            $parsedRedis = is_string($cachedVal) ? json_decode($cachedVal, true) : $cachedVal;
+            if (is_array($parsedRedis)) {
+                $dynamicData = $parsedRedis;
+                $tempDir = dirname($tempKvCache);
+                if (!is_dir($tempDir)) @mkdir($tempDir, 0777, true);
+                @file_put_contents($tempKvCache, json_encode($dynamicData));
             }
         }
     }

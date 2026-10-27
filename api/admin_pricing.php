@@ -15,26 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/KopiKenanganApi.php';
+require_once __DIR__ . '/../includes/SimpleRedis.php';
 
 $validPasscode = trim((string)config('admin.passcode', 'WHOSUTII26'));
 $dataPath = __DIR__ . '/../data/pricing_settings.json';
 $tempPath = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'pricing_settings.json';
-
-// Function to auto-detect and resolve cloud database credentials (REST URL & Bearer Token or REDIS_URL)
-function getCloudDbCredentials() {
-    $kvUrl = getenv('KV_REST_API_URL') ?: getenv('UPSTASH_REDIS_REST_URL') ?: config('database.kv_url');
-    $kvToken = getenv('KV_REST_API_TOKEN') ?: getenv('UPSTASH_REDIS_REST_TOKEN') ?: config('database.kv_token');
-
-    $redisConnUrl = getenv('REDIS_URL') ?: getenv('KV_URL') ?: null;
-    if (!empty($redisConnUrl) && (empty($kvUrl) || empty($kvToken))) {
-        $parsedRedis = parse_url($redisConnUrl);
-        if (!empty($parsedRedis['host']) && !empty($parsedRedis['pass'])) {
-            $kvUrl = 'https://' . $parsedRedis['host'];
-            $kvToken = $parsedRedis['pass'];
-        }
-    }
-    return [$kvUrl, $kvToken];
-}
 
 // Function to get current merged pricing configuration
 function getCurrentPricing() {
@@ -59,30 +44,19 @@ function getCurrentPricing() {
 
     $loaded = null;
 
-    // Check Cloud Database (Vercel KV / Upstash Redis / REDIS_URL) first
-    list($kvUrl, $kvToken) = getCloudDbCredentials();
-    if (!empty($kvUrl) && !empty($kvToken)) {
+    // Check Cloud Database via SimpleRedis first
+    $redis = new SimpleRedis();
+    if ($redis->isConnected()) {
         $tempKvCache = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'kv_pricing_cache.json';
         if (file_exists($tempKvCache)) {
             $loaded = json_decode(@file_get_contents($tempKvCache), true);
         }
         if (!is_array($loaded)) {
-            $ch = curl_init(rtrim($kvUrl, '/') . '/get/pricing_settings');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_HTTPHEADER => ["Authorization: Bearer {$kvToken}"],
-                CURLOPT_TIMEOUT => 2,
-                CURLOPT_SSL_VERIFYPEER => false,
-            ]);
-            $resp = curl_exec($ch);
-            curl_close($ch);
-            if ($resp) {
-                $kvJson = json_decode($resp, true);
-                if (!empty($kvJson['result'])) {
-                    $rawResult = is_string($kvJson['result']) ? json_decode($kvJson['result'], true) : $kvJson['result'];
-                    if (is_array($rawResult)) {
-                        $loaded = $rawResult;
-                    }
+            $cachedVal = $redis->get('pricing_settings');
+            if (!empty($cachedVal)) {
+                $rawResult = is_string($cachedVal) ? json_decode($cachedVal, true) : $cachedVal;
+                if (is_array($rawResult)) {
+                    $loaded = $rawResult;
                 }
             }
         }
@@ -143,8 +117,8 @@ try {
             exit;
         }
 
-        list($kvUrl, $kvToken) = getCloudDbCredentials();
-        $hasCloudDb = !empty($kvUrl) && !empty($kvToken);
+        $redis = new SimpleRedis();
+        $hasCloudDb = $redis->isConnected();
 
         $data = getCurrentPricing();
         unset($data['admin_passcode']); // Do not expose passcode in payload
@@ -154,7 +128,7 @@ try {
             'data' => $data,
             'database' => [
                 'cloud_connected' => $hasCloudDb,
-                'provider' => $hasCloudDb ? 'Vercel KV / Upstash Redis' : 'Lokal / Serverless Temp',
+                'provider' => $redis->getProviderName(),
             ]
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
@@ -233,32 +207,11 @@ try {
         }
         $savedTemp = @file_put_contents($tempPath, json_encode($current, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-        // 3. If Cloud Database (Vercel KV / Upstash Redis / REDIS_URL) is connected, sync to Cloud Database
-        list($kvUrl, $kvToken) = getCloudDbCredentials();
+        // 3. Sync to Cloud Database (Redis TCP Socket & REST API via SimpleRedis)
+        $redis = new SimpleRedis();
         $savedToCloud = false;
-
-        if (!empty($kvUrl) && !empty($kvToken)) {
-            // Official Upstash REST API body format: ["SET", "key", "json_value"]
-            $ch = curl_init(rtrim($kvUrl, '/') . '/');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => json_encode(['SET', 'pricing_settings', json_encode($current)]),
-                CURLOPT_HTTPHEADER => [
-                    "Authorization: Bearer {$kvToken}",
-                    "Content-Type: application/json"
-                ],
-                CURLOPT_TIMEOUT => 4,
-                CURLOPT_SSL_VERIFYPEER => false,
-            ]);
-            $kvResp = curl_exec($ch);
-            curl_close($ch);
-            if ($kvResp) {
-                $kvDecoded = json_decode($kvResp, true);
-                if (!empty($kvDecoded['result'])) {
-                    $savedToCloud = true;
-                }
-            }
+        if ($redis->isConnected()) {
+            $savedToCloud = $redis->set('pricing_settings', json_encode($current));
         }
 
         // Overwrite local KV cache immediately so current lambda does not serve stale data
@@ -298,9 +251,9 @@ try {
             'savedToFile' => (bool)($savedData || $savedTemp),
             'savedToCloud' => $savedToCloud,
             'database' => [
-                'cloud_connected' => !empty($kvUrl) && !empty($kvToken),
+                'cloud_connected' => $redis->isConnected(),
                 'saved_to_cloud' => $savedToCloud,
-                'provider' => (!empty($kvUrl) && !empty($kvToken)) ? 'Vercel KV / Upstash Redis' : 'Lokal / Serverless Temp',
+                'provider' => $redis->getProviderName(),
             ],
             'data' => $current,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
