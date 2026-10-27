@@ -23,6 +23,10 @@
       "dest": "/api/item.php"
     },
     {
+      "src": "/api/kopken/wifi/?",
+      "dest": "/api/wifi.php"
+    },
+    {
       "src": "/api/kopken/menu/([^/]+)/?",
       "dest": "/api/menu.php?outlet=$1"
     },

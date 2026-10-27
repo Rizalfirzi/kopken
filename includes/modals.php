@@ -296,15 +296,12 @@
                     <b id="summarySubtotal">Rp 0</b>
                 </div>
 
-                <!-- Fee 1 pcs Row (Poin 8) -->
-                <div class="pbc-row" id="singleFeeRow" style="display:none;color:var(--brand-accent)">
-                    <span>Fee Pesanan 1 pcs</span>
-                    <b id="summarySingleFee">+Rp 2.000</b>
-                </div>
-                <div class="pbc-row" id="freeFeeRow" style="color:var(--success);font-size:12px">
+                <!-- Fee Pesanan Satuan Row (Revisi Client: Tulis "0" jika tidak ada fee) -->
+                <div class="pbc-row" id="singleFeeRow">
                     <span>Fee Pesanan Satuan</span>
-                    <b>Bebas Fee (Order 2+ pcs) ♡</b>
+                    <b id="summarySingleFee">0</b>
                 </div>
+                <div class="pbc-row" id="freeFeeRow" style="display:none"></div>
 
                 <!-- Plastic Bag Row (Poin 10) -->
                 <div class="pbc-row" id="plasticFeeRow" style="display:none">
@@ -516,3 +513,40 @@
         </div>
     </div>
 </div>
+
+<!-- ============================================================= -->
+<!-- 10. MODAL WI-FI OUTLET (Revisi Client ala Referensi)          -->
+<!-- ============================================================= -->
+<div class="sheet-backdrop dialog-backdrop" id="wifiModal">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="wifiModalTitle" style="max-width:360px">
+        <button class="sheet-close" data-close="wifiModal" aria-label="Tutup" id="wifiCloseBtn" style="position:absolute;right:14px;top:14px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:var(--bg-card-subtle);border:1px solid var(--border-color);border-radius:var(--radius-full);color:var(--text-muted);font-size:18px;cursor:pointer">&times;</button>
+        <div style="text-align:center;margin-bottom:12px">
+            <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:var(--radius-full);background:var(--bg-card-subtle);color:var(--brand-primary);margin-bottom:8px">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+            </div>
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:800;color:var(--text-muted)">Wi-Fi Kopi Kenangan</div>
+            <h3 id="wifiModalTitle" style="font-size:18px;font-weight:900;color:var(--text-main);margin-top:2px">Wi-Fi Outlet</h3>
+            <div id="wifiModalDate" style="font-size:12px;color:var(--text-muted);margin-top:2px">Hari Ini</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+            <div style="background:var(--bg-page);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px 14px">
+                <small style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Nama Jaringan (SSID)</small>
+                <strong id="wifiModalSsid" style="font-size:15px;color:var(--text-main)">Teman Kenangan</strong>
+            </div>
+            <div style="background:var(--bg-page);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+                <div>
+                    <small style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Password Hari Ini</small>
+                    <strong id="wifiModalPass" style="font-size:16px;color:var(--brand-primary-dark);font-family:monospace;letter-spacing:0.5px">Memuat...</strong>
+                </div>
+                <button type="button" class="btn-copy-wifi" id="wifiModalCopyBtn" style="padding:8px 12px">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <span>Salin</span>
+                </button>
+            </div>
+        </div>
+        <div style="margin-top:16px">
+            <button type="button" class="btn btn-secondary btn-block" data-close="wifiModal">Tutup</button>
+        </div>
+    </div>
+</div>
+

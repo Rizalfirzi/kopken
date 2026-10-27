@@ -39,6 +39,9 @@ if (!$initialOutlet && !empty($initialOutlets)) {
 // Fetch initial menu & stock for selected outlet
 $initialMenu = $api->getMenu($defaultOutletCode);
 
+// Fetch initial Wi-Fi details for selected outlet
+$initialWifi = $api->getWifi($defaultOutletCode);
+
 // Sync initialOutlet premium status with initialMenu (Single source of truth: Mantan 22k)
 if ($initialOutlet) {
     $initialOutlet['isPremium'] = !empty($initialMenu['premium']);
@@ -172,26 +175,35 @@ require_once __DIR__ . '/includes/header.php';
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
                 <span>Menu Utama Kedai Kyuti</span>
             </button>
-            <div class="store-back-tag">Diskon 50% + Fee</div>
+            <button type="button" class="btn-wifi-nav" id="wifiNavBtn" title="Lihat Password Wi-Fi Outlet">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                <span>Wi-Fi</span>
+            </button>
         </div>
 
-        <!-- Hero Header -->
-        <div class="hero-banner">
-            <div class="hero-tag">🌸 Diskon 50% + Fee Murah</div>
-            <h2 class="hero-title">Pricelist Kopi Kenangan</h2>
-            <p class="hero-desc">Pilih outlet terdekat, cek ketersediaan menu secara live, dan order langsung via WhatsApp!</p>
-            <div class="hero-stats">
-                <div class="stat-item">
-                    <b id="statTotalItems"><?= (int)($initialMenu['stats']['total'] ?? 0) ?></b>
-                    <small>Total Menu</small>
+        <!-- Tampilan Password Wi-Fi Outlet (Pengganti Tanda Hijau sesuai Revisi Client) -->
+        <div class="wifi-banner-card" id="wifiBannerCard">
+            <div class="wbc-head">
+                <div class="wbc-badge">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                    <span>Password Wi-Fi Outlet</span>
                 </div>
-                <div class="stat-item">
-                    <b id="statReadyItems" style="color:#22C55E"><?= (int)($initialMenu['stats']['available'] ?? 0) ?></b>
-                    <small>Stok Ready</small>
+                <span class="wbc-date" id="wifiTodayDate"><?= htmlspecialchars($initialWifi['date'] ?? date('l, d F Y')) ?></span>
+            </div>
+            <div class="wbc-body">
+                <div class="wbc-field">
+                    <span class="wbc-label">Nama Jaringan (SSID)</span>
+                    <strong class="wbc-val" id="wifiSsidVal"><?= htmlspecialchars($initialWifi['wifi']['ssid'] ?? 'Teman Kenangan') ?></strong>
                 </div>
-                <div class="stat-item">
-                    <b id="statSoldItems" style="color:#F43F5E"><?= (int)($initialMenu['stats']['soldOut'] ?? 0) ?></b>
-                    <small>Habis</small>
+                <div class="wbc-pass-field">
+                    <div class="wbc-pass-left">
+                        <span class="wbc-label">Password Hari Ini</span>
+                        <strong class="wbc-pass-val" id="wifiPassVal"><?= htmlspecialchars($initialWifi['wifi']['password'] ?? ('KopiBikinSemangat@' . date('j'))) ?></strong>
+                    </div>
+                    <button type="button" class="btn-copy-wifi" id="copyWifiBannerBtn" title="Salin Password Wi-Fi">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        <span>Salin</span>
+                    </button>
                 </div>
             </div>
         </div>

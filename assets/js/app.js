@@ -436,6 +436,7 @@ window.selectOutlet = function(code) {
     }
 
     fetchMenu(found.code, false);
+    fetchWifi(found.code);
 };
 
 const outletCardBtn = document.getElementById('outletCardBtn');
@@ -624,7 +625,7 @@ function renderMenu() {
 
     container.innerHTML = `
         <div class="sec-title">
-            <span>Menampilkan ${filtered.length} menu (Diskon 50% + Fee Hemat)</span>
+            <span>Menampilkan ${filtered.length} menu</span>
         </div>
         <div class="menu-grid">
             ${filtered.map(item => {
@@ -839,7 +840,7 @@ function staticGroups(item) {
     const o = item.options || {};
     const isFood = item.isFood || (item.category && item.category.toLowerCase().includes('food'));
     const groups = [];
-    const sizes = o.sizes?.length ? o.sizes : (!isFood ? ['Regular', 'Large'] : []);
+    const sizes = (o.sizes?.length ? o.sizes : (!isFood ? ['Regular', 'Large'] : [])).filter(s => s && s.toLowerCase() !== 'jumbo');
     if (sizes.length) {
         groups.push({ id: 'size', key: 'size', name: 'Ukuran', values: sizes.map((v) => ({ id: v, text: v })), default: sizes[0], impact: true });
     }
@@ -898,8 +899,12 @@ function unitPrice(sel = AppState.sheet?.sel) {
     const sh = AppState.sheet;
     if (!sh || !sh.item) return 0;
     const { item, prices } = sh;
-    if (prices) return prices[comboKey(sel)] ?? null;
-    if (sel?.size === 'Large' && item.largePrice) return item.largePrice;
+    if (prices) {
+        const key = comboKey(sel);
+        if (prices[key] != null) return prices[key];
+    }
+    const isLarge = sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large');
+    if (isLarge && item.largePrice) return item.largePrice;
     return item.price;
 }
 
@@ -908,8 +913,12 @@ function normalPrice(sel = AppState.sheet?.sel) {
     const sh = AppState.sheet;
     if (!sh || !sh.item) return null;
     const { item, normals, prices } = sh;
-    if (prices) return normals ? normals[comboKey(sel)] ?? null : null;
-    if (sel?.size === 'Large' && item.largePrice) return item.largeNormal || null;
+    if (prices && normals) {
+        const key = comboKey(sel);
+        if (normals[key] != null) return normals[key];
+    }
+    const isLarge = sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large');
+    if (isLarge && item.largePrice) return item.largeNormal || (item.normalPrice ? item.normalPrice + 6000 : null);
     return item.normalPrice || null;
 }
 
@@ -959,6 +968,7 @@ function renderOptions() {
     const html = (sh.groups || [])
         .filter((g) => !isHidden(g, sh.sel))
         .map((g) => {
+            const ref = g.impact ? unitPrice({ ...sh.sel, [g.id]: g.default }) : null;
             const pills = g.values.map((v) => {
                 let extra = '';
                 let disabled = false;
@@ -966,8 +976,8 @@ function renderOptions() {
                     const p = unitPrice({ ...sh.sel, [g.id]: v.id });
                     if (sh.prices && p == null) {
                         disabled = !Object.keys(sh.prices).some((k) => k.split('|')[impactGroups().findIndex((x) => x.id === g.id)] === v.id);
-                    } else if (p != null && base != null && p !== base && sh.sel[g.id] !== v.id) {
-                        extra = `<small>${p > base ? '+' : '−'}${formatRp(Math.abs(p - base))}</small>`;
+                    } else if (ref != null && p != null && p > ref) {
+                        extra = ` <small>+${formatRp(p - ref)}</small>`;
                     }
                 }
                 return `<button type="button" class="opt-pill ${sh.sel[g.id] === v.id ? 'active' : ''}" data-g="${esc(g.id)}" data-v="${esc(v.id)}" aria-pressed="${sh.sel[g.id] === v.id}" ${disabled ? 'disabled' : ''}>${esc(v.text)}${extra}</button>`;
@@ -1030,11 +1040,26 @@ async function loadItemDetail(item, line) {
             return;
         }
         if (d.groups?.length && d.prices && Object.keys(d.prices).length) {
-            sheet.groups = d.groups;
+            // Filter out 'Jumbo' from groups
+            sheet.groups = d.groups.map(g => {
+                const gKey = (g.key || '').toLowerCase();
+                const gName = (g.name || '').toLowerCase();
+                if (gKey === 'size' || gName === 'size' || gName === 'ukuran') {
+                    return {
+                        ...g,
+                        values: (g.values || []).filter(v => {
+                            const t = (v.text || '').toLowerCase();
+                            const vId = (v.id || '').toLowerCase();
+                            return t !== 'jumbo' && vId !== 'jumbo' && !t.includes('jumbo');
+                        })
+                    };
+                }
+                return g;
+            });
             sheet.prices = d.prices;
             sheet.normals = d.normals || null;
             sheet.sel = {};
-            for (const g of d.groups) sheet.sel[g.id] = g.default;
+            for (const g of sheet.groups) sheet.sel[g.id] = g.default;
             sheet.addons = [...(d.addons || [])];
             sheet.comboAddons = d.comboAddons && Object.keys(d.comboAddons).length ? d.comboAddons : null;
             sheet.picked = new Set();
@@ -1319,14 +1344,27 @@ function updateCartUI() {
     const subtotalEl = document.getElementById('summarySubtotal');
     const totalEl = document.getElementById('summaryTotal');
     const singleFeeRow = document.getElementById('singleFeeRow');
+    const summarySingleFee = document.getElementById('summarySingleFee');
     const freeFeeRow = document.getElementById('freeFeeRow');
     const plasticFeeRow = document.getElementById('plasticFeeRow');
 
     if (subtotalEl) subtotalEl.textContent = formatRp(subtotal);
     if (totalEl) totalEl.textContent = formatRp(grandTotal);
 
-    if (singleFeeRow) singleFeeRow.style.display = hasSingleFee ? 'flex' : 'none';
-    if (freeFeeRow) freeFeeRow.style.display = totalQty > 1 ? 'flex' : 'none';
+    // Fee Pesanan Satuan: Tulis "+Rp 2.000" jika 1 pcs, tulis "0" jika bebas fee / order 2+ pcs (Revisi Client)
+    if (singleFeeRow) {
+        singleFeeRow.style.display = totalQty > 0 ? 'flex' : 'none';
+        if (summarySingleFee) {
+            if (hasSingleFee) {
+                summarySingleFee.textContent = `+${formatRp(AppState.singleItemFeeAmount)}`;
+                summarySingleFee.style.color = 'var(--brand-accent)';
+            } else {
+                summarySingleFee.textContent = '0';
+                summarySingleFee.style.color = 'var(--text-muted)';
+            }
+        }
+    }
+    if (freeFeeRow) freeFeeRow.style.display = 'none';
     if (plasticFeeRow) plasticFeeRow.style.display = AppState.hasPlasticBag ? 'flex' : 'none';
 
     renderCartItemsList();
@@ -1413,14 +1451,58 @@ const pickupCustomBtn = document.getElementById('pickupCustomBtn');
 const customPickupContainer = document.getElementById('customPickupContainer');
 const pickupTimeSelect = document.getElementById('pickupTimeSelect');
 
+function getCurrentTimeInTz(tz) {
+    const tzMap = {
+        'WIB': 'Asia/Jakarta',
+        'WITA': 'Asia/Makassar',
+        'WIT': 'Asia/Jayapura'
+    };
+    const timeZone = tzMap[tz] || 'Asia/Jakarta';
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: false
+        }).formatToParts(new Date());
+
+        let h = 0, m = 0;
+        for (const p of parts) {
+            if (p.type === 'hour') h = parseInt(p.value, 10);
+            if (p.type === 'minute') m = parseInt(p.value, 10);
+        }
+        return { hour: h, minute: m };
+    } catch {
+        const now = new Date();
+        return { hour: now.getHours(), minute: now.getMinutes() };
+    }
+}
+
 function populate15MinPickupTimes() {
     if (!pickupTimeSelect) return;
     pickupTimeSelect.innerHTML = '';
 
-    const tz = AppState.pickupTimezone;
-    // Generate hours from 07:00 to 22:45
-    for (let h = 7; h <= 22; h++) {
-        for (let m = 0; m < 60; m += 15) {
+    const tz = AppState.pickupTimezone || 'WIB';
+    const { hour: curH, minute: curM } = getCurrentTimeInTz(tz);
+
+    // Buffer ~15 min from current time, then round UP to the next 15-minute mark
+    // E.g. at 19:28 -> 19:28 + 15 = 19:43 -> rounded up to 19:45!
+    let totalTargetMin = curH * 60 + curM + 15;
+    let roundedMin = Math.ceil(totalTargetMin / 15) * 15;
+    let startH = Math.floor(roundedMin / 60);
+    let startM = roundedMin % 60;
+
+    // Minimum operating start hour is 07:00
+    if (startH < 7) {
+        startH = 7;
+        startM = 0;
+    }
+
+    let addedCount = 0;
+    // Generate times up to 23:45
+    for (let h = startH; h <= 23; h++) {
+        const firstM = (h === startH) ? startM : 0;
+        for (let m = firstM; m < 60; m += 15) {
             const hh = String(h).padStart(2, '0');
             const mm = String(m).padStart(2, '0');
             const timeStr = `${hh}.${mm} ${tz}`;
@@ -1428,8 +1510,19 @@ function populate15MinPickupTimes() {
             opt.value = timeStr;
             opt.textContent = timeStr;
             pickupTimeSelect.appendChild(opt);
+            addedCount++;
         }
     }
+
+    // If outlet is about to close (after 23:45 or late night), provide next day option
+    if (addedCount === 0) {
+        const opt = document.createElement('option');
+        opt.value = `Besok 07.00 ${tz}`;
+        opt.textContent = `Besok 07.00 ${tz} (Outlet Mendekati Jam Tutup)`;
+        pickupTimeSelect.appendChild(opt);
+    }
+
+    AppState.pickupTime = pickupTimeSelect.value;
 }
 
 if (pickupNowBtn && pickupCustomBtn && customPickupContainer) {
@@ -1994,6 +2087,104 @@ function populateMenuDropdown() {
     select.innerHTML = html;
 }
 
+// =========================================================================
+// 12. WI-FI OUTLET INTEGRATION (Revisi Client ala Referensi)
+// =========================================================================
+
+async function fetchWifi(outletCode) {
+    const code = outletCode || AppState.outlet?.code || 'LA.CODEFIN';
+    try {
+        const res = await fetch(`api/kopken/wifi?outlet=${encodeURIComponent(code)}`);
+        const data = await res.json();
+        if (data && data.wifi) {
+            updateWifiUI(data);
+            return data.wifi;
+        }
+    } catch (err) {
+        console.warn('fetchWifi error:', err);
+    }
+    const fallback = window.INITIAL_DATA?.wifi || {
+        ssid: 'Teman Kenangan',
+        password: 'KopiBikinSemangat@' + new Date().getDate()
+    };
+    updateWifiUI({ outlet: code, wifi: fallback, date: new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) });
+    return fallback;
+}
+
+function updateWifiUI(data) {
+    if (!data || !data.wifi) return;
+    const ssid = data.wifi.ssid || 'Teman Kenangan';
+    const pass = data.wifi.password || ('KopiBikinSemangat@' + new Date().getDate());
+    const dateText = data.date || new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    // 1. Update Banner Card in Store View
+    const ssidValEl = document.getElementById('wifiSsidVal');
+    const passValEl = document.getElementById('wifiPassVal');
+    const dateTextEl = document.getElementById('wifiTodayDate');
+
+    if (ssidValEl) ssidValEl.textContent = ssid;
+    if (passValEl) passValEl.textContent = pass;
+    if (dateTextEl) dateTextEl.textContent = dateText;
+
+    // 2. Update Modal in Store / Hub View
+    const modalTitleEl = document.getElementById('wifiModalTitle');
+    const modalDateEl = document.getElementById('wifiModalDate');
+    const modalSsidEl = document.getElementById('wifiModalSsid');
+    const modalPassEl = document.getElementById('wifiModalPass');
+
+    if (modalTitleEl) modalTitleEl.textContent = `Wi-Fi ${AppState.outlet?.name || 'Outlet'}`;
+    if (modalDateEl) modalDateEl.textContent = dateText;
+    if (modalSsidEl) modalSsidEl.textContent = ssid;
+    if (modalPassEl) modalPassEl.textContent = pass;
+}
+
+function copyWifiPassword() {
+    const pass = document.getElementById('wifiPassVal')?.textContent || document.getElementById('wifiModalPass')?.textContent || '';
+    if (!pass || pass === 'Memuat...') {
+        showToast('Password Wi-Fi belum siap.');
+        return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pass).then(() => {
+            showToast('✓ Password Wi-Fi disalin ke clipboard!');
+        }).catch(() => {
+            fallbackCopyText(pass);
+        });
+    } else {
+        fallbackCopyText(pass);
+    }
+}
+
+function fallbackCopyText(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+        showToast('✓ Password Wi-Fi disalin!');
+    } catch {
+        showToast(`Password: ${text}`);
+    }
+    document.body.removeChild(ta);
+}
+
+function initWifiFeature() {
+    if (window.INITIAL_DATA?.wifi) {
+        updateWifiUI(window.INITIAL_DATA.wifi);
+    }
+    if (AppState.outlet?.code) {
+        fetchWifi(AppState.outlet.code);
+    }
+
+    document.getElementById('copyWifiBannerBtn')?.addEventListener('click', copyWifiPassword);
+    document.getElementById('wifiModalCopyBtn')?.addEventListener('click', copyWifiPassword);
+
+    document.getElementById('wifiNavBtn')?.addEventListener('click', () => {
+        openSheet('wifiModal');
+    });
+}
+
 // Initial Boot
 document.addEventListener('DOMContentLoaded', () => {
     updateOutletHeader();
@@ -2001,4 +2192,5 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCartUI();
     checkWelcomePopup();
     initAdminPricingFeature();
+    initWifiFeature();
 });

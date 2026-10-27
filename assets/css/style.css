@@ -436,6 +436,162 @@ body {
     border-radius: var(--radius-full);
 }
 
+.btn-wifi-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--brand-primary);
+    padding: 5px 12px;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-wifi-nav:hover {
+    background: var(--bg-card-subtle);
+    border-color: var(--brand-primary);
+    transform: translateY(-1px);
+}
+
+/* Wi-Fi Outlet Banner Card (Revisi Client Pengganti Hero Banner) */
+.wifi-banner-card {
+    background: linear-gradient(135deg, rgba(255, 245, 248, 0.98) 0%, rgba(253, 232, 242, 0.94) 100%);
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    margin: 12px 16px 14px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 14px rgba(219, 39, 119, 0.08);
+    position: relative;
+    overflow: hidden;
+}
+
+[data-theme="dark"] .wifi-banner-card {
+    background: linear-gradient(135deg, rgba(38, 20, 29, 0.98) 0%, rgba(48, 24, 38, 0.94) 100%);
+    border-color: rgba(244, 114, 182, 0.25);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.wbc-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.wbc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--brand-primary);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+}
+
+.wbc-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.wbc-body {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 10px;
+}
+
+@media (max-width: 480px) {
+    .wbc-body {
+        grid-template-columns: 1fr;
+    }
+}
+
+.wbc-field {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.wbc-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 800;
+    letter-spacing: 0.4px;
+}
+
+.wbc-val {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-main);
+    word-break: break-word;
+}
+
+.wbc-pass-field {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 6px 10px 6px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.wbc-pass-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.wbc-pass-val {
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--brand-primary-dark);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.btn-copy-wifi {
+    background: var(--brand-primary);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: var(--transition);
+}
+
+.btn-copy-wifi:hover {
+    background: var(--brand-primary-dark);
+    transform: translateY(-1px);
+}
+
+.btn-copy-wifi:active {
+    transform: scale(0.96);
+}
+
 /* Hero Banner */
 .hero-banner {
     position: relative;

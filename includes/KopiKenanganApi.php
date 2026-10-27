@@ -576,6 +576,43 @@ class KopiKenanganApi
         $response = $this->httpRequest($url, $params);
 
         if ($response && is_array($response)) {
+            // 1. Remove 'Jumbo' from groups and all corresponding combo prices per client revision
+            $jumboIds = [];
+            if (!empty($response['groups']) && is_array($response['groups'])) {
+                foreach ($response['groups'] as &$group) {
+                    $gKey = strtolower($group['key'] ?? '');
+                    $gName = strtolower($group['name'] ?? '');
+                    if ($gKey === 'size' || $gName === 'size' || $gName === 'ukuran') {
+                        $group['values'] = array_values(array_filter($group['values'], function($val) use (&$jumboIds) {
+                            $t = strtolower($val['text'] ?? '');
+                            $vId = strtolower((string)($val['id'] ?? ''));
+                            if ($t === 'jumbo' || $vId === 'jumbo' || str_contains($t, 'jumbo')) {
+                                $jumboIds[] = (string)$val['id'];
+                                return false;
+                            }
+                            return true;
+                        }));
+                    }
+                }
+                unset($group);
+            }
+
+            // Remove jumbo combinations from prices and normals
+            if (!empty($jumboIds) && !empty($response['prices']) && is_array($response['prices'])) {
+                foreach ($jumboIds as $jId) {
+                    foreach (array_keys($response['prices']) as $cKey) {
+                        $parts = explode('|', (string)$cKey);
+                        if (in_array((string)$jId, $parts, true)) {
+                            unset($response['prices'][$cKey]);
+                            if (isset($response['normals'][$cKey])) {
+                                unset($response['normals'][$cKey]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Adjust prices & calculate normals with accurate fee markup
             if (!empty($response['prices']) && is_array($response['prices'])) {
                 $menu = $this->getMenu($outletCode);
                 $matchedItem = null;
@@ -586,28 +623,38 @@ class KopiKenanganApi
                     }
                 }
 
-                $origBasePrice = (float)($matchedItem['normalPrice'] ?? $matchedItem['outletPrice'] ?? $response['price'] ?? 19000);
-                $calculatedBase = (float)($matchedItem['price'] ?? round($origBasePrice * 0.5 + 5000));
-                $largePrice = !empty($matchedItem['largePrice']) ? (float)$matchedItem['largePrice'] : ($calculatedBase + 3500);
+                // Determine base upstream raw price (min price among all combos)
+                $rawBase = 0;
+                if (isset($response['price']) && (float)$response['price'] > 0) {
+                    $rawBase = (float)$response['price'];
+                } else {
+                    $rawBase = (float)min(array_values($response['prices']));
+                }
 
+                // Calculated price in our store for regular base item
+                $calculatedBase = (float)($matchedItem['price'] ?? round($rawBase + 5000));
+                // Fee delta between our price and upstream raw price
+                $deltaMarkup = $calculatedBase - $rawBase;
+
+                // Base normal (unpromoted) price from item
+                $origBaseNormal = (float)($matchedItem['normalPrice'] ?? $matchedItem['outletPrice'] ?? 19000);
+                if ($origBaseNormal <= 0) $origBaseNormal = 19000;
+
+                $normals = [];
                 foreach ($response['prices'] as $combo => &$p) {
                     $rawP = (float)$p;
-                    if ($rawP > $origBasePrice || str_contains(strtolower($combo), 'large')) {
-                        $delta = max(0, $rawP - $origBasePrice);
-                        $p = ($delta > 0) ? ($calculatedBase + $delta) : $largePrice;
-                    } else {
-                        $p = $calculatedBase;
-                    }
+                    // Combo difference from raw base (e.g. +3.000 for Large, +3.000 for Juwara, +3.000 for Oatside)
+                    $comboDiff = max(0, $rawP - $rawBase);
+                    
+                    // Final selling price = raw price + markup delta
+                    $p = round($rawP + $deltaMarkup);
+
+                    // Normal (crossed-out) price: In Kopi Kenangan 50% discount system, a +3.000 jasdor diff = +6.000 normal diff
+                    $normals[$combo] = round($origBaseNormal + ($comboDiff * 2));
                 }
                 unset($p);
 
-                if (empty($response['normals']) && !empty($response['prices'])) {
-                    $normals = [];
-                    foreach ($response['prices'] as $combo => $p) {
-                        $normals[$combo] = $origBasePrice;
-                    }
-                    $response['normals'] = $normals;
-                }
+                $response['normals'] = $normals;
             }
 
             $this->setCache($cacheKey, $response);
@@ -621,6 +668,54 @@ class KopiKenanganApi
             'groups' => [],
             'extras' => [],
         ];
+    }
+
+    /**
+     * Fetch Live Wi-Fi SSID & Daily Password for an outlet
+     * URL: https://tixandcoffee.developerngantuk.my.id/api/kopken/wifi?outlet={outlet}
+     */
+    public function getWifi(string $outletCode): array
+    {
+        $outletCode = trim($outletCode);
+        if ($outletCode === '') {
+            $outletCode = config('store.default_outlet', 'LA.CODEFIN');
+        }
+
+        $cacheKey = 'wifi_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $outletCode);
+        $cached = $this->getCache($cacheKey, 300); // 5 minutes cache
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $url = $this->baseUrl . '/kopken/wifi';
+        $response = $this->httpRequest($url, ['outlet' => $outletCode]);
+
+        if ($response && !empty($response['wifi'])) {
+            $result = [
+                'success' => true,
+                'outlet' => $outletCode,
+                'wifi' => [
+                    'ssid' => $response['wifi']['ssid'] ?? 'Teman Kenangan',
+                    'password' => $response['wifi']['password'] ?? ('KopiBikinSemangat@' . date('j')),
+                ],
+                'date' => date('l, d F Y'),
+            ];
+            $this->setCache($cacheKey, $result);
+            return $result;
+        }
+
+        // Fallback default Kenangan Wi-Fi format
+        $dayNum = date('j');
+        $fallback = [
+            'success' => true,
+            'outlet' => $outletCode,
+            'wifi' => [
+                'ssid' => 'Teman Kenangan',
+                'password' => 'KopiBikinSemangat@' . $dayNum,
+            ],
+            'date' => date('l, d F Y'),
+        ];
+        return $fallback;
     }
 
     /**
@@ -728,9 +823,9 @@ class KopiKenanganApi
         $waMessage .= "Subtotal Menu: Rp " . number_format($order['subtotal'], 0, ',', '.') . "\n";
 
         if ($hasSingleItemFee) {
-            $waMessage .= "Fee Pesanan 1 pcs: +Rp " . number_format($singleItemFee, 0, ',', '.') . "\n";
+            $waMessage .= "Fee Pesanan Satuan: +Rp " . number_format($singleItemFee, 0, ',', '.') . "\n";
         } else {
-            $waMessage .= "Fee Pesanan: Rp 0 (Bebas Fee Order 2+ pcs) ♡\n";
+            $waMessage .= "Fee Pesanan Satuan: 0\n";
         }
 
         if ($hasPlasticBag) {
