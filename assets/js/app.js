@@ -68,6 +68,7 @@ const $ = (sel) => document.querySelector(sel);
 const formatRp = (num) => 'Rp ' + Number(num || 0).toLocaleString('id-ID');
 const esc = (str) => {
     if (str === null || str === undefined) return '';
+    if (typeof str === 'object') return esc(str?.name || str?.title || '');
     return String(str).replace(/[&<>"']/g, s => ({
         '&': '&amp;',
         '<': '&lt;',

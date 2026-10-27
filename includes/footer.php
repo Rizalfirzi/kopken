@@ -48,8 +48,9 @@ window.INITIAL_DATA = {
 };
 </script>
 
-<!-- Native App Script -->
-<script src="assets/js/app.js"></script>
+<!-- Native App Script with Cache Buster -->
+<?php $jsVer = file_exists(__DIR__ . '/../assets/js/app.js') ? filemtime(__DIR__ . '/../assets/js/app.js') : time(); ?>
+<script src="assets/js/app.js?v=<?= $jsVer ?>"></script>
 
 </body>
 </html>

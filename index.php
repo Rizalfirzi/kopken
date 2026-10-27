@@ -66,7 +66,11 @@ require_once __DIR__ . '/includes/header.php';
     <div class="bio-hub-view" id="bioHubView">
         <div class="bio-card">
             <div class="bio-avatar-wrap">
-                <div class="bio-avatar-circle">୨୧</div>
+                <?php if (!empty($logoImg)): ?>
+                    <img src="<?= htmlspecialchars($logoImg) ?>" alt="<?= htmlspecialchars($storeName) ?>" class="bio-avatar-img">
+                <?php else: ?>
+                    <div class="bio-avatar-circle">୨୧</div>
+                <?php endif; ?>
             </div>
             
             <h2 class="bio-title"><?= htmlspecialchars(config('store.bio_title', '୨୧ Kedai Kyuti ୨୧')) ?></h2>

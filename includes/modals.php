@@ -4,6 +4,12 @@
 <div class="sheet-backdrop welcome-modal-backdrop" id="welcomeModal">
     <div class="welcome-card">
         <div class="wc-header">
+            <?php $modalLogoImg = config('store.logo_image'); ?>
+            <?php if (!empty($modalLogoImg)): ?>
+                <div class="wc-logo-wrap">
+                    <img src="<?= htmlspecialchars($modalLogoImg) ?>" alt="<?= htmlspecialchars(config('store.name', 'Kedai Kyuti')) ?>" class="wc-logo-img">
+                </div>
+            <?php endif; ?>
             <div class="wc-badge-top">୨୧ Kedai Kyuti ୨୧</div>
             <h3 class="wc-title">୨୧ 𝐖𝐞𝐥𝐜𝐨𝐦𝐞 𝐭𝐨 𝐊𝐞𝐝𝐚𝐢 𝐊𝐲𝐮𝐭𝐢! ୨୧</h3>
             <p class="wc-greeting">Hi, kyuties! 🌷</p>

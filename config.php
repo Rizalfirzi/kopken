@@ -50,7 +50,7 @@ $config = [
 
         // LOGO:
         'logo_text' => '୨୧',
-        'logo_image' => null, 
+        'logo_image' => 'assets/img/logo/kyuti.jpeg', 
 
         // HERO BANNER DI HALAMAN MENU
         'hero_tag' => '✨ Live Inventory Sync',

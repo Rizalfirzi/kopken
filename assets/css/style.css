@@ -135,6 +135,17 @@ body {
     box-shadow: 0 4px 12px rgba(219, 39, 119, 0.3);
 }
 
+.brand-badge-img {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    object-fit: cover;
+    display: block;
+    box-shadow: 0 4px 12px rgba(219, 39, 119, 0.3);
+    border: 1.5px solid var(--border-color);
+    background: #FFFFFF;
+}
+
 .brand-text h1 {
     font-size: 15px;
     font-weight: 800;
@@ -215,6 +226,15 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.bio-avatar-img {
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-full);
+    object-fit: cover;
+    display: block;
+    box-shadow: 0 4px 14px rgba(219, 39, 119, 0.25);
 }
 
 .bio-title {
@@ -1315,6 +1335,27 @@ body {
     padding: 24px 20px 20px;
     text-align: center;
     animation: scaleIn 0.25s ease;
+}
+
+.wc-logo-wrap {
+    margin: 0 auto 12px;
+    width: 68px;
+    height: 68px;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, #FCE7F3, #FBCFE8);
+    padding: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(244, 114, 182, 0.25);
+}
+
+.wc-logo-img {
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-full);
+    object-fit: cover;
+    display: block;
 }
 
 .wc-badge-top {

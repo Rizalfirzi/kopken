@@ -29,8 +29,14 @@ $borderColor = config('theme.border_color', '#FBCFE8');
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;1,700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Native Stylesheet -->
-    <link rel="stylesheet" href="assets/css/style.css">
+    <!-- Favicon & Brand Icons -->
+    <link rel="icon" type="image/jpeg" href="<?= htmlspecialchars($logoImg ?: 'assets/img/logo/kyuti.jpeg') ?>">
+    <link rel="apple-touch-icon" href="<?= htmlspecialchars($logoImg ?: 'assets/img/logo/kyuti.jpeg') ?>">
+    <meta property="og:image" content="<?= htmlspecialchars($logoImg ?: 'assets/img/logo/kyuti.jpeg') ?>">
+
+    <!-- Native Stylesheet with Cache Buster -->
+    <?php $cssVer = file_exists(__DIR__ . '/../assets/css/style.css') ? filemtime(__DIR__ . '/../assets/css/style.css') : time(); ?>
+    <link rel="stylesheet" href="assets/css/style.css?v=<?= $cssVer ?>">
 
     <!-- Dynamic Theme Customization (from config.php) -->
     <style>
@@ -60,7 +66,11 @@ $borderColor = config('theme.border_color', '#FBCFE8');
     <header class="topnav">
         <div class="topnav-left">
             <button class="nav-hub-btn" id="navHubToggleBtn" type="button" title="Menu Utama / Hub">
-                <span class="brand-badge"><?= htmlspecialchars($logoText) ?></span>
+                <?php if (!empty($logoImg)): ?>
+                    <img src="<?= htmlspecialchars($logoImg) ?>" alt="<?= htmlspecialchars($storeTitle) ?>" class="brand-badge-img">
+                <?php else: ?>
+                    <span class="brand-badge"><?= htmlspecialchars($logoText) ?></span>
+                <?php endif; ?>
                 <div class="brand-text">
                     <h1><?= htmlspecialchars($storeTitle) ?></h1>
                     <span>🌸 <?= htmlspecialchars($tagline) ?></span>
