@@ -42,10 +42,18 @@ $initialMenu = $api->getMenu($defaultOutletCode);
 // Fetch initial Wi-Fi details for selected outlet
 $initialWifi = $api->getWifi($defaultOutletCode);
 
-// Sync initialOutlet premium status with initialMenu (Single source of truth: Mantan 22k)
+// Sync initialOutlet premium & closed status with initialMenu
 if ($initialOutlet) {
     $initialOutlet['isPremium'] = !empty($initialMenu['premium']);
     $initialOutlet['premium'] = !empty($initialMenu['premium']);
+
+    if (!empty($initialMenu['isClosed'])) {
+        $initialOutlet['canOrder'] = false;
+        $initialOutlet['isOpen'] = false;
+        $initialOutlet['statusText'] = 'Tutup';
+    } elseif (isset($initialOutlet['canOrder']) && !$initialOutlet['canOrder']) {
+        $initialMenu['isClosed'] = true;
+    }
 }
 
 // Include Header Template

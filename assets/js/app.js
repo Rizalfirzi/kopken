@@ -76,6 +76,27 @@ const esc = (str) => {
     }[s]));
 };
 
+// Outlet Status Helper: Check if visited outlet is closed
+function isOutletClosed() {
+    if (!AppState.outlet) return false;
+
+    // Explicit boolean / string checks from outlet state
+    if (AppState.outlet.canOrder === false || AppState.outlet.isOpen === false) return true;
+    if (AppState.outlet.canOrder === 'false' || AppState.outlet.isOpen === 'false') return true;
+
+    // Menu level isClosed flag from API
+    if (AppState.menu?.isClosed === true || AppState.menu?.isClosed === 'true') return true;
+    if (AppState.menu?.canOrder === false || AppState.menu?.canOrder === 'false') return true;
+
+    // Text status fallback check
+    const status = (AppState.outlet.statusText || '').toLowerCase().trim();
+    if (status.includes('tutup') || status.includes('closed') || status === 'off') {
+        return true;
+    }
+
+    return false;
+}
+
 // Toast Notification
 function showToast(msg) {
     const wrap = document.getElementById('toastWrap');
@@ -312,8 +333,9 @@ function updateOutletHeader() {
 
     if (nameEl) nameEl.textContent = AppState.outlet.name;
     if (statusEl) {
-        statusEl.textContent = AppState.outlet.statusText || 'Buka';
-        statusEl.className = 'pill ' + (AppState.outlet.canOrder ? 'pill-open' : 'pill-closed');
+        const closed = isOutletClosed();
+        statusEl.textContent = closed ? (AppState.outlet.statusText || 'Tutup') : (AppState.outlet.statusText || 'Buka');
+        statusEl.className = 'pill ' + (closed ? 'pill-closed' : 'pill-open');
     }
     if (hoursEl) hoursEl.textContent = '• ' + (AppState.outlet.hours || 'Buka Setiap Hari');
     if (barOutletEl) barOutletEl.textContent = AppState.outlet.name;
@@ -422,7 +444,11 @@ window.selectOutlet = function(code) {
     });
 
     closeSheet('outletSheet');
-    showToast(`✓ Outlet aktif: ${found.name}`);
+    if (isOutletClosed()) {
+        showToast(`⚠️ Perhatian: ${found.name} saat ini sedang tutup`);
+    } else {
+        showToast(`✓ Outlet aktif: ${found.name}`);
+    }
 
     // If already verified as Premium from previous menu fetch, show alert immediately
     if (found.isPremium === true) {
@@ -518,6 +544,19 @@ function fetchMenu(outletCode, forceRefresh = false) {
         .then(data => {
             AppState.menu = data;
 
+            // Sync closed status if data indicates isClosed
+            if (data && typeof data.isClosed === 'boolean') {
+                if (data.isClosed && AppState.outlet) {
+                    AppState.outlet.canOrder = false;
+                    AppState.outlet.isOpen = false;
+                    if (!AppState.outlet.statusText || AppState.outlet.statusText === 'Buka') {
+                        AppState.outlet.statusText = 'Tutup';
+                    }
+                    outletStore.set(AppState.outlet.code, AppState.outlet);
+                    updateOutletHeader();
+                }
+            }
+
             // Absolute Client Rule: Single source of truth is Kopi Kenangan Mantan normalPrice >= 22k
             let isPrem = false;
             if (Array.isArray(data.items)) {
@@ -558,6 +597,7 @@ function fetchMenu(outletCode, forceRefresh = false) {
             if (syncEl) syncEl.textContent = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
 
             renderMenu();
+            updateCartUI();
             populateMenuDropdown();
             showToast(forceRefresh ? '✓ Stok outlet berhasil diperbarui!' : `Stok siap untuk ${AppState.outlet?.name}`);
         })
@@ -603,6 +643,7 @@ function renderMenu() {
     if (!container) return;
 
     const items = AppState.menu?.items || [];
+    const outletClosed = isOutletClosed();
     
     const filtered = items.filter(item => {
         const matchesCat = AppState.activeCategory === 'all' || item.category === AppState.activeCategory;
@@ -612,8 +653,30 @@ function renderMenu() {
         return matchesCat && matchesSearch;
     });
 
+    const closedBannerHtml = outletClosed ? `
+        <div class="outlet-closed-banner" id="outletClosedBanner">
+            <div class="ocb-icon-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+            </div>
+            <div class="ocb-content">
+                <div class="ocb-title">Outlet Sedang Tutup</div>
+                <div class="ocb-desc">
+                    <b>${esc(AppState.outlet?.name || 'Outlet')}</b> saat ini sedang tutup${AppState.outlet?.hours ? ` (${esc(AppState.outlet.hours)})` : ''}. Semua menu dinonaktifkan sementara. Silakan ganti outlet yang sedang buka untuk memesan.
+                </div>
+            </div>
+            <button type="button" class="ocb-btn" onclick="openSheet('outletSheet')">
+                <span>Ganti Outlet</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    ` : '';
+
     if (!filtered.length) {
         container.innerHTML = `
+            ${closedBannerHtml}
             <div class="empty-box">
                 <div class="empty-icon">☕</div>
                 <h4>Menu Tidak Ditemukan</h4>
@@ -624,8 +687,9 @@ function renderMenu() {
     }
 
     container.innerHTML = `
+        ${closedBannerHtml}
         <div class="sec-title">
-            <span>Menampilkan ${filtered.length} menu</span>
+            <span>Menampilkan ${filtered.length} menu ${outletClosed ? '• (Outlet Tutup)' : ''}</span>
         </div>
         <div class="menu-grid">
             ${filtered.map(item => {
@@ -633,13 +697,39 @@ function renderMenu() {
                 const safeKey = (item.key || item.id || '').replace(/"/g, '&quot;');
                 const isBundle = item.category === 'Bundling' || item.isBundling;
 
+                let cardClasses = 'product-card';
+                if (outletClosed) {
+                    cardClasses += ' outlet-closed-card';
+                } else if (isSold) {
+                    cardClasses += ' sold-out';
+                }
+
+                let badgeHtml = '';
+                if (outletClosed) {
+                    badgeHtml = `<span class="stock-badge closed">✕ Outlet Tutup</span>`;
+                } else if (isSold) {
+                    badgeHtml = `<span class="stock-badge empty">✕ Habis di Outlet</span>`;
+                } else {
+                    badgeHtml = `<span class="stock-badge ready">● Stok Ready</span>`;
+                }
+
+                let btnText = '+ Tambah';
+                let btnDisabled = false;
+                if (outletClosed) {
+                    btnText = 'Outlet Tutup';
+                    btnDisabled = true;
+                } else if (isSold) {
+                    btnText = 'Stok Habis';
+                    btnDisabled = true;
+                } else if (isBundle) {
+                    btnText = 'Pilih Paket';
+                }
+
                 return `
-                    <div class="product-card ${isSold ? 'sold-out' : ''}" data-key="${safeKey}">
+                    <div class="${cardClasses}" data-key="${safeKey}">
                         <div class="product-img-wrap">
                             <img src="${item.img || 'https://cdn.kopikenangan.com/public/da484154-47b1-a756-54a4-8b3490fb0eae'}" alt="${item.name}" loading="lazy" onerror="this.src='https://placehold.co/200x200?text=Kopi+Kenangan'">
-                            <span class="stock-badge ${isSold ? 'empty' : 'ready'}">
-                                ${isSold ? '✕ Habis di Outlet' : '● Stok Ready'}
-                            </span>
+                            ${badgeHtml}
                             ${item.tag ? `<span class="promo-tag">${item.tag}</span>` : ''}
                         </div>
                         <h4 class="product-name">${item.name}</h4>
@@ -648,8 +738,8 @@ function renderMenu() {
                             <span class="product-price">${formatRp(item.price)}</span>
                             ${item.normalPrice && item.normalPrice > item.price ? `<span class="product-normal-price">${formatRp(item.normalPrice)}</span>` : ''}
                         </div>
-                        <button class="product-add-btn" type="button">
-                            ${isSold ? 'Stok Habis' : (isBundle ? 'Pilih Paket' : '+ Tambah')}
+                        <button class="product-add-btn" type="button" ${btnDisabled ? 'disabled aria-disabled="true"' : ''}>
+                            ${btnText}
                         </button>
                     </div>
                 `;
@@ -664,6 +754,13 @@ if (menuContainer) {
     menuContainer.addEventListener('click', (e) => {
         const card = e.target.closest('.product-card');
         if (!card) return;
+
+        if (isOutletClosed()) {
+            showToast(`⚠️ Maaf, Outlet ${AppState.outlet?.name || ''} sedang tutup. Silakan pilih outlet lain.`);
+            openSheet('outletSheet');
+            return;
+        }
+
         const key = card.dataset.key;
         const item = (AppState.menu?.items || []).find(i => (i.key || i.id) === key);
         if (!item) return;
@@ -686,6 +783,11 @@ if (menuContainer) {
 // =========================================================================
 
 function openBundlingModal(bundle) {
+    if (isOutletClosed()) {
+        showToast(`⚠️ Outlet ${AppState.outlet?.name || ''} sedang tutup.`);
+        openSheet('outletSheet');
+        return;
+    }
     AppState.activeBundle = bundle;
     AppState.bundleSlotChoices = {};
 
@@ -1124,6 +1226,11 @@ function optionText(opts) {
 }
 
 function openProductModal(item, editIndex = null) {
+    if (isOutletClosed()) {
+        showToast(`⚠️ Outlet ${AppState.outlet?.name || ''} sedang tutup.`);
+        openSheet('outletSheet');
+        return;
+    }
     AppState.selectedProduct = item;
     AppState.selectedQty = 1;
 
@@ -1261,6 +1368,11 @@ if (addToCartBtn) {
  * tampilkan popup "Ada Fee Tambahan +2.000" sebelum masuk ke keranjang!
  */
 function triggerAddToCartWithFeeCheck(item) {
+    if (isOutletClosed()) {
+        showToast(`⚠️ Maaf, tidak dapat menambah menu karena outlet sedang tutup.`);
+        openSheet('outletSheet');
+        return;
+    }
     const currentTotalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
 
     // If current cart is empty and this single item has qty 1, show Fee Warning Modal
@@ -1366,6 +1478,23 @@ function updateCartUI() {
     }
     if (freeFeeRow) freeFeeRow.style.display = 'none';
     if (plasticFeeRow) plasticFeeRow.style.display = AppState.hasPlasticBag ? 'flex' : 'none';
+
+    // Update Checkout Button if Outlet Closed
+    const checkoutWaBtn = document.getElementById('checkoutWaBtn');
+    if (checkoutWaBtn) {
+        if (isOutletClosed()) {
+            checkoutWaBtn.disabled = true;
+            checkoutWaBtn.style.opacity = '0.7';
+            checkoutWaBtn.innerHTML = `<span>⚠️ Outlet Sedang Tutup (Ganti Outlet)</span>`;
+        } else {
+            checkoutWaBtn.disabled = false;
+            checkoutWaBtn.style.opacity = '1';
+            checkoutWaBtn.innerHTML = `
+                <span>Kirim Pesanan ke WhatsApp</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            `;
+        }
+    }
 
     renderCartItemsList();
 }
@@ -1559,6 +1688,12 @@ document.querySelectorAll('.tz-pill').forEach(btn => {
 const checkoutWaBtn = document.getElementById('checkoutWaBtn');
 if (checkoutWaBtn) {
     checkoutWaBtn.addEventListener('click', () => {
+        if (isOutletClosed()) {
+            alert(`Maaf, Outlet ${AppState.outlet?.name || ''} saat ini sedang tutup. Silakan pilih outlet lain yang sedang buka untuk memesan.`);
+            openSheet('outletSheet');
+            return;
+        }
+
         if (!AppState.cart.length) {
             showToast('Keranjang kamu masih kosong.');
             return;

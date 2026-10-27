@@ -995,6 +995,11 @@ body {
     color: #FFFFFF;
 }
 
+.stock-badge.closed {
+    background: rgba(100, 116, 139, 0.95);
+    color: #FFFFFF;
+}
+
 .promo-tag {
     position: absolute;
     top: 6px;
@@ -1070,6 +1075,140 @@ body {
     background: var(--bg-card-subtle);
     color: var(--text-muted);
     cursor: not-allowed;
+}
+
+/* Validasi Outlet Tutup: Disable Semua Menu */
+.product-card.outlet-closed-card {
+    opacity: 0.58;
+    cursor: not-allowed;
+    filter: grayscale(20%);
+}
+
+.product-card.outlet-closed-card:hover {
+    border-color: var(--border-color);
+    transform: none;
+    box-shadow: var(--shadow-sm);
+}
+
+.product-card.outlet-closed-card:hover .product-img-wrap img {
+    transform: none;
+}
+
+.product-card.outlet-closed-card .product-add-btn {
+    background: #F1F5F9;
+    color: #94A3B8;
+    border-color: #E2E8F0;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+[data-theme="dark"] .product-card.outlet-closed-card .product-add-btn {
+    background: #1E293B;
+    color: #64748B;
+    border-color: #334155;
+}
+
+/* Banner Notifikasi Outlet Sedang Tutup */
+.outlet-closed-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: linear-gradient(135deg, #FEF2F2 0%, #FFF1F2 100%);
+    border: 1px solid #FECDD3;
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-sm);
+    animation: fadeIn 0.3s ease;
+}
+
+[data-theme="dark"] .outlet-closed-banner {
+    background: linear-gradient(135deg, rgba(225, 29, 72, 0.15) 0%, rgba(159, 18, 57, 0.15) 100%);
+    border-color: rgba(225, 29, 72, 0.35);
+}
+
+.ocb-icon-wrap {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-full);
+    background: #FEE2E2;
+    color: #E11D48;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+[data-theme="dark"] .ocb-icon-wrap {
+    background: rgba(225, 29, 72, 0.25);
+    color: #FDA4AF;
+}
+
+.ocb-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.ocb-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #9F1239;
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+[data-theme="dark"] .ocb-title {
+    color: #FECDD3;
+}
+
+.ocb-desc {
+    font-size: 11px;
+    color: #881337;
+    line-height: 1.45;
+}
+
+[data-theme="dark"] .ocb-desc {
+    color: #FDA4AF;
+}
+
+.ocb-desc b {
+    font-weight: 700;
+}
+
+.ocb-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius-full);
+    background: #E11D48;
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 800;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: var(--transition);
+    box-shadow: 0 2px 6px rgba(225, 29, 72, 0.3);
+}
+
+.ocb-btn:hover {
+    background: #BE123C;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 480px) {
+    .outlet-closed-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .ocb-btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 /* =========================================================================

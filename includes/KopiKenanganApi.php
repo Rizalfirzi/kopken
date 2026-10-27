@@ -295,10 +295,29 @@ class KopiKenanganApi
                 $isPremium = !empty($response['premium']) || $this->checkIsPremiumOutlet(['code' => $outletCode, 'name' => $outletCode]);
             }
 
+            // Check if outlet is closed via operational hours or force_status
+            $outletInfo = null;
+            $outletsData = $this->getOutlets();
+            if (!empty($outletsData['outlets'])) {
+                foreach ($outletsData['outlets'] as $o) {
+                    if (($o['code'] ?? '') === $outletCode) {
+                        $outletInfo = $o;
+                        break;
+                    }
+                }
+            }
+            if (!$outletInfo) {
+                $outletInfo = $this->evaluateOutletHours(['code' => $outletCode]);
+            }
+            $isClosed = !empty($response['isClosed']);
+            if ($outletInfo && isset($outletInfo['canOrder']) && !$outletInfo['canOrder']) {
+                $isClosed = true;
+            }
+
             $result = [
                 'success' => true,
                 'live' => $response['live'] ?? true,
-                'isClosed' => $response['isClosed'] ?? false,
+                'isClosed' => $isClosed,
                 'premium' => $isPremium,
                 'brand' => 'kopken',
                 'outletCode' => $outletCode,
@@ -319,6 +338,22 @@ class KopiKenanganApi
 
         // Fallback menu
         $fallback = $this->getFallbackMenu($outletCode);
+        $outletInfo = null;
+        $outletsData = $this->getOutlets();
+        if (!empty($outletsData['outlets'])) {
+            foreach ($outletsData['outlets'] as $o) {
+                if (($o['code'] ?? '') === $outletCode) {
+                    $outletInfo = $o;
+                    break;
+                }
+            }
+        }
+        if (!$outletInfo) {
+            $outletInfo = $this->evaluateOutletHours(['code' => $outletCode]);
+        }
+        if ($outletInfo && isset($outletInfo['canOrder']) && !$outletInfo['canOrder']) {
+            $fallback['isClosed'] = true;
+        }
         return $this->applyMenuCustomizations($fallback, $outletCode);
     }
 
@@ -532,6 +567,12 @@ class KopiKenanganApi
             } else {
                 $availableCount++;
             }
+        }
+
+        // Double check if outlet status is closed
+        $outletCheck = $this->evaluateOutletHours(['code' => $outletCode]);
+        if (!empty($menuData['isClosed']) || ($outletCheck && isset($outletCheck['canOrder']) && !$outletCheck['canOrder'])) {
+            $menuData['isClosed'] = true;
         }
 
         $menuData['categories'] = $categories;
