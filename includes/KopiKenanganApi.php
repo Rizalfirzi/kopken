@@ -597,26 +597,31 @@ class KopiKenanganApi
             $outletCode = config('store.default_outlet', 'LA.CODEFIN');
         }
 
-        $cacheKey = 'item_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $outletCode . '_' . $itemCode . '_' . $itemKey);
-        $cached = $this->getCache($cacheKey, 120);
-        if ($cached !== null) {
-            return $cached;
+        $upstreamCacheKey = 'raw_item_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $outletCode . '_' . $itemCode . '_' . $itemKey);
+        $rawResponse = $this->getCache($upstreamCacheKey, 120);
+
+        if ($rawResponse === null) {
+            $url = $this->baseUrl . '/kopken/item';
+            $params = [
+                'outlet' => $outletCode,
+            ];
+            if (!empty($itemCode)) {
+                $params['code'] = $itemCode;
+            }
+            if (!empty($itemKey)) {
+                $params['key'] = $itemKey;
+            }
+
+            $rawResponse = $this->httpRequest($url, $params);
+            if ($rawResponse && is_array($rawResponse)) {
+                $this->setCache($upstreamCacheKey, $rawResponse);
+            }
         }
 
-        $url = $this->baseUrl . '/kopken/item';
-        $params = [
-            'outlet' => $outletCode,
-        ];
-        if (!empty($itemCode)) {
-            $params['code'] = $itemCode;
-        }
-        if (!empty($itemKey)) {
-            $params['key'] = $itemKey;
-        }
+        if ($rawResponse && is_array($rawResponse)) {
+            // Deep copy so upstream cache remains untouched and pure
+            $response = json_decode(json_encode($rawResponse), true);
 
-        $response = $this->httpRequest($url, $params);
-
-        if ($response && is_array($response)) {
             // 1. Remove 'Jumbo' from groups and all corresponding combo prices per client revision
             $jumboIds = [];
             if (!empty($response['groups']) && is_array($response['groups'])) {
@@ -653,7 +658,7 @@ class KopiKenanganApi
                 }
             }
 
-            // 2. Adjust prices & calculate normals with accurate fee markup
+            // 2. Adjust prices & calculate normals with accurate fee markup dynamically!
             if (!empty($response['prices']) && is_array($response['prices'])) {
                 $menu = $this->getMenu($outletCode);
                 $matchedItem = null;
@@ -698,7 +703,6 @@ class KopiKenanganApi
                 $response['normals'] = $normals;
             }
 
-            $this->setCache($cacheKey, $response);
             return $response;
         }
 

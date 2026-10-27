@@ -1132,7 +1132,7 @@ async function loadItemDetail(item, line) {
         const outletCode = AppState.outlet?.code || 'LA.CODEFIN';
         const itemCode = item.code || '';
         const itemKey = item.key || item.id || '';
-        const res = await fetch(`api/kopken/item?outlet=${encodeURIComponent(outletCode)}&code=${encodeURIComponent(itemCode)}&key=${encodeURIComponent(itemKey)}`);
+        const res = await fetch(`api/kopken/item?outlet=${encodeURIComponent(outletCode)}&code=${encodeURIComponent(itemCode)}&key=${encodeURIComponent(itemKey)}&_t=${Date.now()}`, { cache: 'no-store' });
         const d = await res.json();
         if (AppState.sheet !== sheet) return;
         if (d.isSoldOut) {
@@ -1912,7 +1912,7 @@ function initAdminPricingFeature() {
             passSubmitBtn.textContent = 'Memverifikasi...';
         }
 
-        fetch(`api/admin_pricing.php?code=${encodeURIComponent(code)}`)
+        fetch(`api/admin_pricing.php?code=${encodeURIComponent(code)}&_t=${Date.now()}`)
             .then(res => res.json())
             .then(res => {
                 if (res.success && res.data) {
@@ -1920,7 +1920,7 @@ function initAdminPricingFeature() {
                     sessionStorage.setItem('kyuti_admin_auth', '1');
                     sessionStorage.setItem('kyuti_admin_code', code);
                     closeSheet('adminPasscodeModal');
-                    populateAdminPricingForm(res.data);
+                    populateAdminPricingForm(res.data, res.database);
                     openSheet('adminPricingSheet');
                     showToast('✓ Akses admin berhasil terverifikasi!');
                 } else {
@@ -2115,11 +2115,11 @@ function initAdminPricingFeature() {
 }
 
 function loadAndOpenAdminPanel(code) {
-    fetch(`api/admin_pricing.php?code=${encodeURIComponent(code)}`)
+    fetch(`api/admin_pricing.php?code=${encodeURIComponent(code)}&_t=${Date.now()}`)
         .then(res => res.json())
         .then(res => {
             if (res.success && res.data) {
-                populateAdminPricingForm(res.data);
+                populateAdminPricingForm(res.data, res.database);
                 openSheet('adminPricingSheet');
             } else {
                 sessionStorage.removeItem('kyuti_admin_auth');
@@ -2132,7 +2132,7 @@ function loadAndOpenAdminPanel(code) {
         });
 }
 
-function populateAdminPricingForm(data) {
+function populateAdminPricingForm(data, dbInfo) {
     if (!data) return;
     const defInput = document.getElementById('cfgDefaultMarkup');
     const drinksInput = document.getElementById('cfgCategoryDrinks');
@@ -2145,6 +2145,19 @@ function populateAdminPricingForm(data) {
     if (foodInput) foodInput.value = data.category_markups?.Food ?? data.category_markups?.Makanan ?? 4500;
     if (singleInput) singleInput.value = data.single_item_fee ?? 2000;
     if (plasticInput) plasticInput.value = data.plastic_bag_fee ?? 1000;
+
+    const dbBadge = document.getElementById('adminDbStatusBadge');
+    if (dbBadge) {
+        if (dbInfo && dbInfo.cloud_connected) {
+            dbBadge.innerHTML = '🟢 Terhubung (Vercel KV Cloud)';
+            dbBadge.style.background = '#D1FAE5';
+            dbBadge.style.color = '#065F46';
+        } else {
+            dbBadge.innerHTML = '🟡 Belum Terhubung (Lokal / Cache)';
+            dbBadge.style.background = '#FEF3C7';
+            dbBadge.style.color = '#92400E';
+        }
+    }
 
     adminPricingState.itemMarkupOverrides = Object.assign({}, data.item_markup_overrides || {});
     renderItemOverridesList();

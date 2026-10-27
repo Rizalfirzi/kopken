@@ -20,6 +20,22 @@ $validPasscode = trim((string)config('admin.passcode', 'WHOSUTII26'));
 $dataPath = __DIR__ . '/../data/pricing_settings.json';
 $tempPath = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'pricing_settings.json';
 
+// Function to auto-detect and resolve cloud database credentials (REST URL & Bearer Token or REDIS_URL)
+function getCloudDbCredentials() {
+    $kvUrl = getenv('KV_REST_API_URL') ?: getenv('UPSTASH_REDIS_REST_URL') ?: config('database.kv_url');
+    $kvToken = getenv('KV_REST_API_TOKEN') ?: getenv('UPSTASH_REDIS_REST_TOKEN') ?: config('database.kv_token');
+
+    $redisConnUrl = getenv('REDIS_URL') ?: getenv('KV_URL') ?: null;
+    if (!empty($redisConnUrl) && (empty($kvUrl) || empty($kvToken))) {
+        $parsedRedis = parse_url($redisConnUrl);
+        if (!empty($parsedRedis['host']) && !empty($parsedRedis['pass'])) {
+            $kvUrl = 'https://' . $parsedRedis['host'];
+            $kvToken = $parsedRedis['pass'];
+        }
+    }
+    return [$kvUrl, $kvToken];
+}
+
 // Function to get current merged pricing configuration
 function getCurrentPricing() {
     global $dataPath, $tempPath;
@@ -42,7 +58,37 @@ function getCurrentPricing() {
     ];
 
     $loaded = null;
-    if (file_exists($tempPath)) {
+
+    // Check Cloud Database (Vercel KV / Upstash Redis / REDIS_URL) first
+    list($kvUrl, $kvToken) = getCloudDbCredentials();
+    if (!empty($kvUrl) && !empty($kvToken)) {
+        $tempKvCache = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'kv_pricing_cache.json';
+        if (file_exists($tempKvCache)) {
+            $loaded = json_decode(@file_get_contents($tempKvCache), true);
+        }
+        if (!is_array($loaded)) {
+            $ch = curl_init(rtrim($kvUrl, '/') . '/get/pricing_settings');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => ["Authorization: Bearer {$kvToken}"],
+                CURLOPT_TIMEOUT => 2,
+                CURLOPT_SSL_VERIFYPEER => false,
+            ]);
+            $resp = curl_exec($ch);
+            curl_close($ch);
+            if ($resp) {
+                $kvJson = json_decode($resp, true);
+                if (!empty($kvJson['result'])) {
+                    $rawResult = is_string($kvJson['result']) ? json_decode($kvJson['result'], true) : $kvJson['result'];
+                    if (is_array($rawResult)) {
+                        $loaded = $rawResult;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!is_array($loaded) && file_exists($tempPath)) {
         $loaded = json_decode(@file_get_contents($tempPath), true);
     }
     if (!is_array($loaded) && file_exists($dataPath)) {
@@ -97,12 +143,19 @@ try {
             exit;
         }
 
+        list($kvUrl, $kvToken) = getCloudDbCredentials();
+        $hasCloudDb = !empty($kvUrl) && !empty($kvToken);
+
         $data = getCurrentPricing();
         unset($data['admin_passcode']); // Do not expose passcode in payload
 
         echo json_encode([
             'success' => true,
             'data' => $data,
+            'database' => [
+                'cloud_connected' => $hasCloudDb,
+                'provider' => $hasCloudDb ? 'Vercel KV / Upstash Redis' : 'Lokal / Serverless Temp',
+            ]
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -180,40 +233,54 @@ try {
         }
         $savedTemp = @file_put_contents($tempPath, json_encode($current, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-        // 3. If Cloud Database (Vercel KV / Upstash Redis) is connected, sync to Cloud Database
-        $kvUrl = getenv('KV_REST_API_URL') ?: getenv('UPSTASH_REDIS_REST_URL') ?: null;
-        $kvToken = getenv('KV_REST_API_TOKEN') ?: getenv('UPSTASH_REDIS_REST_TOKEN') ?: null;
+        // 3. If Cloud Database (Vercel KV / Upstash Redis / REDIS_URL) is connected, sync to Cloud Database
+        list($kvUrl, $kvToken) = getCloudDbCredentials();
+        $savedToCloud = false;
+
         if (!empty($kvUrl) && !empty($kvToken)) {
-            $ch = curl_init(rtrim($kvUrl, '/') . '/set/pricing_settings');
+            // Official Upstash REST API body format: ["SET", "key", "json_value"]
+            $ch = curl_init(rtrim($kvUrl, '/') . '/');
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => json_encode($current),
+                CURLOPT_POSTFIELDS => json_encode(['SET', 'pricing_settings', json_encode($current)]),
                 CURLOPT_HTTPHEADER => [
                     "Authorization: Bearer {$kvToken}",
                     "Content-Type: application/json"
                 ],
-                CURLOPT_TIMEOUT => 3,
+                CURLOPT_TIMEOUT => 4,
                 CURLOPT_SSL_VERIFYPEER => false,
             ]);
-            curl_exec($ch);
+            $kvResp = curl_exec($ch);
             curl_close($ch);
+            if ($kvResp) {
+                $kvDecoded = json_decode($kvResp, true);
+                if (!empty($kvDecoded['result'])) {
+                    $savedToCloud = true;
+                }
+            }
         }
 
-        // 3. Clear menu cache files in CACHE_PATH so new pricing takes effect instantly
+        // Overwrite local KV cache immediately so current lambda does not serve stale data
+        $tempKvCache = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'kv_pricing_cache.json';
+        $tempKvDir = dirname($tempKvCache);
+        if (!is_dir($tempKvDir)) @mkdir($tempKvDir, 0777, true);
+        @file_put_contents($tempKvCache, json_encode($current));
+
+        // 4. CRITICAL: Clear ALL menu and item cache files in CACHE_PATH so new pricing takes effect instantly
         $cacheDir = defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache';
         if (is_dir($cacheDir)) {
-            $files = glob($cacheDir . DIRECTORY_SEPARATOR . 'menu_*');
+            $files = glob($cacheDir . DIRECTORY_SEPARATOR . '*');
             if ($files) {
                 foreach ($files as $f) {
-                    if (is_file($f)) {
+                    if (is_file($f) && basename($f) !== 'kv_pricing_cache.json') {
                         @unlink($f);
                     }
                 }
             }
         }
 
-        // 4. Set Cookie for immediate cross-request synchronization on serverless
+        // 5. Set Cookie for immediate cross-request synchronization on serverless
         $cookiePayload = $current;
         unset($cookiePayload['admin_passcode']);
         @setcookie('kyuti_custom_pricing', urlencode(json_encode($cookiePayload, JSON_UNESCAPED_UNICODE)), [
@@ -229,6 +296,12 @@ try {
             'success' => true,
             'message' => 'Pengaturan fee berhasil disimpan! Harga menu langsung diperbarui.',
             'savedToFile' => (bool)($savedData || $savedTemp),
+            'savedToCloud' => $savedToCloud,
+            'database' => [
+                'cloud_connected' => !empty($kvUrl) && !empty($kvToken),
+                'saved_to_cloud' => $savedToCloud,
+                'provider' => (!empty($kvUrl) && !empty($kvToken)) ? 'Vercel KV / Upstash Redis' : 'Lokal / Serverless Temp',
+            ],
             'data' => $current,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;

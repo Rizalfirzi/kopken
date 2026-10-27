@@ -352,19 +352,41 @@ $config = [
     'admin' => [
         'passcode' => 'WHOSUTII26', // Redeem Code / Passcode untuk akses Admin Fee di website
     ],
+
+    // =========================================================================
+    // 9. DATABASE CLOUD UNTUK VERCEL (100% FREE TIER)
+    // =========================================================================
+    // Mendukung Vercel KV / Upstash Redis REST API.
+    // Otomatis membaca Environment Variables di Vercel:
+    // - KV_REST_API_URL / UPSTASH_REDIS_REST_URL
+    // - KV_REST_API_TOKEN / UPSTASH_REDIS_REST_TOKEN
+    'database' => [
+        'kv_url' => getenv('KV_REST_API_URL') ?: getenv('UPSTASH_REDIS_REST_URL') ?: '',
+        'kv_token' => getenv('KV_REST_API_TOKEN') ?: getenv('UPSTASH_REDIS_REST_TOKEN') ?: '',
+    ],
 ];
 
 // =========================================================================
-// MERGE DYNAMIC PRICING DARI ADMIN PANEL (data/pricing_settings.json, /tmp cache, & Cookie fallback)
+// MERGE DYNAMIC PRICING DARI ADMIN PANEL (Vercel KV Cloud, data/pricing_settings.json, /tmp cache, & Cookie fallback)
 // =========================================================================
-// 1. Check Cloud Database (Vercel KV / Upstash Redis REST API) if configured in Vercel Environment Variables
-$kvUrl = getenv('KV_REST_API_URL') ?: getenv('UPSTASH_REDIS_REST_URL') ?: null;
-$kvToken = getenv('KV_REST_API_TOKEN') ?: getenv('UPSTASH_REDIS_REST_TOKEN') ?: null;
+// 1. Check Cloud Database (Vercel KV / Upstash Redis REST API / REDIS_URL)
+$kvUrl = getenv('KV_REST_API_URL') ?: getenv('UPSTASH_REDIS_REST_URL') ?: ($config['database']['kv_url'] ?? null);
+$kvToken = getenv('KV_REST_API_TOKEN') ?: getenv('UPSTASH_REDIS_REST_TOKEN') ?: ($config['database']['kv_token'] ?? null);
+
+// Auto-detect & parse REDIS_URL / KV_URL (e.g. rediss://default:token@host:port)
+$redisConnUrl = getenv('REDIS_URL') ?: getenv('KV_URL') ?: null;
+if (!empty($redisConnUrl) && (empty($kvUrl) || empty($kvToken))) {
+    $parsedRedis = parse_url($redisConnUrl);
+    if (!empty($parsedRedis['host']) && !empty($parsedRedis['pass'])) {
+        $kvUrl = 'https://' . $parsedRedis['host'];
+        $kvToken = $parsedRedis['pass'];
+    }
+}
 
 $dynamicData = null;
 if (!empty($kvUrl) && !empty($kvToken)) {
     $tempKvCache = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'kv_pricing_cache.json';
-    if (file_exists($tempKvCache) && (time() - filemtime($tempKvCache)) < 10) {
+    if (file_exists($tempKvCache) && (time() - filemtime($tempKvCache)) < 5) {
         $dynamicData = json_decode(@file_get_contents($tempKvCache), true);
     } else {
         $ch = curl_init(rtrim($kvUrl, '/') . '/get/pricing_settings');
@@ -382,6 +404,8 @@ if (!empty($kvUrl) && !empty($kvToken)) {
                 $rawResult = is_string($kvJson['result']) ? json_decode($kvJson['result'], true) : $kvJson['result'];
                 if (is_array($rawResult)) {
                     $dynamicData = $rawResult;
+                    $tempDir = dirname($tempKvCache);
+                    if (!is_dir($tempDir)) @mkdir($tempDir, 0777, true);
                     @file_put_contents($tempKvCache, json_encode($dynamicData));
                 }
             }

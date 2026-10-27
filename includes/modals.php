@@ -392,9 +392,17 @@
         </div>
         <div class="sheet-body" style="padding-bottom:90px">
             <!-- Alert Info -->
-            <div style="background:var(--bg-card-subtle);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--text-main);line-height:1.4">
+            <div style="background:var(--bg-card-subtle);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--text-main);line-height:1.4">
                 💡 <b>Formula Harga:</b> <code>(Harga Asli Kopken - 50%) + Fee</code>.<br>
                 Di sini kamu bisa atur fee default, fee per kategori makanan/minuman, hingga fee khusus untuk menu tertentu!
+            </div>
+
+            <!-- Database Status Indicator -->
+            <div id="adminDbStatusBox" style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:16px;font-size:12px;display:flex;align-items:center;justify-content:space-between">
+                <span style="font-weight:700;color:var(--text-main);display:inline-flex;align-items:center;gap:6px">
+                    <span>☁️ Database Cloud:</span>
+                </span>
+                <span id="adminDbStatusBadge" style="font-weight:700;padding:3px 10px;border-radius:12px;font-size:11px;background:#FEF3C7;color:#92400E">Memeriksa...</span>
             </div>
 
             <!-- 1. Fee Global / Default -->
