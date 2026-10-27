@@ -1814,6 +1814,7 @@ body {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
+    align-items: stretch;
 }
 
 .bundle-choices-grid.single-col {
@@ -1836,6 +1837,8 @@ body {
     gap: 6px;
     transition: var(--transition);
     user-select: none;
+    min-height: 44px;
+    box-sizing: border-box;
 }
 
 .bundle-choice-card:hover:not(.sold-out) {
@@ -1885,6 +1888,176 @@ body {
     padding: 2px 6px;
     border-radius: 4px;
     white-space: nowrap;
+}
+
+/* Bundling Per-Item Options Customizer (Revisi Client) */
+.bundle-slot-custom-box {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #FFFFFF;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    animation: fadeIn 0.2s ease;
+}
+
+.bundle-cup-custom-group + .bundle-cup-custom-group {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.bundle-cup-pref-header {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: var(--brand-primary-dark);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.bundle-pref-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.bundle-pref-row:last-child {
+    margin-bottom: 0;
+}
+
+.bundle-pref-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    min-width: 38px;
+}
+
+.bundle-pref-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.bundle-pref-pills .og-pill {
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-color);
+    background: var(--bg-page);
+    color: var(--text-main);
+    cursor: pointer;
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.bundle-pref-pills .og-pill:hover {
+    border-color: var(--brand-primary);
+}
+
+.bundle-pref-pills .og-pill.active {
+    background: var(--brand-primary);
+    color: #FFFFFF;
+    border-color: var(--brand-primary);
+    font-weight: 700;
+    box-shadow: 0 2px 4px rgba(219, 39, 119, 0.25);
+}
+
+.bundle-food-badge-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #854D0E;
+    background: #FEF9C3;
+    border: 1px solid #FEF08A;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+}
+
+/* Admin Bundling ON/OFF Switches & Tags */
+.admin-bundling-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+}
+
+.admin-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.admin-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.admin-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #D1D5DB;
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.admin-toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.admin-toggle-switch input:checked + .admin-toggle-slider {
+    background-color: #10B981;
+}
+
+.admin-toggle-switch input:checked + .admin-toggle-slider:before {
+    transform: translateX(20px);
+}
+
+.disabled-bundling-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
+    border-radius: var(--radius-full);
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.disabled-bundling-pill button {
+    background: none;
+    border: none;
+    color: #DC2626;
+    cursor: pointer;
+    font-weight: 900;
+    font-size: 12px;
+    padding: 0;
+    line-height: 1;
 }
 
 /* Floating Cart */

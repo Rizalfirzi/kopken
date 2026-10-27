@@ -32,6 +32,7 @@ const AppState = {
     // Active Bundling Customization
     activeBundle: null,
     bundleSlotChoices: {},
+    bundleSlotPrefs: {},
     bundleIce: 'Normal Ice',
     bundleSugar: 'Normal Sugar',
 
@@ -645,7 +646,11 @@ function renderMenu() {
     const items = AppState.menu?.items || [];
     const outletClosed = isOutletClosed();
     
+    const bStatus = adminPricingState?.bundlingStatus || window.INITIAL_DATA?.pricing?.bundlingStatus;
     const filtered = items.filter(item => {
+        if ((item.category === 'Bundling' || item.isBundling) && bStatus && item.key && bStatus[item.key] === false) {
+            return false;
+        }
         const matchesCat = AppState.activeCategory === 'all' || item.category === AppState.activeCategory;
         const matchesSearch = !AppState.searchQuery || 
             item.name.toLowerCase().includes(AppState.searchQuery) ||
@@ -779,7 +784,7 @@ if (menuContainer) {
 }
 
 // =========================================================================
-// 4. BUNDLING MODAL CONTROLLER (Live Outlet Stock Check & Dynamic Pricing)
+// 4. BUNDLING MODAL CONTROLLER (Per-Item Customizer, Live Stock & Admin Control)
 // =========================================================================
 
 function normBundleStr(str) {
@@ -794,6 +799,23 @@ const BUNDLE_ITEM_ALIASES = {
     'dutchchocokenangan': ['dutchchocokenanganfrappe', 'dutchchocolate', 'dutchchocokenangan'],
     'butterscotchkenangan': ['butterscotchkenanganfrappe', 'butterscotchkenangan'],
 };
+
+const BUNDLING_FOOD_ITEMS = new Set([
+    'classic peanut butter panini', 'butter croissant', 'salt bread sausage',
+    'salt bread choco butter', 'friend chip cookie', 'choco chip cookie',
+    'chocolate croissant', 'bananachoco soft bake', 'sweet honey soft bake',
+    'oatmeal raisin soft bake', 'chocolate donut', 'donut almond',
+    'double choco bagel', 'vanilla choux puff', 'strawberry choux puff',
+    'chocolate choux puff', 'bambang choco cheese toast', 'adam ayam toast',
+    'triple cheese bagel', 'wahyu sapi toast', 'roti srikaya'
+]);
+
+function isBundlingFoodItem(name) {
+    if (!name) return false;
+    const n = String(name).toLowerCase().trim();
+    if (BUNDLING_FOOD_ITEMS.has(n)) return true;
+    return /croissant|panini|toast|bread|cookie|donut|bagel|puff|bake|srikaya|roti/i.test(n);
+}
 
 function isSingleItemSoldOut(name) {
     const menuItems = AppState.menu?.items || [];
@@ -826,8 +848,27 @@ function isSingleItemSoldOut(name) {
     return true;
 }
 
+function isBundleOptionDisabledByAdmin(opt) {
+    let optName = typeof opt === 'string' ? opt : (opt?.name || '');
+    const disabledList = adminPricingState?.disabledBundlingOptions || window.INITIAL_DATA?.pricing?.disabledBundlingOptions || [];
+    if (!disabledList.length) return false;
+    if (disabledList.includes(optName)) return true;
+    if (optName.includes('+')) {
+        const parts = optName.split('+').map(p => p.trim());
+        for (const p of parts) {
+            if (disabledList.includes(p)) return true;
+        }
+    }
+    return false;
+}
+
 function isBundleOptionSoldOut(opt) {
     let optName = typeof opt === 'string' ? opt : (opt?.name || '');
+    // 1. Check if disabled via admin toggle
+    if (isBundleOptionDisabledByAdmin(optName)) {
+        return true;
+    }
+    // 2. Check live outlet stock
     if (optName.includes('+')) {
         const parts = optName.split('+').map(p => p.trim());
         for (const p of parts) {
@@ -838,6 +879,123 @@ function isBundleOptionSoldOut(opt) {
         return false;
     }
     return isSingleItemSoldOut(optName);
+}
+
+function renderBundleSlotCustomizer(sIdx) {
+    const box = document.getElementById(`bundleCustomBox_${sIdx}`);
+    if (!box) return;
+
+    const choice = AppState.bundleSlotChoices[sIdx];
+    if (!choice || !choice.name) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
+    }
+
+    const optName = choice.name;
+
+    // Food item -> show food badge note without ice/sugar
+    if (isBundlingFoodItem(optName)) {
+        box.style.display = 'block';
+        box.innerHTML = `
+            <div class="bundle-food-badge-note">
+                <span>🥐</span>
+                <span><b>${esc(optName)}</b> siap saji (tanpa pilihan es / gula)</span>
+            </div>
+        `;
+        return;
+    }
+
+    if (!AppState.bundleSlotPrefs[sIdx]) {
+        AppState.bundleSlotPrefs[sIdx] = {};
+    }
+
+    // Frappe Combo (2 cups in one slot, separated by '+')
+    if (optName.includes('+')) {
+        const cups = optName.split('+').map(c => c.trim());
+        const cup1Name = cups[0] || 'Cup 1';
+        const cup2Name = cups[1] || 'Cup 2';
+
+        if (!AppState.bundleSlotPrefs[sIdx].cup1) {
+            AppState.bundleSlotPrefs[sIdx].cup1 = { ice: 'Normal Ice', sugar: 'Normal Sugar' };
+        }
+        if (!AppState.bundleSlotPrefs[sIdx].cup2) {
+            AppState.bundleSlotPrefs[sIdx].cup2 = { ice: 'Normal Ice', sugar: 'Normal Sugar' };
+        }
+
+        const p1 = AppState.bundleSlotPrefs[sIdx].cup1;
+        const p2 = AppState.bundleSlotPrefs[sIdx].cup2;
+
+        box.style.display = 'block';
+        box.innerHTML = `
+            <div class="bundle-cup-custom-group">
+                <div class="bundle-cup-pref-header">🥤 Cup 1: <b>${esc(cup1Name)}</b></div>
+                <div class="bundle-pref-row">
+                    <span class="bundle-pref-title">Es:</span>
+                    <div class="bundle-pref-pills" data-slot="${sIdx}" data-cup="cup1" data-type="ice">
+                        <button type="button" class="og-pill ${p1.ice === 'Normal Ice' ? 'active' : ''}" data-val="Normal Ice">Normal Ice</button>
+                        <button type="button" class="og-pill ${p1.ice === 'Less Ice' ? 'active' : ''}" data-val="Less Ice">Less Ice</button>
+                    </div>
+                </div>
+                <div class="bundle-pref-row">
+                    <span class="bundle-pref-title">Gula:</span>
+                    <div class="bundle-pref-pills" data-slot="${sIdx}" data-cup="cup1" data-type="sugar">
+                        <button type="button" class="og-pill ${p1.sugar === 'Normal Sugar' ? 'active' : ''}" data-val="Normal Sugar">Normal Sugar</button>
+                        <button type="button" class="og-pill ${p1.sugar === 'Less Sugar (50%)' ? 'active' : ''}" data-val="Less Sugar (50%)">Less Sugar</button>
+                        <button type="button" class="og-pill ${p1.sugar === 'No Sugar' ? 'active' : ''}" data-val="No Sugar">No Sugar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bundle-cup-custom-group">
+                <div class="bundle-cup-pref-header">🥤 Cup 2: <b>${esc(cup2Name)}</b></div>
+                <div class="bundle-pref-row">
+                    <span class="bundle-pref-title">Es:</span>
+                    <div class="bundle-pref-pills" data-slot="${sIdx}" data-cup="cup2" data-type="ice">
+                        <button type="button" class="og-pill ${p2.ice === 'Normal Ice' ? 'active' : ''}" data-val="Normal Ice">Normal Ice</button>
+                        <button type="button" class="og-pill ${p2.ice === 'Less Ice' ? 'active' : ''}" data-val="Less Ice">Less Ice</button>
+                    </div>
+                </div>
+                <div class="bundle-pref-row">
+                    <span class="bundle-pref-title">Gula:</span>
+                    <div class="bundle-pref-pills" data-slot="${sIdx}" data-cup="cup2" data-type="sugar">
+                        <button type="button" class="og-pill ${p2.sugar === 'Normal Sugar' ? 'active' : ''}" data-val="Normal Sugar">Normal Sugar</button>
+                        <button type="button" class="og-pill ${p2.sugar === 'Less Sugar (50%)' ? 'active' : ''}" data-val="Less Sugar (50%)">Less Sugar</button>
+                        <button type="button" class="og-pill ${p2.sugar === 'No Sugar' ? 'active' : ''}" data-val="No Sugar">No Sugar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    // Single drink slot
+    if (!AppState.bundleSlotPrefs[sIdx].single) {
+        AppState.bundleSlotPrefs[sIdx].single = { ice: 'Normal Ice', sugar: 'Normal Sugar' };
+    }
+    const p = AppState.bundleSlotPrefs[sIdx].single;
+
+    box.style.display = 'block';
+    box.innerHTML = `
+        <div class="bundle-cup-custom-group">
+            <div class="bundle-cup-pref-header">🥤 Pilihan Minuman: <b>${esc(optName)}</b></div>
+            <div class="bundle-pref-row">
+                <span class="bundle-pref-title">Es:</span>
+                <div class="bundle-pref-pills" data-slot="${sIdx}" data-cup="single" data-type="ice">
+                    <button type="button" class="og-pill ${p.ice === 'Normal Ice' ? 'active' : ''}" data-val="Normal Ice">Normal Ice</button>
+                    <button type="button" class="og-pill ${p.ice === 'Less Ice' ? 'active' : ''}" data-val="Less Ice">Less Ice</button>
+                </div>
+            </div>
+            <div class="bundle-pref-row">
+                <span class="bundle-pref-title">Gula:</span>
+                <div class="bundle-pref-pills" data-slot="${sIdx}" data-cup="single" data-type="sugar">
+                    <button type="button" class="og-pill ${p.sugar === 'Normal Sugar' ? 'active' : ''}" data-val="Normal Sugar">Normal Sugar</button>
+                    <button type="button" class="og-pill ${p.sugar === 'Less Sugar (50%)' ? 'active' : ''}" data-val="Less Sugar (50%)">Less Sugar</button>
+                    <button type="button" class="og-pill ${p.sugar === 'No Sugar' ? 'active' : ''}" data-val="No Sugar">No Sugar</button>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function updateBundleModalPrice() {
@@ -870,6 +1028,7 @@ function openBundlingModal(bundle) {
     }
     AppState.activeBundle = bundle;
     AppState.bundleSlotChoices = {};
+    AppState.bundleSlotPrefs = {};
     AppState.bundleIce = 'Normal Ice';
     AppState.bundleSugar = 'Normal Sugar';
 
@@ -893,14 +1052,6 @@ function openBundlingModal(bundle) {
         noticeEl.innerHTML = '';
     }
 
-    // Reset ice & sugar pills active state
-    document.querySelectorAll('#bundleIcePills .og-pill').forEach((btn, idx) => {
-        btn.classList.toggle('active', idx === 0);
-    });
-    document.querySelectorAll('#bundleSugarPills .og-pill').forEach((btn, idx) => {
-        btn.classList.toggle('active', idx === 0);
-    });
-
     let hasUnavailableRequiredSlot = false;
     const slots = bundle.slots || [];
 
@@ -914,6 +1065,7 @@ function openBundlingModal(bundle) {
                 const optName = typeof opt === 'string' ? opt : (opt?.name || '');
                 const optPrice = (typeof opt === 'object' && opt?.price) ? opt.price : null;
                 const isSoldOut = isBundleOptionSoldOut(opt);
+                const isDisabledByAdmin = isBundleOptionDisabledByAdmin(opt);
 
                 let isSelected = false;
                 if (!isSoldOut && !selectedOptForSlot) {
@@ -922,8 +1074,11 @@ function openBundlingModal(bundle) {
                 }
 
                 const priceBadge = optPrice ? `<span class="bundle-opt-price">${formatRp(optPrice)}</span>` : '';
-                const soldBadge = isSoldOut ? `<span class="bundle-opt-badge-sold">✕ Habis</span>` : '';
-                const singleColClass = optName.length > 25 ? 'style="grid-column: 1 / -1;"' : '';
+                const soldBadge = isSoldOut ? `<span class="bundle-opt-badge-sold">${isDisabledByAdmin ? '✕ Nonaktif' : '✕ Habis'}</span>` : '';
+                
+                // Khusus PAKET HEMAT 3 ITEM, jangan gunakan grid-column span agar layout rapi 2 kolom simetris tanpa celah kosong
+                const isHemat3Item = (bundle.key === 'bundle_hemat_3_item');
+                const singleColClass = (!isHemat3Item && optName.length > 28) ? 'style="grid-column: 1 / -1;"' : '';
 
                 return `
                     <div class="bundle-choice-card ${isSelected ? 'selected' : ''} ${isSoldOut ? 'sold-out' : ''}" 
@@ -972,15 +1127,21 @@ function openBundlingModal(bundle) {
                         <span>${slot.label || `Pilihan ${sIdx + 1}`}</span>
                     </div>
                     ${optionsHtml}
+                    <div class="bundle-slot-custom-box" id="bundleCustomBox_${sIdx}" style="display:none"></div>
                 </div>
             `;
         }).join('');
+
+        // Render initial customizers for pre-selected slot choices
+        slots.forEach((_, sIdx) => {
+            renderBundleSlotCustomizer(sIdx);
+        });
     }
 
     if (hasUnavailableRequiredSlot) {
         if (noticeEl) {
             noticeEl.style.display = 'block';
-            noticeEl.innerHTML = `⚠️ <b>Menu Paket Habis</b>: Beberapa pilihan menu dalam paket ini sedang kosong di <b>${esc(AppState.outlet?.name || 'outlet ini')}</b>. Silakan coba paket lain atau ganti outlet.`;
+            noticeEl.innerHTML = `⚠️ <b>Menu Paket Habis</b>: Beberapa pilihan menu dalam paket ini sedang kosong atau dinonaktifkan di <b>${esc(AppState.outlet?.name || 'outlet ini')}</b>. Silakan coba paket lain atau ganti outlet.`;
         }
         if (addBtn) {
             addBtn.disabled = true;
@@ -996,15 +1157,36 @@ function openBundlingModal(bundle) {
     openSheet('bundlingSheet');
 }
 
-// Handle Slot Choice Click
+// Handle Slot Choice & Customizer Pill Clicks
 const bundleSlotsContainer = document.getElementById('bundleSlotsContainer');
 if (bundleSlotsContainer) {
     bundleSlotsContainer.addEventListener('click', (e) => {
+        // 1. Pill click inside slot customizer (Ice / Sugar)
+        const pill = e.target.closest('.bundle-pref-pills .og-pill');
+        if (pill) {
+            const container = pill.closest('.bundle-pref-pills');
+            const slot = container.dataset.slot;
+            const cup = container.dataset.cup; // 'cup1', 'cup2', or 'single'
+            const type = container.dataset.type; // 'ice' or 'sugar'
+            const val = pill.dataset.val;
+
+            if (!AppState.bundleSlotPrefs[slot]) AppState.bundleSlotPrefs[slot] = {};
+            if (!AppState.bundleSlotPrefs[slot][cup]) {
+                AppState.bundleSlotPrefs[slot][cup] = { ice: 'Normal Ice', sugar: 'Normal Sugar' };
+            }
+            AppState.bundleSlotPrefs[slot][cup][type] = val;
+
+            container.querySelectorAll('.og-pill').forEach(b => b.classList.remove('active'));
+            pill.classList.add('active');
+            return;
+        }
+
+        // 2. Choice card click
         const choiceCard = e.target.closest('.bundle-choice-card');
         if (!choiceCard) return;
 
         if (choiceCard.classList.contains('sold-out')) {
-            showToast('⚠️ Maaf, menu ini sedang habis / kosong di outlet ini.');
+            showToast('⚠️ Maaf, menu ini sedang habis atau dinonaktifkan di outlet ini.');
             return;
         }
 
@@ -1023,26 +1205,10 @@ if (bundleSlotsContainer) {
         }
         choiceCard.classList.add('selected');
 
+        renderBundleSlotCustomizer(slotIdx);
         updateBundleModalPrice();
     });
 }
-
-// Bundle Ice & Sugar Pills
-document.querySelectorAll('#bundleIcePills .og-pill').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('#bundleIcePills .og-pill').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        AppState.bundleIce = btn.dataset.val;
-    });
-});
-
-document.querySelectorAll('#bundleSugarPills .og-pill').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('#bundleSugarPills .og-pill').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        AppState.bundleSugar = btn.dataset.val;
-    });
-});
 
 const addBundleToCartBtn = document.getElementById('addBundleToCartBtn');
 if (addBundleToCartBtn) {
@@ -1056,8 +1222,26 @@ if (addBundleToCartBtn) {
             return;
         }
 
-        const choicesNames = Object.values(AppState.bundleSlotChoices).map(c => (typeof c === 'object' ? c.name : c)).filter(Boolean);
-        const choicesList = choicesNames.join(' + ');
+        const choicesParts = [];
+        slots.forEach((slot, sIdx) => {
+            const choice = AppState.bundleSlotChoices[sIdx];
+            if (!choice || !choice.name) return;
+            const optName = choice.name;
+
+            if (isBundlingFoodItem(optName)) {
+                choicesParts.push(optName);
+            } else if (optName.includes('+')) {
+                const cups = optName.split('+').map(c => c.trim());
+                const p1 = AppState.bundleSlotPrefs[sIdx]?.cup1 || { ice: 'Normal Ice', sugar: 'Normal Sugar' };
+                const p2 = AppState.bundleSlotPrefs[sIdx]?.cup2 || { ice: 'Normal Ice', sugar: 'Normal Sugar' };
+                choicesParts.push(`${cups[0]} (${p1.ice}, ${p1.sugar}) + ${cups[1]} (${p2.ice}, ${p2.sugar})`);
+            } else {
+                const p = AppState.bundleSlotPrefs[sIdx]?.single || { ice: 'Normal Ice', sugar: 'Normal Sugar' };
+                choicesParts.push(`${optName} (${p.ice}, ${p.sugar})`);
+            }
+        });
+
+        const choicesList = choicesParts.join(' + ');
         const notes = document.getElementById('bundleNotes')?.value.trim() || '';
         const finalPrice = AppState.activeBundle.currentPrice || AppState.activeBundle.price;
 
@@ -1068,14 +1252,13 @@ if (addBundleToCartBtn) {
             price: finalPrice,
             qty: 1,
             size: AppState.activeBundle.size || '',
-            temp: 'Ice',
-            ice: AppState.bundleIce || 'Normal Ice',
-            sugar: AppState.bundleSugar || 'Normal Sugar',
+            variantText: AppState.activeBundle.size || 'Paket Bundling',
             bundleChoices: choicesList,
             note: notes,
             img: AppState.activeBundle.img,
             subtotal: finalPrice,
             isBundling: true,
+            category: 'Bundling',
         };
 
         closeSheet('bundlingSheet');
@@ -1559,6 +1742,13 @@ function triggerAddToCartWithFeeCheck(item) {
         openSheet('outletSheet');
         return;
     }
+
+    // Bundling packages are exempt from single-item fee (+2.000) and warning modal
+    if (item.isBundling || item.category === 'Bundling') {
+        commitItemToCart(item);
+        return;
+    }
+
     const currentTotalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
 
     // If current cart is empty and this single item has qty 1, show Fee Warning Modal
@@ -1612,8 +1802,9 @@ function updateCartUI() {
     const totalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
     const subtotal = AppState.cart.reduce((sum, i) => sum + (i.subtotal || 0), 0);
 
-    // Calculate Single Item Fee (+2.000 if total qty == 1)
-    const hasSingleFee = totalQty === 1;
+    // Calculate Single Item Fee (+2.000 if total qty == 1, but exempt if cart contains bundling)
+    const hasBundling = AppState.cart.some(i => i.isBundling || i.category === 'Bundling');
+    const hasSingleFee = (totalQty === 1) && !hasBundling;
     const singleFee = hasSingleFee ? AppState.singleItemFeeAmount : 0;
 
     // Calculate Plastic Bag Fee (+1.000 if checked)
@@ -1901,8 +2092,8 @@ if (checkoutWaBtn) {
         }
 
         const totalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
-        const subtotal = AppState.cart.reduce((sum, i) => sum + (i.subtotal || 0), 0);
-        const hasSingleFee = totalQty === 1;
+        const hasBundling = AppState.cart.some(i => i.isBundling || i.category === 'Bundling');
+        const hasSingleFee = (totalQty === 1) && !hasBundling;
 
         checkoutWaBtn.disabled = true;
         checkoutWaBtn.innerHTML = '<span>Menyiapkan Pesanan...</span>';
@@ -2057,6 +2248,17 @@ let adminPricingState = {
         : {},
     singleItemFee: window.INITIAL_DATA?.singleItemFee || 2000,
     plasticBagFee: window.INITIAL_DATA?.plasticBagFee || 1000,
+    bundlingStatus: (window.INITIAL_DATA?.pricing?.bundlingStatus && typeof window.INITIAL_DATA.pricing.bundlingStatus === 'object')
+        ? Object.assign({}, window.INITIAL_DATA.pricing.bundlingStatus)
+        : {
+            bundle_2_cup_large: true,
+            bundle_2_frappe: true,
+            promo_minuman_special: true,
+            bundle_hemat_3_item: true,
+        },
+    disabledBundlingOptions: Array.isArray(window.INITIAL_DATA?.pricing?.disabledBundlingOptions)
+        ? [...window.INITIAL_DATA.pricing.disabledBundlingOptions]
+        : [],
 };
 
 function initAdminPricingFeature() {
@@ -2203,6 +2405,27 @@ function initAdminPricingFeature() {
         });
     }
 
+    // Add Disabled Bundling Option Button
+    const addDisabledBundlingBtn = document.getElementById('cfgAddDisabledOptionBtn');
+    const disableBundlingSelect = document.getElementById('cfgDisableBundlingSelect');
+    if (addDisabledBundlingBtn && disableBundlingSelect) {
+        addDisabledBundlingBtn.addEventListener('click', () => {
+            const val = disableBundlingSelect.value.trim();
+            if (!val) {
+                showToast('Silakan pilih menu bundling yang ingin dinonaktifkan.');
+                return;
+            }
+            if (!adminPricingState.disabledBundlingOptions.includes(val)) {
+                adminPricingState.disabledBundlingOptions.push(val);
+                renderDisabledBundlingOptionsList();
+                showToast(`✓ "${val}" dinonaktifkan dari menu bundling.`);
+            } else {
+                showToast(`Menu "${val}" sudah berstatus nonaktif.`);
+            }
+            disableBundlingSelect.value = '';
+        });
+    }
+
     // Save Admin Pricing Changes
     const saveBtn = document.getElementById('saveAdminPricingBtn');
     if (saveBtn) {
@@ -2237,6 +2460,8 @@ function initAdminPricingFeature() {
                 item_markup_overrides: adminPricingState.itemMarkupOverrides,
                 single_item_fee: singleFee,
                 plastic_bag_fee: plasticFee,
+                bundling_status: adminPricingState.bundlingStatus,
+                disabled_bundling_options: adminPricingState.disabledBundlingOptions,
             };
 
             fetch('api/admin_pricing.php', {
@@ -2253,10 +2478,18 @@ function initAdminPricingFeature() {
                         // Synchronize in-memory admin pricing state & initial data
                         if (res.data) {
                             adminPricingState.itemMarkupOverrides = Object.assign({}, res.data.item_markup_overrides || {});
+                            if (res.data.bundling_status) {
+                                adminPricingState.bundlingStatus = Object.assign({}, res.data.bundling_status);
+                            }
+                            if (Array.isArray(res.data.disabled_bundling_options)) {
+                                adminPricingState.disabledBundlingOptions = [...res.data.disabled_bundling_options];
+                            }
                             if (window.INITIAL_DATA?.pricing) {
                                 window.INITIAL_DATA.pricing.itemMarkupOverrides = Object.assign({}, res.data.item_markup_overrides || {});
                                 window.INITIAL_DATA.pricing.defaultMarkup = res.data.default_markup ?? defMarkup;
                                 window.INITIAL_DATA.pricing.categoryMarkups = Object.assign({}, res.data.category_markups || {});
+                                window.INITIAL_DATA.pricing.bundlingStatus = Object.assign({}, res.data.bundling_status || adminPricingState.bundlingStatus);
+                                window.INITIAL_DATA.pricing.disabledBundlingOptions = Array.isArray(res.data.disabled_bundling_options) ? [...res.data.disabled_bundling_options] : adminPricingState.disabledBundlingOptions;
                             }
                         } else {
                             adminPricingState.itemMarkupOverrides = Object.assign({}, payload.item_markup_overrides || {});
@@ -2274,12 +2507,13 @@ function initAdminPricingFeature() {
                         } catch (e) {}
 
                         updateCartUI();
+                        renderMenu();
 
                         closeSheet('adminPricingSheet');
                         adminPricingState.activePasscode = '';
                         sessionStorage.removeItem('kyuti_admin_auth');
                         sessionStorage.removeItem('kyuti_admin_code');
-                        showToast('✓ Pengaturan fee berhasil disimpan! Memperbarui harga...');
+                        showToast('✓ Pengaturan fee & bundling berhasil disimpan!');
 
                         // Refresh menu to immediately apply new fee formula
                         if (AppState.outlet?.code) {
@@ -2346,8 +2580,123 @@ function populateAdminPricingForm(data, dbInfo) {
     }
 
     adminPricingState.itemMarkupOverrides = Object.assign({}, data.item_markup_overrides || {});
+    adminPricingState.bundlingStatus = Object.assign({
+        bundle_2_cup_large: true,
+        bundle_2_frappe: true,
+        promo_minuman_special: true,
+        bundle_hemat_3_item: true,
+    }, data.bundling_status || {});
+    adminPricingState.disabledBundlingOptions = Array.isArray(data.disabled_bundling_options)
+        ? [...data.disabled_bundling_options]
+        : [];
+
     renderItemOverridesList();
+    renderBundlingStatusList();
+    populateBundlingOptionsDropdown();
+    renderDisabledBundlingOptionsList();
     populateMenuDropdown();
+}
+
+function renderBundlingStatusList() {
+    const container = document.getElementById('cfgBundlingStatusList');
+    if (!container) return;
+
+    const packages = [
+        { key: 'bundle_2_cup_large', label: 'PAKET BUNDLING 2 CUP LARGE' },
+        { key: 'bundle_2_frappe', label: 'PAKET BUNDLING 2 FRAPPE' },
+        { key: 'promo_minuman_special', label: 'PROMO MINUMAN SPECIAL' },
+        { key: 'bundle_hemat_3_item', label: 'PAKET HEMAT 3 ITEM' },
+    ];
+
+    container.innerHTML = packages.map(pkg => {
+        const isOn = adminPricingState.bundlingStatus[pkg.key] !== false;
+        return `
+            <div class="admin-bundling-toggle-row">
+                <div>
+                    <div style="font-size:12px;font-weight:800;color:var(--text-main)">${pkg.label}</div>
+                    <small style="font-size:10px;color:${isOn ? '#059669' : '#DC2626'};font-weight:700">
+                        ${isOn ? '● Status: Aktif (Ditampilkan di Website)' : '✕ Status: Nonaktif (Disembunyikan)'}
+                    </small>
+                </div>
+                <label class="admin-toggle-switch">
+                    <input type="checkbox" class="cfg-bundle-pkg-toggle" data-key="${pkg.key}" ${isOn ? 'checked' : ''}>
+                    <span class="admin-toggle-slider"></span>
+                </label>
+            </div>
+        `;
+    }).join('');
+
+    container.querySelectorAll('.cfg-bundle-pkg-toggle').forEach(input => {
+        input.addEventListener('change', (e) => {
+            const key = e.target.dataset.key;
+            adminPricingState.bundlingStatus[key] = e.target.checked;
+            renderBundlingStatusList();
+            renderMenu();
+        });
+    });
+}
+
+function renderDisabledBundlingOptionsList() {
+    const container = document.getElementById('cfgDisabledOptionsList');
+    if (!container) return;
+
+    const list = adminPricingState.disabledBundlingOptions || [];
+    if (!list.length) {
+        container.innerHTML = '<div style="font-size:11px;color:var(--text-muted);font-style:italic">Semua varian menu dalam paket bundling berstatus aktif.</div>';
+        return;
+    }
+
+    container.innerHTML = list.map(item => `
+        <div class="disabled-bundling-pill">
+            <span>${esc(item)}</span>
+            <button type="button" class="btn-remove-disabled-bundle" data-val="${esc(item)}" title="Aktifkan Kembali">✕</button>
+        </div>
+    `).join('');
+
+    container.querySelectorAll('.btn-remove-disabled-bundle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const val = btn.dataset.val;
+            adminPricingState.disabledBundlingOptions = adminPricingState.disabledBundlingOptions.filter(x => x !== val);
+            renderDisabledBundlingOptionsList();
+            showToast(`✓ "${val}" diaktifkan kembali di bundling.`);
+        });
+    });
+}
+
+function populateBundlingOptionsDropdown() {
+    const select = document.getElementById('cfgDisableBundlingSelect');
+    if (!select) return;
+
+    const allOptionsSet = new Set();
+    const bundlingItems = window.INITIAL_DATA?.bundlingItems || [];
+    bundlingItems.forEach(b => {
+        (b.slots || []).forEach(slot => {
+            if (slot.groups) {
+                Object.values(slot.groups).forEach(grp => {
+                    grp.forEach(name => allOptionsSet.add(name));
+                });
+            } else if (Array.isArray(slot.options)) {
+                slot.options.forEach(opt => {
+                    const name = typeof opt === 'string' ? opt : opt.name;
+                    if (name) {
+                        if (name.includes('+')) {
+                            name.split('+').forEach(p => allOptionsSet.add(p.trim()));
+                            allOptionsSet.add(name);
+                        } else {
+                            allOptionsSet.add(name);
+                        }
+                    }
+                });
+            }
+        });
+    });
+
+    const sorted = Array.from(allOptionsSet).sort((a, b) => a.localeCompare(b));
+    let html = '<option value="">-- 🔍 Pilih Menu untuk Dinonaktifkan --</option>';
+    sorted.forEach(opt => {
+        html += `<option value="${esc(opt)}">${esc(opt)}</option>`;
+    });
+    select.innerHTML = html;
 }
 
 function renderItemOverridesList() {

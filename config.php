@@ -543,6 +543,12 @@ if (is_array($dynamicData)) {
     if (isset($dynamicData['plastic_bag_fee'])) {
         $config['fees']['plastic_bag_fee'] = max(0, (float)$dynamicData['plastic_bag_fee']);
     }
+    if (isset($dynamicData['bundling_status']) && is_array($dynamicData['bundling_status'])) {
+        $config['pricing']['bundling_status'] = $dynamicData['bundling_status'];
+    }
+    if (isset($dynamicData['disabled_bundling_options']) && is_array($dynamicData['disabled_bundling_options'])) {
+        $config['pricing']['disabled_bundling_options'] = $dynamicData['disabled_bundling_options'];
+    }
     if (!empty($dynamicData['admin_passcode'])) {
         $config['admin']['passcode'] = trim((string)$dynamicData['admin_passcode']);
     }

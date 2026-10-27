@@ -12,6 +12,13 @@
     "item_markup_overrides": [],
     "single_item_fee": 2000,
     "plastic_bag_fee": 1000,
+    "bundling_status": {
+        "bundle_2_cup_large": true,
+        "bundle_2_frappe": true,
+        "promo_minuman_special": true,
+        "bundle_hemat_3_item": true
+    },
+    "disabled_bundling_options": [],
     "admin_passcode": "WHOSUTII26",
-    "updated_at": "2026-10-27T12:53:56+07:00"
+    "updated_at": "2026-10-27T16:04:27+07:00"
 }

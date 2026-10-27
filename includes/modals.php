@@ -200,21 +200,23 @@
             <!-- Bundling Slots Container (Rendered dynamically by JS) -->
             <div id="bundleSlotsContainer"></div>
 
-            <!-- Sugar & Ice Global Preferences for Bundle -->
-            <div class="option-group">
-                <div class="og-label">Pilihan Es untuk Minuman</div>
-                <div class="og-pills" id="bundleIcePills">
-                    <button class="og-pill active" data-val="Normal Ice">Normal Ice</button>
-                    <button class="og-pill" data-val="Less Ice">Less Ice</button>
+            <!-- Sugar & Ice Global Preferences for Bundle (Hidden - Replaced by Per-Menu Option) -->
+            <div id="bundleGlobalPrefs" style="display:none">
+                <div class="option-group">
+                    <div class="og-label">Pilihan Es untuk Minuman</div>
+                    <div class="og-pills" id="bundleIcePills">
+                        <button class="og-pill active" data-val="Normal Ice">Normal Ice</button>
+                        <button class="og-pill" data-val="Less Ice">Less Ice</button>
+                    </div>
                 </div>
-            </div>
 
-            <div class="option-group">
-                <div class="og-label">Tingkat Manis (Sugar)</div>
-                <div class="og-pills" id="bundleSugarPills">
-                    <button class="og-pill active" data-val="Normal Sugar">Normal Sugar</button>
-                    <button class="og-pill" data-val="Less Sugar (50%)">Less Sugar (50%)</button>
-                    <button class="og-pill" data-val="No Sugar">No Sugar</button>
+                <div class="option-group">
+                    <div class="og-label">Tingkat Manis (Sugar)</div>
+                    <div class="og-pills" id="bundleSugarPills">
+                        <button class="og-pill active" data-val="Normal Sugar">Normal Sugar</button>
+                        <button class="og-pill" data-val="Less Sugar (50%)">Less Sugar (50%)</button>
+                        <button class="og-pill" data-val="No Sugar">No Sugar</button>
+                    </div>
                 </div>
             </div>
 
@@ -511,6 +513,44 @@
                             <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--text-muted);font-size:12px">Rp +</span>
                             <input type="number" class="form-input" id="cfgPlasticBagFee" placeholder="1000" style="padding-left:46px;font-weight:800">
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Kelola Status Menu Bundling (ON / OFF) (Revisi Client) -->
+            <div class="admin-setting-section" style="margin-bottom:20px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <label style="font-size:13px;font-weight:800;color:var(--text-main)">
+                        5. Status Menu Bundling (ON / OFF)
+                    </label>
+                    <span class="pill pill-premium" style="font-size:10px">Kontrol Menu</span>
+                </div>
+                <small style="color:var(--text-muted);font-size:11px;display:block;margin-bottom:12px">
+                    Aktifkan atau nonaktifkan paket bundling dan menu di dalamnya langsung dari website.
+                </small>
+
+                <!-- List of Bundling Packages with ON/OFF Switches -->
+                <div id="cfgBundlingStatusList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+                    <!-- Rendered dynamically by JS -->
+                </div>
+
+                <!-- Disable specific items inside bundling -->
+                <div style="background:var(--bg-page);border:1.5px dashed var(--border-color);border-radius:var(--radius-md);padding:12px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <b style="font-size:11.5px;color:var(--text-main)">Nonaktifkan Menu Tertentu di Bundling:</b>
+                        <small style="color:var(--text-muted);font-size:10px">Opsional</small>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-bottom:8px">
+                        <select class="form-input" id="cfgDisableBundlingSelect" style="font-size:12px;font-weight:700;flex:1">
+                            <option value="">-- 🔍 Pilih Menu untuk Dinonaktifkan --</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary" id="cfgAddDisabledOptionBtn" style="padding:6px 12px;font-size:12px;font-weight:800;white-space:nowrap">
+                            + Matikan
+                        </button>
+                    </div>
+                    <!-- Disabled Bundling Items List -->
+                    <div id="cfgDisabledOptionsList" style="display:flex;flex-wrap:wrap;gap:6px">
+                        <!-- Rendered by JS -->
                     </div>
                 </div>
             </div>

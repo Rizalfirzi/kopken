@@ -35,6 +35,13 @@ window.INITIAL_DATA = {
         defaultMarkup: <?= (float) config('pricing.default_markup', 5000) ?>,
         categoryMarkups: <?= json_encode(config('pricing.category_markups', []), JSON_UNESCAPED_UNICODE) ?>,
         itemMarkupOverrides: <?= json_encode(config('pricing.item_markup_overrides', []), JSON_UNESCAPED_UNICODE) ?>,
+        bundlingStatus: <?= json_encode(config('pricing.bundling_status', [
+            'bundle_2_cup_large' => true,
+            'bundle_2_frappe' => true,
+            'promo_minuman_special' => true,
+            'bundle_hemat_3_item' => true,
+        ]), JSON_UNESCAPED_UNICODE) ?>,
+        disabledBundlingOptions: <?= json_encode(config('pricing.disabled_bundling_options', []), JSON_UNESCAPED_UNICODE) ?>,
     },
     addons: <?= json_encode(config('addons', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
     wifi: <?= json_encode($initialWifi ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>

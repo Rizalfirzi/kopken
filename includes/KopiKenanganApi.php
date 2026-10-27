@@ -507,9 +507,14 @@ class KopiKenanganApi
         $categories = $menuData['categories'] ?? [];
         if (empty($menuData['premium'])) {
             $bundlingItems = config('bundling_items', []);
+            $bundlingStatus = config('pricing.bundling_status', []);
             $bundlingFormatted = [];
             if (!empty($bundlingItems) && is_array($bundlingItems)) {
                 foreach ($bundlingItems as $b) {
+                    // Check if package is disabled by admin
+                    if (isset($bundlingStatus[$b['key']]) && $bundlingStatus[$b['key']] === false) {
+                        continue;
+                    }
                     $bundlingFormatted[] = [
                         'key' => $b['key'],
                         'id' => $b['key'],
@@ -780,9 +785,16 @@ class KopiKenanganApi
             $totalQty += (int) ($it['qty'] ?? 1);
         }
 
-        // Single item fee: +2.000 if order is 1 pcs
+        // Single item fee: +2.000 if order is 1 pcs (Exempt for Bundling packages per client requirement)
+        $hasBundling = false;
+        foreach ($items as $it) {
+            if (!empty($it['isBundling']) || ($it['category'] ?? '') === 'Bundling') {
+                $hasBundling = true;
+                break;
+            }
+        }
         $singleItemFeeConfig = (int) config('fees.single_item_fee', 2000);
-        $hasSingleItemFee = ($totalQty === 1) || !empty($data['hasSingleItemFee']);
+        $hasSingleItemFee = (($totalQty === 1) || !empty($data['hasSingleItemFee'])) && !$hasBundling;
         $singleItemFee = $hasSingleItemFee ? $singleItemFeeConfig : 0;
 
         // Plastic bag fee: +1.000 if selected
@@ -838,10 +850,13 @@ class KopiKenanganApi
 
         foreach ($order['items'] as $idx => $item) {
             $options = [];
-            if (!empty($item['size'])) $options[] = $item['size'];
-            if (!empty($item['temp'])) $options[] = $item['temp'];
-            if (!empty($item['ice'])) $options[] = $item['ice'];
-            if (!empty($item['sugar'])) $options[] = $item['sugar'];
+            $isBundling = !empty($item['isBundling']) || ($item['category'] ?? '') === 'Bundling';
+            if (!$isBundling) {
+                if (!empty($item['size'])) $options[] = $item['size'];
+                if (!empty($item['temp'])) $options[] = $item['temp'];
+                if (!empty($item['ice'])) $options[] = $item['ice'];
+                if (!empty($item['sugar'])) $options[] = $item['sugar'];
+            }
             $optStr = !empty($options) ? ' (' . implode(', ', $options) . ')' : '';
 
             $priceFormatted = number_format($item['price'] ?? 0, 0, ',', '.');

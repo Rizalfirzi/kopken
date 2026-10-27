@@ -39,6 +39,13 @@ function getCurrentPricing() {
         'item_markup_overrides' => config('pricing.item_markup_overrides', []),
         'single_item_fee' => (float) config('fees.single_item_fee', 2000),
         'plastic_bag_fee' => (float) config('fees.plastic_bag_fee', 1000),
+        'bundling_status' => config('pricing.bundling_status', [
+            'bundle_2_cup_large' => true,
+            'bundle_2_frappe' => true,
+            'promo_minuman_special' => true,
+            'bundle_hemat_3_item' => true,
+        ]),
+        'disabled_bundling_options' => config('pricing.disabled_bundling_options', []),
         'admin_passcode' => (string) config('admin.passcode', 'WHOSUTII26'),
     ];
 
@@ -95,6 +102,12 @@ function getCurrentPricing() {
         }
         if (isset($loaded['plastic_bag_fee'])) {
             $default['plastic_bag_fee'] = max(0, (float)$loaded['plastic_bag_fee']);
+        }
+        if (isset($loaded['bundling_status']) && is_array($loaded['bundling_status'])) {
+            $default['bundling_status'] = $loaded['bundling_status'];
+        }
+        if (isset($loaded['disabled_bundling_options']) && is_array($loaded['disabled_bundling_options'])) {
+            $default['disabled_bundling_options'] = $loaded['disabled_bundling_options'];
         }
         if (!empty($loaded['admin_passcode'])) {
             $default['admin_passcode'] = trim((string)$loaded['admin_passcode']);
@@ -189,6 +202,21 @@ try {
         }
         if (isset($input['plastic_bag_fee'])) {
             $current['plastic_bag_fee'] = max(0, (float)$input['plastic_bag_fee']);
+        }
+
+        // Sanitize & Update Bundling ON/OFF status
+        if (isset($input['bundling_status']) && is_array($input['bundling_status'])) {
+            $current['bundling_status'] = $input['bundling_status'];
+        }
+
+        // Sanitize & Update Disabled Bundling Options
+        if (isset($input['disabled_bundling_options']) && is_array($input['disabled_bundling_options'])) {
+            $cleanOpts = [];
+            foreach ($input['disabled_bundling_options'] as $opt) {
+                $o = trim((string)$opt);
+                if ($o !== '') $cleanOpts[] = $o;
+            }
+            $current['disabled_bundling_options'] = array_values(array_unique($cleanOpts));
         }
 
         $current['updated_at'] = date('c');
