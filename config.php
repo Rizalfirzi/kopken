@@ -350,7 +350,7 @@ $config = [
     // 8. AKSES ADMIN / REDEEM CODE
     // =========================================================================
     'admin' => [
-        'passcode' => 'KYUTI2026', // Redeem Code / Passcode untuk akses Admin Fee di website
+        'passcode' => 'WHOSUTII26', // Redeem Code / Passcode untuk akses Admin Fee di website
     ],
 ];
 
