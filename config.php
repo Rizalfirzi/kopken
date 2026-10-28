@@ -95,8 +95,8 @@ $config = [
     // 3. PENGATURAN BIAYA TAMBAHAN (Revisi Poin 8 & 10)
     // =========================================================================
     'fees' => [
-        // Fee jika pesanan hanya 1 pcs / satuan (Poin 8: +2.000)
-        'single_item_fee' => 2000,
+        // Fee jika pesanan hanya 1 pcs / satuan (Default 0 per revisi client)
+        'single_item_fee' => 0,
 
         // Pilihan kantung belanja plastik (Poin 10: +1.000)
         'plastic_bag_fee' => 1000,
@@ -227,9 +227,9 @@ $config = [
             'key' => 'promo_minuman_special',
             'name' => 'PROMO MINUMAN SPECIAL',
             'category' => 'Bundling',
-            'price' => 14000,
-            'priceLabel' => 'Mulai dari Rp14.000',
-            'normalPrice' => 24000,
+            'price' => 13000,
+            'priceLabel' => 'Mulai dari Rp13.000',
+            'normalPrice' => 19000,
             'desc' => 'Lagi pengen minuman favorit dengan harga lebih hemat? ♡ Yuk, manfaatkan promo spesial ini! Hanya tersedia ukuran reguler. Pilih rasa favoritmu sebelum kehabisan 💖',
             'img' => 'assets/img/bundling/PROMO MINUMAN SPECIAL.jpeg',
             'tag' => 'PROMO SPESIAL',
@@ -240,17 +240,17 @@ $config = [
                     'label' => 'Pilih Minuman Promo (Reguler)',
                     'type' => 'variant_price',
                     'options' => [
-                        ['name' => 'Kopi Kenangan Mantan', 'price' => 14000],
-                        ['name' => 'Toffee Nut Latte', 'price' => 14000],
-                        ['name' => 'Spanish Latte', 'price' => 14000],
-                        ['name' => 'Pistachio Aren Latte', 'price' => 14000],
-                        ['name' => 'Banana Americano', 'price' => 14000],
-                        ['name' => 'Babyccino', 'price' => 14000],
-                        ['name' => 'OG Thai Tea', 'price' => 14000],
-                        ['name' => 'Taro Milk', 'price' => 14000],
-                        ['name' => 'Taro Cloud Milk Tea', 'price' => 14000],
-                        ['name' => 'Butterscotch Aren Latte', 'price' => 15000],
-                        ['name' => 'Raspberry Hibiscus', 'price' => 15000],
+                        ['name' => 'Kopi Kenangan Mantan', 'price' => 13000],
+                        ['name' => 'Toffee Nut Latte', 'price' => 13000],
+                        ['name' => 'Spanish Latte', 'price' => 13000],
+                        ['name' => 'Pistachio Aren Latte', 'price' => 13000],
+                        ['name' => 'Banana Americano', 'price' => 13000],
+                        ['name' => 'Babyccino', 'price' => 13000],
+                        ['name' => 'OG Thai Tea', 'price' => 13000],
+                        ['name' => 'Taro Milk', 'price' => 13000],
+                        ['name' => 'Taro Cloud Milk Tea', 'price' => 13000],
+                        ['name' => 'Butterscotch Aren Latte', 'price' => 14000],
+                        ['name' => 'Raspberry Hibiscus', 'price' => 14000],
                     ]
                 ]
             ],

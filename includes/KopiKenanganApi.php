@@ -406,8 +406,12 @@ class KopiKenanganApi
             $normKey = strtolower(str_replace([' ', '_', '-'], '', $key));
             $normName = strtolower(str_replace([' ', '_', '-'], '', $name));
 
-            // 1. Check Item Markup Override by key or name
+            // 1. Check Item Markup Override by key or name (excluding Large-specific overrides)
             foreach ($itemMarkupOverrides as $oKey => $oFee) {
+                // Large overrides only apply when calculating the Large size price
+                if (preg_match('/\(large\)$/i', trim((string)$oKey))) {
+                    continue;
+                }
                 $normOK = strtolower(str_replace([' ', '_', '-'], '', (string)$oKey));
                 if ($oKey === $key || $oKey === $name || $normOK === $normKey || $normOK === $normName || str_contains($normName, $normOK) || str_contains($normKey, $normOK)) {
                     $fee = (float) $oFee;
@@ -472,12 +476,42 @@ class KopiKenanganApi
             $hasLargeSize = !empty($item['largePrice']) || (isset($item['options']['sizes']) && in_array('Large', (array)$item['options']['sizes'], true));
 
             if ($hasLargeSize) {
+                // Check if there is an override specifically for Large size (e.g. "Kopi Kenangan Mantan (Large)")
+                $largeFee = null;
+                $largeKey = $name . ' (Large)';
+                $normLargeKey = strtolower(str_replace([' ', '_', '-', '(', ')'], '', $largeKey));
+
+                foreach ($itemMarkupOverrides as $oKey => $oFee) {
+                    $oKeyStr = trim((string)$oKey);
+                    if (preg_match('/\(large\)$/i', $oKeyStr)) {
+                        $normOK = strtolower(str_replace([' ', '_', '-', '(', ')'], '', $oKeyStr));
+                        $basePart = trim(preg_replace('/\(large\)$/i', '', $oKeyStr));
+                        $normBasePart = strtolower(str_replace([' ', '_', '-', '(', ')'], '', $basePart));
+
+                        if (
+                            strtolower($oKeyStr) === strtolower($largeKey) ||
+                            $normOK === $normLargeKey ||
+                            $normBasePart === $normKey ||
+                            $normBasePart === $normName ||
+                            str_contains($normName, $normBasePart) ||
+                            str_contains($normBasePart, $normName)
+                        ) {
+                            $largeFee = (float)$oFee;
+                            break;
+                        }
+                    }
+                }
+
+                $effectiveLargeFee = ($largeFee !== null) ? $largeFee : $fee;
+                $effectiveLargeFeeDelta = $effectiveLargeFee - $defaultMarkup;
+
                 $rawApiLarge = !empty($item['largePrice']) ? (float)$item['largePrice'] : 0;
                 if ($rawApiLarge > 0) {
                     // Upstream API provides the exact large price! Apply delta if fee is overridden
-                    $calcLarge = round($rawApiLarge + $feeDelta);
+                    $calcLarge = round($rawApiLarge + $effectiveLargeFeeDelta);
                 } else {
-                    $calcLarge = $calculatedPrice + 3500;
+                    $feeDiff = ($largeFee !== null) ? ($largeFee - $fee) : 0;
+                    $calcLarge = $calculatedPrice + 3500 + $feeDiff;
                 }
 
                 // Ensure large price is strictly higher than regular price
@@ -629,19 +663,23 @@ class KopiKenanganApi
             // Deep copy so upstream cache remains untouched and pure
             $response = json_decode(json_encode($rawResponse), true);
 
-            // 1. Remove 'Jumbo' from groups and all corresponding combo prices per client revision
+            // 1. Remove 'Jumbo' from groups and detect 'Large' IDs
             $jumboIds = [];
+            $largeIds = [];
             if (!empty($response['groups']) && is_array($response['groups'])) {
                 foreach ($response['groups'] as &$group) {
                     $gKey = strtolower($group['key'] ?? '');
                     $gName = strtolower($group['name'] ?? '');
                     if ($gKey === 'size' || $gName === 'size' || $gName === 'ukuran') {
-                        $group['values'] = array_values(array_filter($group['values'], function($val) use (&$jumboIds) {
+                        $group['values'] = array_values(array_filter($group['values'], function($val) use (&$jumboIds, &$largeIds) {
                             $t = strtolower($val['text'] ?? '');
                             $vId = strtolower((string)($val['id'] ?? ''));
                             if ($t === 'jumbo' || $vId === 'jumbo' || str_contains($t, 'jumbo')) {
                                 $jumboIds[] = (string)$val['id'];
                                 return false;
+                            }
+                            if ($t === 'large' || $vId === 'large' || str_contains($t, 'large')) {
+                                $largeIds[] = (string)$val['id'];
                             }
                             return true;
                         }));
@@ -689,6 +727,25 @@ class KopiKenanganApi
                 // Fee delta between our price and upstream raw price
                 $deltaMarkup = $calculatedBase - $rawBase;
 
+                // Check for Large fee override specifically for this menu item
+                $itemMarkupOverrides = config('pricing.item_markup_overrides', []);
+                $defaultMarkup = (float)config('pricing.default_markup', 5000);
+                $mName = $matchedItem['name'] ?? '';
+                $normMName = strtolower(str_replace([' ', '_', '-'], '', $mName));
+                $largeFee = null;
+                foreach ($itemMarkupOverrides as $oKey => $oFee) {
+                    $oKeyStr = trim((string)$oKey);
+                    if (preg_match('/\(large\)$/i', $oKeyStr)) {
+                        $basePart = trim(preg_replace('/\(large\)$/i', '', $oKeyStr));
+                        $normBasePart = strtolower(str_replace([' ', '_', '-'], '', $basePart));
+                        if ($normBasePart === $normMName || str_contains($normMName, $normBasePart) || str_contains($normBasePart, $normMName)) {
+                            $largeFee = (float)$oFee;
+                            break;
+                        }
+                    }
+                }
+                $deltaLargeMarkup = ($largeFee !== null) ? ($largeFee - $defaultMarkup) : $deltaMarkup;
+
                 // Base normal (unpromoted) price from item
                 $origBaseNormal = (float)($matchedItem['normalPrice'] ?? $matchedItem['outletPrice'] ?? 19000);
                 if ($origBaseNormal <= 0) $origBaseNormal = 19000;
@@ -698,9 +755,20 @@ class KopiKenanganApi
                     $rawP = (float)$p;
                     // Combo difference from raw base (e.g. +3.000 for Large, +3.000 for Juwara, +3.000 for Oatside)
                     $comboDiff = max(0, $rawP - $rawBase);
-                    
-                    // Final selling price = raw price + markup delta
-                    $p = round($rawP + $deltaMarkup);
+
+                    // Check if this combo is Large
+                    $isLargeCombo = false;
+                    $parts = explode('|', (string)$combo);
+                    foreach ($parts as $partId) {
+                        if (in_array((string)$partId, $largeIds, true)) {
+                            $isLargeCombo = true;
+                            break;
+                        }
+                    }
+
+                    // Final selling price = raw price + markup delta (use Large markup if Large variant has override)
+                    $appliedDelta = ($isLargeCombo && $largeFee !== null) ? $deltaLargeMarkup : $deltaMarkup;
+                    $p = round($rawP + $appliedDelta);
 
                     // Normal (crossed-out) price: In Kopi Kenangan 50% discount system, a +3.000 jasdor diff = +6.000 normal diff
                     $normals[$combo] = round($origBaseNormal + ($comboDiff * 2));
@@ -793,8 +861,8 @@ class KopiKenanganApi
                 break;
             }
         }
-        $singleItemFeeConfig = (int) config('fees.single_item_fee', 2000);
-        $hasSingleItemFee = (($totalQty === 1) || !empty($data['hasSingleItemFee'])) && !$hasBundling;
+        $singleItemFeeConfig = (int) config('fees.single_item_fee', 0);
+        $hasSingleItemFee = (($totalQty === 1) || !empty($data['hasSingleItemFee'])) && !$hasBundling && ($singleItemFeeConfig > 0);
         $singleItemFee = $hasSingleItemFee ? $singleItemFeeConfig : 0;
 
         // Plastic bag fee: support quantity and boolean
@@ -905,9 +973,9 @@ class KopiKenanganApi
         $waMessage .= "--------------------------------------\n";
         $waMessage .= "Subtotal Menu: Rp " . number_format($order['subtotal'], 0, ',', '.') . "\n";
 
-        if ($hasSingleItemFee) {
+        if ($hasSingleItemFee && $singleItemFee > 0) {
             $waMessage .= "Fee Pesanan Satuan: +Rp " . number_format($singleItemFee, 0, ',', '.') . "\n";
-        } else {
+        } elseif ($singleItemFeeConfig > 0) {
             $waMessage .= "Fee Pesanan Satuan: 0\n";
         }
 

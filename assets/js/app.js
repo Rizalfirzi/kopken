@@ -22,7 +22,7 @@ const AppState = {
     selectedQty: 1,
 
     // Fee & Addon Settings
-    singleItemFeeAmount: window.INITIAL_DATA?.singleItemFee || 2000,
+    singleItemFeeAmount: window.INITIAL_DATA?.singleItemFee ?? 0,
     plasticBagFeeAmount: window.INITIAL_DATA?.plasticBagFee || 1000,
     hasPlasticBag: false,
     plasticBagQty: 1,
@@ -1386,7 +1386,16 @@ function unitPrice(sel = AppState.sheet?.sel) {
         if (prices[key] != null) return prices[key];
     }
     const isLarge = sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large');
-    if (isLarge && item.largePrice) return item.largePrice;
+    if (isLarge) {
+        if (item.largePrice) return item.largePrice;
+        // Fallback if largePrice was not pre-calculated
+        const overrides = adminPricingState?.itemMarkupOverrides || window.INITIAL_DATA?.pricing?.itemMarkupOverrides || {};
+        const largeOverride = overrides[`${item.name} (Large)`];
+        if (largeOverride !== undefined) {
+            const defFee = adminPricingState?.defaultMarkup || 5000;
+            return (item.price || 0) + 3500 + (largeOverride - defFee);
+        }
+    }
     return item.price;
 }
 
@@ -1400,7 +1409,7 @@ function normalPrice(sel = AppState.sheet?.sel) {
         if (normals[key] != null) return normals[key];
     }
     const isLarge = sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large');
-    if (isLarge && item.largePrice) return item.largeNormal || (item.normalPrice ? item.normalPrice + 6000 : null);
+    if (isLarge) return item.largeNormal || (item.normalPrice ? item.normalPrice + 6000 : null);
     return item.normalPrice || null;
 }
 
@@ -1762,8 +1771,8 @@ function triggerAddToCartWithFeeCheck(item) {
 
     const currentTotalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
 
-    // If current cart is empty and this single item has qty 1, show Fee Warning Modal
-    if (currentTotalQty === 0 && item.qty === 1) {
+    // If current cart is empty, this single item has qty 1, and single item fee is enabled (>0), show Fee Warning Modal
+    if (currentTotalQty === 0 && item.qty === 1 && (AppState.singleItemFeeAmount || 0) > 0) {
         AppState.pendingCartItem = item;
         openSheet('singleItemFeeModal');
         return;
@@ -1781,7 +1790,7 @@ if (feeContinueBtn) {
         if (AppState.pendingCartItem) {
             commitItemToCart(AppState.pendingCartItem);
             AppState.pendingCartItem = null;
-            showToast('✓ Pesanan satuan dimasukkan ke keranjang (+fee 2.000)');
+            showToast('✓ Pesanan satuan dimasukkan ke keranjang');
         }
     });
 }
@@ -1793,7 +1802,7 @@ if (feeAddMoreBtn) {
         if (AppState.pendingCartItem) {
             commitItemToCart(AppState.pendingCartItem);
             AppState.pendingCartItem = null;
-            showToast('Yuk pilih 1 item lagi agar bebas fee 2.000! ♡');
+            showToast('Yuk pilih 1 item lagi agar bebas fee! ♡');
         }
     });
 }
@@ -1813,9 +1822,9 @@ function updateCartUI() {
     const totalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
     const subtotal = AppState.cart.reduce((sum, i) => sum + (i.subtotal || ((i.price || 0) * (i.qty || 1))), 0);
 
-    // Calculate Single Item Fee (+2.000 if total qty == 1, but exempt if cart contains bundling)
+    // Calculate Single Item Fee (only if single item fee > 0 and total qty == 1, exempt if cart contains bundling)
     const hasBundling = AppState.cart.some(i => i.isBundling || i.category === 'Bundling');
-    const hasSingleFee = (totalQty === 1) && !hasBundling;
+    const hasSingleFee = (totalQty === 1) && !hasBundling && ((AppState.singleItemFeeAmount || 0) > 0);
     const singleFee = hasSingleFee ? AppState.singleItemFeeAmount : 0;
 
     // Calculate Plastic Bag Fee (Qty * Fee per bag)
@@ -1852,9 +1861,10 @@ function updateCartUI() {
     if (subtotalEl) subtotalEl.textContent = formatRp(subtotal);
     if (totalEl) totalEl.textContent = formatRp(grandTotal);
 
-    // Fee Pesanan Satuan: Tulis "+Rp 2.000" jika 1 pcs, tulis "0" jika bebas fee / order 2+ pcs (Revisi Client)
+    // Fee Pesanan Satuan: Tampilkan hanya jika admin mengaktifkan singleItemFeeAmount > 0
     if (singleFeeRow) {
-        singleFeeRow.style.display = totalQty > 0 ? 'flex' : 'none';
+        const showSingleFeeRow = (AppState.singleItemFeeAmount || 0) > 0 && totalQty > 0;
+        singleFeeRow.style.display = showSingleFeeRow ? 'flex' : 'none';
         if (summarySingleFee) {
             if (hasSingleFee) {
                 summarySingleFee.textContent = `+${formatRp(AppState.singleItemFeeAmount)}`;
@@ -2199,8 +2209,8 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
     const totalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
     const subtotal = AppState.cart.reduce((sum, i) => sum + (i.subtotal || ((i.price || 0) * (i.qty || 1))), 0);
     const hasBundling = AppState.cart.some(i => i.isBundling || i.category === 'Bundling');
-    const hasSingleFee = (totalQty === 1) && !hasBundling;
-    const singleFee = hasSingleFee ? (AppState.singleItemFeeAmount || 2000) : 0;
+    const hasSingleFee = (totalQty === 1) && !hasBundling && ((AppState.singleItemFeeAmount || 0) > 0);
+    const singleFee = hasSingleFee ? (AppState.singleItemFeeAmount || 0) : 0;
     const singleItemFee = singleFee;
     const plasticBagQty = AppState.hasPlasticBag ? Math.max(1, AppState.plasticBagQty || 1) : 0;
     const plasticFee = plasticBagQty * (AppState.plasticBagFeeAmount || 1000);
@@ -2260,9 +2270,9 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
     msg += `--------------------------------------\n`;
     msg += `Subtotal Menu: Rp ${Number(subtotal).toLocaleString('id-ID')}\n`;
 
-    if (hasSingleFee) {
+    if (hasSingleFee && singleFee > 0) {
         msg += `Fee Pesanan Satuan: +Rp ${Number(singleFee).toLocaleString('id-ID')}\n`;
-    } else {
+    } else if ((AppState.singleItemFeeAmount || 0) > 0) {
         msg += `Fee Pesanan Satuan: 0\n`;
     }
 
@@ -2557,7 +2567,7 @@ let adminPricingState = {
     itemMarkupOverrides: (window.INITIAL_DATA?.pricing?.itemMarkupOverrides && typeof window.INITIAL_DATA.pricing.itemMarkupOverrides === 'object' && !Array.isArray(window.INITIAL_DATA.pricing.itemMarkupOverrides))
         ? Object.assign({}, window.INITIAL_DATA.pricing.itemMarkupOverrides)
         : {},
-    singleItemFee: window.INITIAL_DATA?.singleItemFee || 2000,
+    singleItemFee: window.INITIAL_DATA?.singleItemFee ?? 0,
     plasticBagFee: window.INITIAL_DATA?.plasticBagFee || 1000,
     bundlingStatus: (window.INITIAL_DATA?.pricing?.bundlingStatus && typeof window.INITIAL_DATA.pricing.bundlingStatus === 'object')
         ? Object.assign({}, window.INITIAL_DATA.pricing.bundlingStatus)
@@ -2650,11 +2660,36 @@ function initAdminPricingFeature() {
         });
     }
 
-    // Menu Dropdown Selection Handler
+    // Menu Dropdown & Size Selection Handler
     const menuSelect = document.getElementById('cfgMenuSelect');
+    const sizeSelect = document.getElementById('cfgItemSizeSelect');
     const customWrap = document.getElementById('cfgCustomNameWrap');
     const nameInput = document.getElementById('cfgNewItemName');
     const feeInput = document.getElementById('cfgNewItemFee');
+
+    const updateFeeSuggestion = () => {
+        let val = (menuSelect?.value || '').trim();
+        if (val === '__CUSTOM__') {
+            val = (nameInput?.value || '').trim();
+        }
+        if (!val) return;
+
+        const isLarge = sizeSelect?.value === 'Large';
+        const baseName = val.replace(/\s*\(large\)$/i, '').trim();
+        const targetKey = isLarge ? `${baseName} (Large)` : baseName;
+
+        // Pre-fill fee if already overridden, or suggest category/default fee
+        if (adminPricingState.itemMarkupOverrides?.[targetKey] !== undefined) {
+            if (feeInput) feeInput.value = adminPricingState.itemMarkupOverrides[targetKey];
+        } else {
+            const items = AppState.menu?.items || window.INITIAL_DATA?.menu?.items || [];
+            const found = items.find(i => i.name === baseName);
+            const cat = found?.category || 'Coffee';
+            const catMarkup = adminPricingState.categoryMarkups?.[cat];
+            const defaultFee = catMarkup !== undefined ? catMarkup : (adminPricingState.defaultMarkup || 5000);
+            if (feeInput) feeInput.value = defaultFee;
+        }
+    };
 
     if (menuSelect) {
         menuSelect.addEventListener('change', () => {
@@ -2668,33 +2703,27 @@ function initAdminPricingFeature() {
             } else {
                 if (customWrap) customWrap.style.display = 'none';
                 if (nameInput) nameInput.value = val;
-
-                // Pre-fill fee if already overridden, or suggest category/default fee
-                if (val && adminPricingState.itemMarkupOverrides?.[val] !== undefined) {
-                    if (feeInput) feeInput.value = adminPricingState.itemMarkupOverrides[val];
-                } else if (val) {
-                    const items = AppState.menu?.items || window.INITIAL_DATA?.menu?.items || [];
-                    const found = items.find(i => i.name === val);
-                    const cat = found?.category || 'Minuman';
-                    const catMarkup = adminPricingState.categoryMarkups?.[cat];
-                    const defaultFee = catMarkup !== undefined ? catMarkup : (adminPricingState.defaultMarkup || 5000);
-                    if (feeInput) feeInput.value = defaultFee;
-                }
+                updateFeeSuggestion();
             }
         });
+    }
+
+    if (sizeSelect) {
+        sizeSelect.addEventListener('change', updateFeeSuggestion);
     }
 
     // Add New Item Override Button
     const addItemBtn = document.getElementById('cfgAddNewItemBtn');
     if (addItemBtn) {
         addItemBtn.addEventListener('click', () => {
-            let name = (menuSelect?.value || '').trim();
-            if (name === '__CUSTOM__' || !name) {
-                name = (nameInput?.value || '').trim();
+            let rawName = (menuSelect?.value || '').trim();
+            if (rawName === '__CUSTOM__' || !rawName) {
+                rawName = (nameInput?.value || '').trim();
             }
             const fee = parseInt(feeInput?.value || '0', 10);
+            const isLarge = sizeSelect?.value === 'Large';
 
-            if (!name) {
+            if (!rawName) {
                 showToast('Silakan pilih menu dari daftar API terlebih dahulu');
                 return;
             }
@@ -2703,16 +2732,20 @@ function initAdminPricingFeature() {
                 return;
             }
 
-            adminPricingState.itemMarkupOverrides[name] = fee;
+            const baseName = rawName.replace(/\s*\(large\)$/i, '').trim();
+            const targetKey = isLarge ? `${baseName} (Large)` : baseName;
+
+            adminPricingState.itemMarkupOverrides[targetKey] = fee;
             renderItemOverridesList();
             populateMenuDropdown();
 
             if (menuSelect) menuSelect.value = '';
             if (nameInput) nameInput.value = '';
             if (feeInput) feeInput.value = '';
+            if (sizeSelect) sizeSelect.value = '';
             if (customWrap) customWrap.style.display = 'none';
 
-            showToast(`✓ Fee khusus untuk "${name}" diset +${formatRp(fee).replace('Rp ', '')}`);
+            showToast(`✓ Fee khusus untuk "${targetKey}" diset +${formatRp(fee).replace('Rp ', '')}`);
         });
     }
 
@@ -3020,17 +3053,28 @@ function renderItemOverridesList() {
         return;
     }
 
-    container.innerHTML = entries.map(([name, fee]) => `
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:8px 12px;">
-            <div style="display:flex;align-items:center;gap:6px">
-                <span style="font-size:12px;font-weight:800;color:var(--text-main)">${name}</span>
-                <span class="fee-badge-pill" style="font-size:11px;padding:2px 8px">+Rp ${Number(fee).toLocaleString('id-ID')}</span>
+    container.innerHTML = entries.map(([name, fee]) => {
+        const isLarge = /\(large\)$/i.test(name.trim());
+        const cleanName = isLarge ? name.replace(/\s*\(large\)$/i, '') : name;
+        const sizeBadge = isLarge
+            ? '<span style="background:#FCE7F3;color:#BE185D;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;border:1px solid #FBCFE8">Ukuran: Large ⭐</span>'
+            : '<span style="background:#E0F2FE;color:#0369A1;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;border:1px solid #BAE6FD">Regular / Default</span>';
+
+        return `
+        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:9px 12px;">
+            <div style="display:flex;flex-direction:column;gap:3px">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    <span style="font-size:12.5px;font-weight:800;color:var(--text-main)">${cleanName}</span>
+                    ${sizeBadge}
+                </div>
+                <span class="fee-badge-pill" style="font-size:11px;padding:2px 8px;width:fit-content">+Rp ${Number(fee).toLocaleString('id-ID')}</span>
             </div>
-            <button type="button" class="btn-del-override" data-name="${name}" style="background:#FFE4E6;color:#E11D48;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:700">
+            <button type="button" class="btn-del-override" data-name="${name.replace(/"/g, '&quot;')}" style="background:#FFE4E6;color:#E11D48;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:700">
                 Hapus ✕
             </button>
         </div>
-    `).join('');
+        `;
+    }).join('');
 
     container.querySelectorAll('.btn-del-override').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -3093,8 +3137,16 @@ function populateMenuDropdown() {
         const icon = cat === 'Coffee' ? '☕' : (cat === 'Non Coffee' ? '🍵' : (cat === 'Frappe' ? '🍦' : (cat === 'Food' ? '🥪' : (cat === 'Bundling' ? '🎀' : '📂'))));
         html += `<optgroup label="${icon} ${cat}">`;
         uniqueNames.forEach(name => {
-            const currentOverride = adminPricingState.itemMarkupOverrides?.[name];
-            const badge = currentOverride !== undefined ? ` ★ (+Rp ${Number(currentOverride).toLocaleString('id-ID')})` : '';
+            const currentReg = adminPricingState.itemMarkupOverrides?.[name];
+            const currentLarge = adminPricingState.itemMarkupOverrides?.[`${name} (Large)`];
+            let badge = '';
+            if (currentReg !== undefined && currentLarge !== undefined) {
+                badge = ` ★ (Reg: +${Number(currentReg).toLocaleString('id-ID')} | L: +${Number(currentLarge).toLocaleString('id-ID')})`;
+            } else if (currentReg !== undefined) {
+                badge = ` ★ (Reg: +Rp ${Number(currentReg).toLocaleString('id-ID')})`;
+            } else if (currentLarge !== undefined) {
+                badge = ` ★ (Large: +Rp ${Number(currentLarge).toLocaleString('id-ID')})`;
+            }
             html += `<option value="${name.replace(/"/g, '&quot;')}">${name}${badge}</option>`;
         });
         html += `</optgroup>`;

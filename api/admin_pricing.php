@@ -37,7 +37,7 @@ function getCurrentPricing() {
             'Bundling' => 0,
         ]),
         'item_markup_overrides' => config('pricing.item_markup_overrides', []),
-        'single_item_fee' => (float) config('fees.single_item_fee', 2000),
+        'single_item_fee' => (float) config('fees.single_item_fee', 0),
         'plastic_bag_fee' => (float) config('fees.plastic_bag_fee', 1000),
         'bundling_status' => config('pricing.bundling_status', [
             'bundle_2_cup_large' => true,

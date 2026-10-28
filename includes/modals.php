@@ -473,7 +473,7 @@
                     <span class="pill pill-premium" style="font-size:10px">Prioritas Utama</span>
                 </div>
                 <small style="color:var(--text-muted);font-size:11px;display:block;margin-bottom:8px">
-                    Contoh: Klien ingin 1 menu <b>Kopi Kenangan Mantan +6.000</b> sedangkan menu lainnya tetap standar.
+                    Bisa atur fee per menu maupun <b>khusus ukuran Large</b> (misal: <i>Kopi Kenangan Mantan Regular +5.000</i> dan <i>Large +7.000</i>).
                 </small>
 
                 <!-- List of current active item overrides -->
@@ -484,31 +484,45 @@
                 <!-- Add new item override box with Live API Menu Selector -->
                 <div style="background:var(--bg-page);border:1.5px dashed var(--brand-primary);border-radius:var(--radius-md);padding:14px;margin-top:6px">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                        <b style="font-size:12px;font-weight:800;color:var(--text-main)">+ Tambah Fee Khusus Menu:</b>
+                        <b style="font-size:12px;font-weight:800;color:var(--text-main)">+ Tambah Fee Khusus Menu & Ukuran:</b>
                         <span style="font-size:10px;color:var(--brand-primary-dark);font-weight:700;background:var(--bg-card-subtle);padding:2px 8px;border-radius:10px;border:1px solid var(--border-color)">⚡ Live dari API</span>
                     </div>
 
-                    <!-- Row 1: Dropdown Menu Selector + Fee Amount -->
-                    <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;margin-bottom:8px">
-                        <div>
-                            <select class="form-input" id="cfgMenuSelect" style="font-size:12.5px;font-weight:700;color:var(--text-main);background:var(--bg-card);border:1.5px solid var(--border-color);cursor:pointer;width:100%;text-overflow:ellipsis">
-                                <option value="">-- 🔍 Pilih Menu dari API --</option>
-                            </select>
-                        </div>
-                        <div style="position:relative">
-                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:800;color:var(--text-muted);font-size:12px">+</span>
-                            <input type="number" class="form-input" id="cfgNewItemFee" placeholder="6000" style="padding-left:26px;font-size:13px;font-weight:800;width:100%">
-                        </div>
+                    <!-- Row 1: Pilih Menu -->
+                    <div style="margin-bottom:8px">
+                        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">1. Pilih Menu:</label>
+                        <select class="form-input" id="cfgMenuSelect" style="font-size:12.5px;font-weight:700;color:var(--text-main);background:var(--bg-card);border:1.5px solid var(--border-color);cursor:pointer;width:100%;text-overflow:ellipsis">
+                            <option value="">-- 🔍 Pilih Menu dari API --</option>
+                        </select>
                     </div>
 
                     <!-- Optional Fallback: Manual Name Input (if user specifically selects manual) -->
                     <div id="cfgCustomNameWrap" style="display:none;margin-bottom:8px">
+                        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Ketik Nama Menu:</label>
                         <input type="text" class="form-input" id="cfgNewItemName" placeholder="Ketik nama menu manual..." style="font-size:12px">
                     </div>
 
-                    <!-- Row 2: Add Button Full Width -->
+                    <!-- Row 2: Pilih Ukuran + Nominal Fee -->
+                    <div style="display:grid;grid-template-columns:1fr 120px;gap:8px;margin-bottom:10px">
+                        <div>
+                            <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">2. Pilih Ukuran:</label>
+                            <select class="form-input" id="cfgItemSizeSelect" style="font-size:12px;font-weight:700;color:var(--text-main);background:var(--bg-card);border:1.5px solid var(--border-color);cursor:pointer;width:100%">
+                                <option value="">Regular / Default</option>
+                                <option value="Large">Khusus Ukuran Large ⭐</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">3. Fee (Rp):</label>
+                            <div style="position:relative">
+                                <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-weight:800;color:var(--text-muted);font-size:12px">+</span>
+                                <input type="number" class="form-input" id="cfgNewItemFee" placeholder="6000" style="padding-left:22px;font-size:13px;font-weight:800;width:100%">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Add Button Full Width -->
                     <button type="button" class="btn btn-primary btn-block" id="cfgAddNewItemBtn" style="font-size:13px;padding:10px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px">
-                        <span>+ Pasang Fee Khusus</span>
+                        <span>+ Pasang Fee Khusus Menu</span>
                     </button>
                 </div>
             </div>
@@ -520,10 +534,10 @@
                 </label>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div>
-                        <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Fee Order 1 Pcs</small>
+                        <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Fee Order 1 Pcs (0 = Bebas Fee)</small>
                         <div style="position:relative">
                             <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--text-muted);font-size:12px">Rp +</span>
-                            <input type="number" class="form-input" id="cfgSingleItemFee" placeholder="2000" style="padding-left:46px;font-weight:800">
+                            <input type="number" class="form-input" id="cfgSingleItemFee" placeholder="0" style="padding-left:46px;font-weight:800">
                         </div>
                     </div>
                     <div>
