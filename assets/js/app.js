@@ -2192,6 +2192,7 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
     const hasBundling = AppState.cart.some(i => i.isBundling || i.category === 'Bundling');
     const hasSingleFee = (totalQty === 1) && !hasBundling;
     const singleFee = hasSingleFee ? (AppState.singleItemFeeAmount || 2000) : 0;
+    const singleItemFee = singleFee;
     const plasticBagQty = AppState.hasPlasticBag ? Math.max(1, AppState.plasticBagQty || 1) : 0;
     const plasticFee = plasticBagQty * (AppState.plasticBagFeeAmount || 1000);
     const grandTotal = subtotal + singleFee + plasticFee;
@@ -2306,7 +2307,9 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
         waMessage: msg,
         waUrl,
         subtotal,
+        hasSingleFee,
         singleFee,
+        singleItemFee,
         plasticFee,
         grandTotal,
         plasticBagQty
@@ -2417,7 +2420,8 @@ if (checkoutWaBtn) {
             notes: notes,
             plasticBag: generated.plasticBagQty > 0,
             plasticBagQty: generated.plasticBagQty,
-            hasSingleItemFee: generated.singleFee > 0,
+            hasSingleItemFee: generated.hasSingleFee,
+            singleItemFee: generated.singleItemFee,
             items: generated.order.items,
             subtotal: generated.subtotal
         };
