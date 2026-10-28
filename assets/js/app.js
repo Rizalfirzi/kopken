@@ -896,15 +896,10 @@ function renderBundleSlotCustomizer(sIdx) {
 
     const optName = choice.name;
 
-    // Food item -> show food badge note without ice/sugar
+    // Food item -> hide customizer because food has no ice/sugar options
     if (isBundlingFoodItem(optName)) {
-        box.style.display = 'block';
-        box.innerHTML = `
-            <div class="bundle-food-badge-note">
-                <span>🥐</span>
-                <span><b>${esc(optName)}</b> siap saji (tanpa pilihan es / gula)</span>
-            </div>
-        `;
+        box.style.display = 'none';
+        box.innerHTML = '';
         return;
     }
 
@@ -1097,14 +1092,23 @@ function openBundlingModal(bundle) {
             };
 
             // Categorized groups (e.g. Minuman vs Makanan in Paket Hemat 3 Item)
+            let customBoxRendered = false;
             if (slot.groups && typeof slot.groups === 'object') {
                 for (const [groupTitle, groupItems] of Object.entries(slot.groups)) {
+                    const isDrinkGroup = /minuman|drink|kopi|coffee|tea|frappe/i.test(groupTitle);
                     optionsHtml += `
                         <div class="bundle-subgroup-title">${esc(groupTitle)}</div>
                         <div class="bundle-choices-grid" data-slot="${sIdx}">
                             ${groupItems.map(renderCard).join('')}
                         </div>
                     `;
+                    // Place the customizer (Ice / Sugar) directly below the Minuman options so customer won't skip it
+                    if (isDrinkGroup && !customBoxRendered) {
+                        optionsHtml += `
+                            <div class="bundle-slot-custom-box" id="bundleCustomBox_${sIdx}" style="display:none"></div>
+                        `;
+                        customBoxRendered = true;
+                    }
                 }
             } else {
                 // Regular or variant list
@@ -1113,6 +1117,12 @@ function openBundlingModal(bundle) {
                     <div class="bundle-choices-grid ${isSingleCol ? 'single-col' : ''}" data-slot="${sIdx}">
                         ${(slot.options || []).map(renderCard).join('')}
                     </div>
+                `;
+            }
+
+            if (!customBoxRendered) {
+                optionsHtml += `
+                    <div class="bundle-slot-custom-box" id="bundleCustomBox_${sIdx}" style="display:none"></div>
                 `;
             }
 
@@ -1129,7 +1139,6 @@ function openBundlingModal(bundle) {
                         <span>${slot.label || `Pilihan ${sIdx + 1}`}</span>
                     </div>
                     ${optionsHtml}
-                    <div class="bundle-slot-custom-box" id="bundleCustomBox_${sIdx}" style="display:none"></div>
                 </div>
             `;
         }).join('');

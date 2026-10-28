@@ -2036,9 +2036,9 @@ body {
     white-space: nowrap;
 }
 
-/* Bundling Per-Item Options Customizer (Revisi Client) */
+/* Bundling Per-Item Options Customizer (Revisi Client: Tepat di Bawah Minuman) */
 .bundle-slot-custom-box {
-    margin-top: 10px;
+    margin: 10px 0 14px;
     padding: 10px 12px;
     background: #FFFFFF;
     border: 1px solid var(--border-color);
