@@ -284,13 +284,26 @@
                 </div>
             </div>
 
-            <!-- Pilihan Kantung Belanja Plastik (Revisi Poin 10: +Rp 1.000) -->
-            <div class="checkbox-addon-box">
-                <label class="checkbox-label" for="plasticBagCheckbox">
-                    <input type="checkbox" id="plasticBagCheckbox">
-                    <span class="custom-chk"></span>
-                    <span class="chk-text">Pakai kantung belanja <b>+Rp 1.000</b></span>
-                </label>
+            <!-- Pilihan Kantung Belanja Plastik (Revisi: Bisa Diatur Jumlahnya) -->
+            <div class="checkbox-addon-box" id="plasticBagAddonBox">
+                <div class="plastic-bag-row">
+                    <label class="checkbox-label" for="plasticBagCheckbox" style="flex:1;margin:0;cursor:pointer">
+                        <input type="checkbox" id="plasticBagCheckbox">
+                        <span class="custom-chk"></span>
+                        <span class="chk-text">
+                            <span class="chk-title">Pakai kantung belanja</span>
+                            <small class="chk-price-tag">+Rp 1.000 / kantung</small>
+                        </span>
+                    </label>
+                    <div class="plastic-stepper" id="plasticBagStepper" style="display:none">
+                        <button type="button" class="plastic-step-btn" id="plasticBagMinusBtn" title="Kurangi Kantung" aria-label="Kurangi Kantung">−</button>
+                        <span class="plastic-qty-count" id="plasticBagQtyDisplay">1</span>
+                        <button type="button" class="plastic-step-btn" id="plasticBagPlusBtn" title="Tambah Kantung" aria-label="Tambah Kantung">+</button>
+                    </div>
+                </div>
+                <div class="plastic-bag-hint" id="plasticBagHint" style="display:none">
+                    <span id="plasticBagHintText">🛍️ 1 Kantung Belanja (+Rp 1.000)</span>
+                </div>
             </div>
 
             <!-- Overall Notes -->
@@ -315,7 +328,7 @@
 
                 <!-- Plastic Bag Row (Poin 10) -->
                 <div class="pbc-row" id="plasticFeeRow" style="display:none">
-                    <span>Kantung Belanja Plastik</span>
+                    <span id="summaryPlasticLabel">Kantung Belanja Plastik</span>
                     <b id="summaryPlasticFee">+Rp 1.000</b>
                 </div>
 
@@ -602,6 +615,55 @@
         </div>
         <div style="margin-top:16px">
             <button type="button" class="btn btn-secondary btn-block" data-close="wifiModal">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================= -->
+<!-- 11. MODAL ORDER SUKSES & REDIRECT WHATSAPP                    -->
+<!-- ============================================================= -->
+<div class="sheet-backdrop dialog-backdrop" id="orderSuccessModal">
+    <div class="dialog" role="dialog" aria-modal="true" style="max-width:390px;text-align:center">
+        <button class="sheet-close" data-close="orderSuccessModal" aria-label="Tutup" style="position:absolute;right:14px;top:14px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:var(--bg-card-subtle);border:1px solid var(--border-color);border-radius:var(--radius-full);color:var(--text-muted);font-size:18px;cursor:pointer">&times;</button>
+        
+        <div style="width:60px;height:60px;border-radius:var(--radius-full);background:linear-gradient(135deg, #DCFCE7, #BBF7D0);color:#16A34A;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 4px 12px rgba(22, 163, 74, 0.2)">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        
+        <h3 style="font-size:17px;font-weight:900;color:var(--text-main);margin-bottom:4px">Pesanan Berhasil Disiapkan! 🌸</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Format pesan telah siap. Kamu sedang dialihkan ke WhatsApp...</p>
+        
+        <div style="background:var(--bg-page);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:12px;text-align:left;font-size:12px;margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                <span style="color:var(--text-muted)">Kode Pesanan:</span>
+                <strong id="successModalCode" style="color:var(--brand-primary-dark);font-family:monospace;font-size:13px">KYUTI-XXXX</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                <span style="color:var(--text-muted)">Nama Pemesan:</span>
+                <strong id="successModalName">-</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                <span style="color:var(--text-muted)">Kantung Belanja:</span>
+                <strong id="successModalBag">-</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--border-color);padding-top:6px;margin-top:4px">
+                <span style="color:var(--text-main);font-weight:700">Total Pembayaran:</span>
+                <strong id="successModalTotal" style="color:var(--brand-primary-dark);font-size:14px">Rp 0</strong>
+            </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+            <a href="#" id="successOpenWaBtn" class="btn btn-wa btn-block" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;font-size:14px;font-weight:800;border-radius:var(--radius-full)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-.9-2.3c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7 6.3 6.3 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .8 2.5.7 3 .6a2.9 2.9 0 0 0 1.9-1.3 2.4 2.4 0 0 0 .2-1.3c-.1-.2-.3-.3-.6-.4zM12 21.8a9.8 9.8 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A9.8 9.8 0 1 1 12 21.8zm8.4-18.2A11.8 11.8 0 0 0 1.7 17.8L0 24l6.4-1.7a11.8 11.8 0 0 0 5.6 1.4A11.8 11.8 0 0 0 20.4 3.6z"/></svg>
+                <span>Buka WhatsApp Sekarang</span>
+            </a>
+            <button type="button" class="btn btn-secondary btn-block" id="successCopyMsgBtn" style="padding:10px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span id="successCopyMsgText">Salin Format Pesanan</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-block" data-close="orderSuccessModal" style="padding:8px;font-size:12px;opacity:0.8;border:none;background:transparent;cursor:pointer">
+                Tutup Jendela Ini
+            </button>
         </div>
     </div>
 </div>

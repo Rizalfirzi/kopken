@@ -25,6 +25,7 @@ const AppState = {
     singleItemFeeAmount: window.INITIAL_DATA?.singleItemFee || 2000,
     plasticBagFeeAmount: window.INITIAL_DATA?.plasticBagFee || 1000,
     hasPlasticBag: false,
+    plasticBagQty: 1,
     pickupType: 'Sekarang', // 'Sekarang' or 'Atur Jam'
     pickupTimezone: 'WIB',
     pickupTime: '',
@@ -1801,15 +1802,16 @@ function commitItemToCart(item) {
 
 function updateCartUI() {
     const totalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
-    const subtotal = AppState.cart.reduce((sum, i) => sum + (i.subtotal || 0), 0);
+    const subtotal = AppState.cart.reduce((sum, i) => sum + (i.subtotal || ((i.price || 0) * (i.qty || 1))), 0);
 
     // Calculate Single Item Fee (+2.000 if total qty == 1, but exempt if cart contains bundling)
     const hasBundling = AppState.cart.some(i => i.isBundling || i.category === 'Bundling');
     const hasSingleFee = (totalQty === 1) && !hasBundling;
     const singleFee = hasSingleFee ? AppState.singleItemFeeAmount : 0;
 
-    // Calculate Plastic Bag Fee (+1.000 if checked)
-    const plasticFee = AppState.hasPlasticBag ? AppState.plasticBagFeeAmount : 0;
+    // Calculate Plastic Bag Fee (Qty * Fee per bag)
+    const plasticBagQty = AppState.hasPlasticBag ? Math.max(1, AppState.plasticBagQty || 1) : 0;
+    const plasticFee = plasticBagQty * AppState.plasticBagFeeAmount;
 
     const grandTotal = subtotal + singleFee + plasticFee;
 
@@ -1855,7 +1857,21 @@ function updateCartUI() {
         }
     }
     if (freeFeeRow) freeFeeRow.style.display = 'none';
-    if (plasticFeeRow) plasticFeeRow.style.display = AppState.hasPlasticBag ? 'flex' : 'none';
+
+    if (plasticFeeRow) {
+        plasticFeeRow.style.display = AppState.hasPlasticBag ? 'flex' : 'none';
+        const summaryPlasticFee = document.getElementById('summaryPlasticFee');
+        if (summaryPlasticFee) {
+            summaryPlasticFee.textContent = `+${formatRp(plasticFee)}`;
+        }
+        const summaryPlasticLabel = document.getElementById('summaryPlasticLabel');
+        if (summaryPlasticLabel) {
+            summaryPlasticLabel.textContent = plasticBagQty > 1 ? `Kantung Belanja Plastik (${plasticBagQty} pcs)` : `Kantung Belanja Plastik`;
+        }
+    }
+
+    // Update Plastic Bag UI controls & hints
+    updatePlasticBagUI();
 
     // Update Checkout Button if Outlet Closed
     const checkoutWaBtn = document.getElementById('checkoutWaBtn');
@@ -1936,18 +1952,82 @@ if (clearCartBtn) {
     clearCartBtn.addEventListener('click', () => {
         if (confirm('Kosongkan keranjang belanja?')) {
             AppState.cart = [];
+            AppState.hasPlasticBag = false;
+            AppState.plasticBagQty = 1;
             localStorage.removeItem('kyuti_cart');
+            updatePlasticBagUI();
             updateCartUI();
             showToast('Keranjang telah dikosongkan.');
         }
     });
 }
 
-// Plastic Bag Checkbox Addon (Revisi Poin 10)
+function updatePlasticBagUI() {
+    const checkbox = document.getElementById('plasticBagCheckbox');
+    const stepper = document.getElementById('plasticBagStepper');
+    const hint = document.getElementById('plasticBagHint');
+    const box = document.getElementById('plasticBagAddonBox');
+    const qtyDisplay = document.getElementById('plasticBagQtyDisplay');
+    const hintText = document.getElementById('plasticBagHintText');
+
+    const isChecked = !!AppState.hasPlasticBag;
+    if (checkbox) checkbox.checked = isChecked;
+    if (stepper) stepper.style.display = isChecked ? 'flex' : 'none';
+    if (hint) hint.style.display = isChecked ? 'flex' : 'none';
+    if (box) box.classList.toggle('active', isChecked);
+    if (qtyDisplay) qtyDisplay.textContent = AppState.plasticBagQty || 1;
+
+    if (hintText && isChecked) {
+        const qty = AppState.plasticBagQty || 1;
+        const totalItems = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
+        const cost = qty * (AppState.plasticBagFeeAmount || 1000);
+        if (totalItems >= 4 && qty === 1) {
+            hintText.innerHTML = `🛍️ 1 Kantung (+${formatRp(cost)}). <span style="color:var(--brand-primary-dark);font-weight:700">Ada ${totalItems} item, bisa tambah kantung jika perlu.</span>`;
+        } else {
+            hintText.innerHTML = `🛍️ Total <b>${qty} Kantung Belanja</b> (+${formatRp(cost)})`;
+        }
+    }
+}
+
+// Plastic Bag Addon Event Listeners (Revisi: Jumlah Bisa Diatur)
 const plasticBagCheckbox = document.getElementById('plasticBagCheckbox');
 if (plasticBagCheckbox) {
     plasticBagCheckbox.addEventListener('change', (e) => {
         AppState.hasPlasticBag = e.target.checked;
+        if (AppState.hasPlasticBag) {
+            if (!AppState.plasticBagQty || AppState.plasticBagQty < 1) {
+                AppState.plasticBagQty = 1;
+            }
+        }
+        updatePlasticBagUI();
+        updateCartUI();
+    });
+}
+
+const plasticBagMinusBtn = document.getElementById('plasticBagMinusBtn');
+if (plasticBagMinusBtn) {
+    plasticBagMinusBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (AppState.plasticBagQty > 1) {
+            AppState.plasticBagQty--;
+        } else {
+            AppState.hasPlasticBag = false;
+            AppState.plasticBagQty = 1;
+        }
+        updatePlasticBagUI();
+        updateCartUI();
+    });
+}
+
+const plasticBagPlusBtn = document.getElementById('plasticBagPlusBtn');
+if (plasticBagPlusBtn) {
+    plasticBagPlusBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        AppState.hasPlasticBag = true;
+        AppState.plasticBagQty = Math.min(50, (AppState.plasticBagQty || 1) + 1);
+        updatePlasticBagUI();
         updateCartUI();
     });
 }
@@ -2060,8 +2140,178 @@ document.querySelectorAll('.tz-pill').forEach(btn => {
 });
 
 // =========================================================================
-// 7. CHECKOUT VIA WHATSAPP (Revisi Poin 8, 10, 11)
+// 7. CHECKOUT VIA WHATSAPP & CLIENT ORDER ENGINE (Revisi Poin 8, 10, 11)
 // =========================================================================
+
+function normalizeWaPhone(phone) {
+    if (!phone) return '628972276154';
+    let clean = String(phone).replace(/\D/g, '');
+    if (clean.startsWith('0')) {
+        clean = '62' + clean.slice(1);
+    }
+    return clean || '628972276154';
+}
+
+function copyToClipboard(text, onSuccess) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            if (typeof onSuccess === 'function') onSuccess();
+        }).catch(() => {
+            fallbackCopy(text, onSuccess);
+        });
+    } else {
+        fallbackCopy(text, onSuccess);
+    }
+}
+
+function fallbackCopy(text, onSuccess) {
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-999999px';
+        ta.style.top = '-999999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (typeof onSuccess === 'function') onSuccess();
+    } catch (err) {
+        console.error('Fallback copy error:', err);
+    }
+}
+
+function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
+    const prefix = window.INITIAL_DATA?.orderPrefix || 'KYUTI';
+    const randPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const orderCode = `${prefix}-${randPart}`;
+
+    const totalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
+    const subtotal = AppState.cart.reduce((sum, i) => sum + (i.subtotal || ((i.price || 0) * (i.qty || 1))), 0);
+    const hasBundling = AppState.cart.some(i => i.isBundling || i.category === 'Bundling');
+    const hasSingleFee = (totalQty === 1) && !hasBundling;
+    const singleFee = hasSingleFee ? (AppState.singleItemFeeAmount || 2000) : 0;
+    const plasticBagQty = AppState.hasPlasticBag ? Math.max(1, AppState.plasticBagQty || 1) : 0;
+    const plasticFee = plasticBagQty * (AppState.plasticBagFeeAmount || 1000);
+    const grandTotal = subtotal + singleFee + plasticFee;
+
+    let fullPickup = pickupTime || 'Sekarang';
+    if (fullPickup !== 'Sekarang' && !fullPickup.includes(AppState.pickupTimezone)) {
+        fullPickup += ` ${AppState.pickupTimezone}`;
+    }
+
+    const outletName = AppState.outlet?.name || 'Kopi Kenangan';
+    const outletCode = AppState.outlet?.code || 'LA.CODEFIN';
+
+    // Format WhatsApp message
+    let msg = `୨୧ *FORMAT ORDER KEDAI KYUTI* ୨୧\n`;
+    msg += `--------------------------------------\n`;
+    msg += `Kode Pesanan: *${orderCode}*\n`;
+    msg += `Outlet: *${outletName}*\n`;
+    msg += `Nama: *${custName}*\n`;
+    if (custPhone) {
+        msg += `No. HP: ${custPhone}\n`;
+    }
+    msg += `Waktu Pickup: *${fullPickup}*\n`;
+    msg += `--------------------------------------\n`;
+    msg += `*Detail Menu:*\n`;
+
+    AppState.cart.forEach((item, idx) => {
+        const isBundling = !!item.isBundling || item.category === 'Bundling';
+        let optStr = '';
+        if (!isBundling) {
+            const options = [];
+            if (item.size) options.push(item.size);
+            if (item.temp) options.push(item.temp);
+            if (item.ice) options.push(item.ice);
+            if (item.sugar) options.push(item.sugar);
+            if (options.length) optStr = ` (${options.join(', ')})`;
+        }
+
+        const itemQty = item.qty || 1;
+        const itemPrice = item.price || 0;
+        const itemSubtotal = item.subtotal || (itemPrice * itemQty);
+
+        msg += `${idx + 1}. *${item.name || 'Item'}* x${itemQty}${optStr}\n`;
+        if (item.bundleChoices) {
+            msg += `    Isi Paket: _${item.bundleChoices}_\n`;
+        }
+        if (item.addons && Array.isArray(item.addons) && item.addons.length) {
+            const addonStrings = item.addons.map(a => `${a.name || a.text || 'Addon'} (+Rp ${Number(a.price || 0).toLocaleString('id-ID')})`);
+            msg += `    + Topping/Syrup: _${addonStrings.join(', ')}_\n`;
+        }
+        msg += `    Harga: Rp ${Number(itemPrice).toLocaleString('id-ID')} | Subtotal: Rp ${Number(itemSubtotal).toLocaleString('id-ID')}\n`;
+        if (item.note) {
+            msg += `    Catatan: _${item.note}_\n`;
+        }
+    });
+
+    msg += `--------------------------------------\n`;
+    msg += `Subtotal Menu: Rp ${Number(subtotal).toLocaleString('id-ID')}\n`;
+
+    if (hasSingleFee) {
+        msg += `Fee Pesanan Satuan: +Rp ${Number(singleFee).toLocaleString('id-ID')}\n`;
+    } else {
+        msg += `Fee Pesanan Satuan: 0\n`;
+    }
+
+    if (AppState.hasPlasticBag && plasticBagQty > 0) {
+        const bagLabel = plasticBagQty > 1 ? `Kantung Belanja Plastik (${plasticBagQty} pcs)` : `Kantung Belanja Plastik`;
+        msg += `${bagLabel}: +Rp ${Number(plasticFee).toLocaleString('id-ID')}\n`;
+    }
+
+    if (notes) {
+        msg += `Catatan Tambahan: _${notes}_\n`;
+    }
+    msg += `--------------------------------------\n`;
+    msg += `*TOTAL BAYAR: Rp ${Number(grandTotal).toLocaleString('id-ID')}*\n\n`;
+    msg += `𝒯𝒽𝒶𝓃𝓀 𝓎𝑜𝓊 𝒻𝑜𝓇 𝒸𝒽𝑜𝑜𝓈𝒾𝓃𝑔 𝓀𝑒𝒹𝒶𝒾 𝓀𝓎𝓊𝓉𝒾! ୨୧ ♡\n`;
+    msg += `Mohon diproses ya min, terima kasih! 🌷✨`;
+
+    const adminPhone = normalizeWaPhone(window.INITIAL_DATA?.adminPhone || '628972276154');
+    let waUrl = `https://wa.me/${adminPhone}?text=${encodeURIComponent(msg)}`;
+    if (window.INITIAL_DATA?.waBaseLink && window.INITIAL_DATA.waBaseLink.includes('wa.me')) {
+        const base = window.INITIAL_DATA.waBaseLink;
+        const delim = base.includes('?') ? '&' : '?';
+        waUrl = `${base}${delim}text=${encodeURIComponent(msg)}`;
+    }
+
+    const orderObj = {
+        orderCode,
+        customerName: custName,
+        customerPhone: custPhone,
+        outletCode,
+        outletName,
+        pickupTime: fullPickup,
+        notes,
+        hasPlasticBag: AppState.hasPlasticBag,
+        plasticBagQty,
+        plasticBagFee: plasticFee,
+        hasSingleItemFee: hasSingleFee,
+        singleItemFee,
+        status: 'diproses',
+        statusText: 'Pesanan Sedang Disiapkan',
+        statusDesc: 'Pesananmu sedang disiapkan dengan penuh cinta oleh Kedai Kyuti ♡',
+        items: JSON.parse(JSON.stringify(AppState.cart)),
+        subtotal,
+        total: grandTotal,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+
+    return {
+        orderCode,
+        order: orderObj,
+        waMessage: msg,
+        waUrl,
+        subtotal,
+        singleFee,
+        plasticFee,
+        grandTotal,
+        plasticBagQty
+    };
+}
 
 const checkoutWaBtn = document.getElementById('checkoutWaBtn');
 if (checkoutWaBtn) {
@@ -2092,14 +2342,72 @@ if (checkoutWaBtn) {
             pickupTime = pickupTimeSelect.value || 'Sekarang';
         }
 
-        const totalQty = AppState.cart.reduce((sum, i) => sum + (i.qty || 1), 0);
-        const hasBundling = AppState.cart.some(i => i.isBundling || i.category === 'Bundling');
-        const hasSingleFee = (totalQty === 1) && !hasBundling;
+        // Instant local order & format generation (0 delay, bulletproof)
+        const generated = generateClientOrder({
+            custName,
+            custPhone,
+            notes,
+            pickupTime
+        });
 
-        checkoutWaBtn.disabled = true;
-        checkoutWaBtn.innerHTML = '<span>Menyiapkan Pesanan...</span>';
+        // 1. Immediately save order into local history
+        try {
+            const history = JSON.parse(localStorage.getItem('kyuti_orders') || '[]');
+            history.unshift(generated.order);
+            localStorage.setItem('kyuti_orders', JSON.stringify(history.slice(0, 10)));
+        } catch (e) {
+            console.warn('Could not save order history:', e);
+        }
 
-        const payload = {
+        // 2. Clear cart
+        AppState.cart = [];
+        AppState.hasPlasticBag = false;
+        AppState.plasticBagQty = 1;
+        localStorage.removeItem('kyuti_cart');
+        updatePlasticBagUI();
+        updateCartUI();
+        closeSheet('cartSheet');
+
+        // 3. Prepare & show Order Success Modal
+        const successModalCode = document.getElementById('successModalCode');
+        const successModalName = document.getElementById('successModalName');
+        const successModalBag = document.getElementById('successModalBag');
+        const successModalTotal = document.getElementById('successModalTotal');
+        const successOpenWaBtn = document.getElementById('successOpenWaBtn');
+        const successCopyMsgBtn = document.getElementById('successCopyMsgBtn');
+        const successCopyMsgText = document.getElementById('successCopyMsgText');
+
+        if (successModalCode) successModalCode.textContent = generated.orderCode;
+        if (successModalName) successModalName.textContent = custName;
+        if (successModalBag) {
+            successModalBag.textContent = generated.plasticBagQty > 0 ? `${generated.plasticBagQty} pcs (+${formatRp(generated.plasticFee)})` : 'Tidak pakai';
+        }
+        if (successModalTotal) successModalTotal.textContent = formatRp(generated.grandTotal);
+        if (successOpenWaBtn) successOpenWaBtn.href = generated.waUrl;
+
+        if (successCopyMsgBtn) {
+            successCopyMsgBtn.onclick = () => {
+                copyToClipboard(generated.waMessage, () => {
+                    if (successCopyMsgText) successCopyMsgText.textContent = '✓ Format Disalin!';
+                    showToast('✓ Format pesanan berhasil disalin ke clipboard!');
+                    setTimeout(() => {
+                        if (successCopyMsgText) successCopyMsgText.textContent = 'Salin Format Pesanan';
+                    }, 2500);
+                });
+            };
+        }
+
+        openSheet('orderSuccessModal');
+        showToast(`✓ Pesanan ${generated.orderCode} berhasil dibuat! Membuka WhatsApp...`);
+
+        // 4. Redirect to WhatsApp via window.location.href (never blocked by mobile popup blockers!)
+        setTimeout(() => {
+            window.location.href = generated.waUrl;
+        }, 350);
+
+        // 5. Send order payload to server asynchronously (silent, non-blocking)
+        const serverPayload = {
+            orderCode: generated.orderCode,
             customerName: custName,
             customerPhone: custPhone,
             outletCode: AppState.outlet?.code || 'LA.CODEFIN',
@@ -2107,50 +2415,39 @@ if (checkoutWaBtn) {
             pickupTime: pickupTime,
             pickupTimezone: AppState.pickupTimezone,
             notes: notes,
-            plasticBag: AppState.hasPlasticBag,
-            hasSingleItemFee: hasSingleFee,
-            items: AppState.cart,
-            subtotal: subtotal
+            plasticBag: generated.plasticBagQty > 0,
+            plasticBagQty: generated.plasticBagQty,
+            hasSingleItemFee: generated.singleFee > 0,
+            items: generated.order.items,
+            subtotal: generated.subtotal
         };
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
 
         fetch('api/order.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(serverPayload),
+            signal: controller.signal
         })
         .then(res => res.json())
         .then(res => {
-            if (res.success && res.waUrl) {
-                // Save Order into local history
-                const history = JSON.parse(localStorage.getItem('kyuti_orders') || '[]');
-                history.unshift(res.order);
-                localStorage.setItem('kyuti_orders', JSON.stringify(history.slice(0, 10)));
-
-                // Clear cart
-                AppState.cart = [];
-                localStorage.removeItem('kyuti_cart');
-                updateCartUI();
-                closeSheet('cartSheet');
-
-                showToast(`✓ Pesanan ${res.orderCode} berhasil dibuat! Membuka WhatsApp...`);
-
-                // Open WhatsApp
-                setTimeout(() => {
-                    window.open(res.waUrl, '_blank');
-                }, 400);
-            } else {
-                alert(res.message || 'Gagal memproses pesanan.');
+            clearTimeout(timeoutId);
+            if (res.success && res.order) {
+                try {
+                    const h = JSON.parse(localStorage.getItem('kyuti_orders') || '[]');
+                    const idx = h.findIndex(o => o.orderCode === generated.orderCode);
+                    if (idx !== -1) {
+                        h[idx] = res.order;
+                        localStorage.setItem('kyuti_orders', JSON.stringify(h));
+                    }
+                } catch (err) {}
             }
         })
-        .catch(() => {
-            alert('Terjadi kesalahan jaringan saat membuat pesanan.');
-        })
-        .finally(() => {
-            checkoutWaBtn.disabled = false;
-            checkoutWaBtn.innerHTML = `
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-.9-2.3c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7 6.3 6.3 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .8 2.5.7 3 .6a2.9 2.9 0 0 0 1.9-1.3 2.4 2.4 0 0 0 .2-1.3c-.1-.2-.3-.3-.6-.4zM12 21.8a9.8 9.8 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A9.8 9.8 0 1 1 12 21.8zm8.4-18.2A11.8 11.8 0 0 0 1.7 17.8L0 24l6.4-1.7a11.8 11.8 0 0 0 5.6 1.4A11.8 11.8 0 0 0 20.4 3.6z"/></svg>
-                <span>Pesan via WhatsApp</span>
-            `;
+        .catch(err => {
+            clearTimeout(timeoutId);
+            console.log('Background server sync finished:', err?.name);
         });
     });
 }

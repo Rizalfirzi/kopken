@@ -777,7 +777,7 @@ class KopiKenanganApi
     {
         $prefix = (string) config('store.order_prefix', 'KYUTI');
         $randomCode = strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
-        $orderCode = $prefix . '-' . $randomCode;
+        $orderCode = !empty($data['orderCode']) ? trim((string)$data['orderCode']) : ($prefix . '-' . $randomCode);
 
         $items = $data['items'] ?? [];
         $totalQty = 0;
@@ -797,12 +797,25 @@ class KopiKenanganApi
         $hasSingleItemFee = (($totalQty === 1) || !empty($data['hasSingleItemFee'])) && !$hasBundling;
         $singleItemFee = $hasSingleItemFee ? $singleItemFeeConfig : 0;
 
-        // Plastic bag fee: +1.000 if selected
+        // Plastic bag fee: support quantity and boolean
         $plasticBagFeeConfig = (int) config('fees.plastic_bag_fee', 1000);
-        $hasPlasticBag = !empty($data['plasticBag']);
-        $plasticBagFee = $hasPlasticBag ? $plasticBagFeeConfig : 0;
+        $plasticBagQty = 0;
+        if (isset($data['plasticBagQty'])) {
+            $plasticBagQty = max(0, (int) $data['plasticBagQty']);
+        } elseif (!empty($data['plasticBag'])) {
+            $plasticBagQty = 1;
+        }
+        $hasPlasticBag = $plasticBagQty > 0;
+        $plasticBagFee = $plasticBagQty * $plasticBagFeeConfig;
 
-        $subtotal = (float) ($data['subtotal'] ?? 0);
+        $subtotal = 0;
+        if (isset($data['subtotal']) && (float)$data['subtotal'] > 0) {
+            $subtotal = (float)$data['subtotal'];
+        } else {
+            foreach ($items as $it) {
+                $subtotal += (float)($it['subtotal'] ?? (($it['price'] ?? 0) * ($it['qty'] ?? 1)));
+            }
+        }
         $total = $subtotal + $singleItemFee + $plasticBagFee;
 
         $pickupTime = $data['pickupTime'] ?? 'Sekarang';
@@ -820,6 +833,7 @@ class KopiKenanganApi
             'pickupTime' => $pickupTime,
             'notes' => trim($data['notes'] ?? ''),
             'hasPlasticBag' => $hasPlasticBag,
+            'plasticBagQty' => $plasticBagQty,
             'plasticBagFee' => $plasticBagFee,
             'hasSingleItemFee' => $hasSingleItemFee,
             'singleItemFee' => $singleItemFee,
@@ -834,7 +848,14 @@ class KopiKenanganApi
         ];
 
         // Format WhatsApp message
-        $adminPhone = (string) config('store.admin_phone', '6288298374458');
+        $rawPhone = (string) config('store.admin_phone', '628972276154');
+        $adminPhone = preg_replace('/\D/', '', $rawPhone);
+        if (str_starts_with($adminPhone, '0')) {
+            $adminPhone = '62' . substr($adminPhone, 1);
+        }
+        if (empty($adminPhone)) {
+            $adminPhone = '628972276154';
+        }
         
         $waMessage = "୨୧ *FORMAT ORDER KEDAI KYUTI* ୨୧\n";
         $waMessage .= "--------------------------------------\n";
@@ -891,7 +912,8 @@ class KopiKenanganApi
         }
 
         if ($hasPlasticBag) {
-            $waMessage .= "Kantung Belanja Plastik: +Rp " . number_format($plasticBagFee, 0, ',', '.') . "\n";
+            $bagText = $plasticBagQty > 1 ? "Kantung Belanja Plastik ({$plasticBagQty} pcs)" : "Kantung Belanja Plastik";
+            $waMessage .= "{$bagText}: +Rp " . number_format($plasticBagFee, 0, ',', '.') . "\n";
         }
 
         if (!empty($order['notes'])) {

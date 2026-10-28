@@ -1319,6 +1319,25 @@ body {
     background: var(--bg-card);
 }
 
+/* 3.1 GENERAL DIALOG MODAL (Centered for Wi-Fi & Order Success) */
+.dialog-backdrop {
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+}
+
+.dialog {
+    width: 100%;
+    max-width: 400px;
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    border: 2px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    padding: 24px 20px 20px;
+    position: relative;
+    animation: scaleIn 0.25s ease;
+}
+
 /* 3.1 WELCOME POPUP (Revisi Poin 4) */
 .welcome-modal-backdrop {
     align-items: center;
@@ -1609,12 +1628,40 @@ body {
     border-color: var(--brand-primary-dark);
 }
 
-/* Custom Checkbox Addon (Kantung Belanja Plastik) */
+/* Custom Checkbox Addon (Kantung Belanja Plastik - Jumlah Bisa Diatur) */
 .checkbox-addon-box {
     background: var(--bg-card-subtle);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: 12px 14px;
+    transition: var(--transition);
+}
+
+.checkbox-addon-box.active {
+    border-color: var(--brand-primary);
+    background: #FFF5F7;
+}
+
+.plastic-bag-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.chk-title {
+    display: block;
+    font-weight: 800;
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.chk-price-tag {
+    display: block;
+    font-size: 11px;
+    color: var(--brand-primary-dark);
+    font-weight: 700;
+    margin-top: 1px;
 }
 
 .checkbox-label {
@@ -1653,6 +1700,64 @@ body {
     color: #FFFFFF;
     font-size: 13px;
     font-weight: 900;
+}
+
+.plastic-stepper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #FFFFFF;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-full);
+    padding: 3px 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    animation: scaleIn 0.2s ease;
+}
+
+.plastic-step-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-full);
+    border: none;
+    background: var(--bg-card-subtle);
+    color: var(--brand-primary-dark);
+    font-size: 16px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+}
+
+.plastic-step-btn:hover {
+    background: var(--brand-primary);
+    color: #FFFFFF;
+}
+
+.plastic-step-btn:active {
+    transform: scale(0.92);
+}
+
+.plastic-qty-count {
+    min-width: 22px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-main);
+}
+
+.plastic-bag-hint {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-color);
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    animation: fadeIn 0.2s ease;
 }
 
 /* Price Breakdown Card */

@@ -58,7 +58,7 @@ $config = [
         'hero_desc' => 'Pilih outlet terdekat untuk cek stok menu real-time dan pesan langsung via WhatsApp dengan harga hemat!',
 
         // KONTAK ORDER WHATSAPP & SOSIAL MEDIA (Poin 5)
-        'admin_phone' => '08972276154',
+        'admin_phone' => '628972276154',
         'order_prefix' => 'KYUTI',
         'default_outlet' => 'LA.CODEFIN',
 
