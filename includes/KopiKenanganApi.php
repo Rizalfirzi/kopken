@@ -450,14 +450,19 @@ class KopiKenanganApi
             // Raw price from API
             $rawApiPrice = isset($item['price']) ? (float)$item['price'] : 0;
 
-            if ($rawApiPrice > 0) {
-                // Upstream API provides the exact discounted jasdor price!
-                // If there is a fee override (e.g. +6.000 instead of default +5.000), apply the delta
-                $calculatedPrice = round($rawApiPrice + $feeDelta);
-            } else {
-                // Fallback Formula: (Harga Asli - 50% + Fee)
+            // Calculate Selling Price using Kedai Kyuti Formula: (Harga Asli - 50%) + Fee
+            // Catatan: Upstream API menambahkan fee +6.500 (surcharge +1.500) pada outlet premium.
+            // Oleh karena itu, kita hitung murni dari $origPrice (normalPrice / outletPrice)
+            // agar fee tetap konsisten sesuai aturan Kedai Kyuti (+5.000 / setting admin).
+            if ($origPrice > 0) {
                 $discountedBase = $origPrice * (1 - ($discountPercent / 100));
                 $calculatedPrice = round($discountedBase + $fee);
+            } elseif ($rawApiPrice > 0) {
+                // Fallback jika item tidak memiliki normalPrice di upstream API
+                $baseRaw = (!empty($menuData['premium']) && $rawApiPrice > 1500) ? ($rawApiPrice - 1500) : $rawApiPrice;
+                $calculatedPrice = round($baseRaw + $feeDelta);
+            } else {
+                $calculatedPrice = (float)($item['price'] ?? 0);
             }
 
             // Manual fixed price override if configured (by key or name)
@@ -503,14 +508,17 @@ class KopiKenanganApi
                 }
 
                 $effectiveLargeFee = ($largeFee !== null) ? $largeFee : $fee;
-                $effectiveLargeFeeDelta = $effectiveLargeFee - $defaultMarkup;
+                $feeDiff = ($largeFee !== null) ? ($largeFee - $fee) : 0;
 
                 $rawApiLarge = !empty($item['largePrice']) ? (float)$item['largePrice'] : 0;
-                if ($rawApiLarge > 0) {
-                    // Upstream API provides the exact large price! Apply delta if fee is overridden
-                    $calcLarge = round($rawApiLarge + $effectiveLargeFeeDelta);
+                if ($rawApiLarge > 0 && $rawApiPrice > 0) {
+                    // Upstream API provides the exact Large difference from raw price (e.g. +3.000)
+                    $largeDelta = max(0, $rawApiLarge - $rawApiPrice);
+                    $calcLarge = $calculatedPrice + $largeDelta + $feeDiff;
+                } elseif (!empty($item['largeNormal']) && (float)$item['largeNormal'] > 0) {
+                    $origLarge = (float)$item['largeNormal'];
+                    $calcLarge = round(($origLarge * (1 - ($discountPercent / 100))) + $effectiveLargeFee);
                 } else {
-                    $feeDiff = ($largeFee !== null) ? ($largeFee - $fee) : 0;
                     $calcLarge = $calculatedPrice + 3500 + $feeDiff;
                 }
 
@@ -744,7 +752,31 @@ class KopiKenanganApi
                         }
                     }
                 }
-                $deltaLargeMarkup = ($largeFee !== null) ? ($largeFee - $defaultMarkup) : $deltaMarkup;
+                // Determine item base fee to calculate fee difference for Large
+                $baseFee = null;
+                foreach ($itemMarkupOverrides as $oKey => $oFee) {
+                    if (preg_match('/\(large\)$/i', trim((string)$oKey))) continue;
+                    $normOK = strtolower(str_replace([' ', '_', '-'], '', (string)$oKey));
+                    if ($normOK === $normMName || str_contains($normMName, $normOK) || str_contains($normOK, $normMName)) {
+                        $baseFee = (float)$oFee;
+                        break;
+                    }
+                }
+                if ($baseFee === null) {
+                    $cat = $matchedItem['category'] ?? '';
+                    $categoryMarkups = config('pricing.category_markups', []);
+                    foreach ($categoryMarkups as $cKey => $cFee) {
+                        if (strcasecmp($cKey, $cat) === 0) {
+                            $baseFee = (float)$cFee;
+                            break;
+                        }
+                    }
+                }
+                if ($baseFee === null) {
+                    $baseFee = $defaultMarkup;
+                }
+                $feeDiff = ($largeFee !== null) ? ($largeFee - $baseFee) : 0;
+                $deltaLargeMarkup = $deltaMarkup + $feeDiff;
 
                 // Base normal (unpromoted) price from item
                 $origBaseNormal = (float)($matchedItem['normalPrice'] ?? $matchedItem['outletPrice'] ?? 19000);
