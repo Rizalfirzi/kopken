@@ -545,6 +545,18 @@ function fetchMenu(outletCode, forceRefresh = false) {
     fetch(`api/menu.php?outlet=${encodeURIComponent(outletCode)}&refresh=${forceRefresh ? 1 : 0}${forceRefresh ? `&_t=${Date.now()}` : ''}`)
         .then(res => res.json())
         .then(data => {
+            // Guard against temporary upstream glitch where 100% of items are marked sold-out on an open outlet
+            if (data && Array.isArray(data.items) && data.items.length > 5 && !data.isClosed) {
+                const avail = data.items.filter(i => !i.isSoldOut && !i.notCarried).length;
+                if (avail === 0 && Array.isArray(AppState.menu?.items) && AppState.menu.items.length > 0) {
+                    const prevAvail = AppState.menu.items.filter(i => !i.isSoldOut && !i.notCarried).length;
+                    if (prevAvail > 0) {
+                        showToast('⚠️ Sinkronisasi stok upstream sedang kendala, menggunakan cache stok aktif.');
+                        return;
+                    }
+                }
+            }
+
             AppState.menu = data;
 
             // Sync closed status if data indicates isClosed
@@ -650,6 +662,8 @@ function renderMenu() {
     
     const bStatus = adminPricingState?.bundlingStatus || window.INITIAL_DATA?.pricing?.bundlingStatus;
     const filtered = items.filter(item => {
+        // Hide items that this outlet does not carry (discontinued seasonal promos / not sold here)
+        if (item.notCarried) return false;
         if ((item.category === 'Bundling' || item.isBundling) && bStatus && item.key && bStatus[item.key] === false) {
             return false;
         }
@@ -658,6 +672,14 @@ function renderMenu() {
             item.name.toLowerCase().includes(AppState.searchQuery) ||
             (item.desc && item.desc.toLowerCase().includes(AppState.searchQuery));
         return matchesCat && matchesSearch;
+    });
+
+    // Sort: Available items first, sold-out items at the bottom
+    filtered.sort((a, b) => {
+        const aSold = Boolean(a.isSoldOut);
+        const bSold = Boolean(b.isSoldOut);
+        if (aSold !== bSold) return aSold ? 1 : -1;
+        return 0;
     });
 
     const closedBannerHtml = outletClosed ? `

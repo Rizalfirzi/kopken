@@ -161,7 +161,7 @@ $config = [
                         'Raspberry Hibiscus',
                         'Thai Tea Loaded',
                         'Butterscotch Aren Latte',
-                        'Banana Americano',
+                        'Americano',
                         'Kopi Kenangan Mantan',
                         'Taro Milk',
                         'Taro Cloud Milk Tea',
@@ -176,7 +176,7 @@ $config = [
                         'Raspberry Hibiscus',
                         'Thai Tea Loaded',
                         'Butterscotch Aren Latte',
-                        'Banana Americano',
+                        'Americano',
                         'Kopi Kenangan Mantan',
                         'Taro Milk',
                         'Taro Cloud Milk Tea',
@@ -244,7 +244,7 @@ $config = [
                         ['name' => 'Toffee Nut Latte', 'price' => 13000],
                         ['name' => 'Spanish Latte', 'price' => 13000],
                         ['name' => 'Pistachio Aren Latte', 'price' => 13000],
-                        ['name' => 'Banana Americano', 'price' => 13000],
+                        ['name' => 'Americano', 'price' => 13000],
                         ['name' => 'Babyccino', 'price' => 13000],
                         ['name' => 'OG Thai Tea', 'price' => 13000],
                         ['name' => 'Taro Milk', 'price' => 13000],
@@ -275,7 +275,7 @@ $config = [
                     'categorized' => true,
                     'groups' => [
                         '🥤 Minuman' => [
-                            'Americano', 'Fresh Lemonade', 'Raspberry Hibiscus', 'Lemon Black Tea',
+                            'Americano', 'Caramel Latte', 'Raspberry Hibiscus', 'Lemon Black Tea',
                             'OG Thai Tea', 'Taro Cloud Milk Tea', 'Spanish Latte', 'Babyccino',
                             'Pistachio Aren Latte', 'Kopi Kenangan Mantan', 'Taro Milk'
                         ],
@@ -295,7 +295,7 @@ $config = [
                     'categorized' => true,
                     'groups' => [
                         '🥤 Minuman' => [
-                            'Americano', 'Fresh Lemonade', 'Raspberry Hibiscus', 'Lemon Black Tea',
+                            'Americano', 'Caramel Latte', 'Raspberry Hibiscus', 'Lemon Black Tea',
                             'OG Thai Tea', 'Taro Cloud Milk Tea', 'Spanish Latte', 'Babyccino',
                             'Pistachio Aren Latte', 'Kopi Kenangan Mantan', 'Taro Milk'
                         ],
@@ -315,7 +315,7 @@ $config = [
                     'categorized' => true,
                     'groups' => [
                         '🥤 Minuman' => [
-                            'Americano', 'Fresh Lemonade', 'Raspberry Hibiscus', 'Lemon Black Tea',
+                            'Americano', 'Caramel Latte', 'Raspberry Hibiscus', 'Lemon Black Tea',
                             'OG Thai Tea', 'Taro Cloud Milk Tea', 'Spanish Latte', 'Babyccino',
                             'Pistachio Aren Latte', 'Kopi Kenangan Mantan', 'Taro Milk'
                         ],
@@ -442,7 +442,7 @@ $config = [
 
     // External Live API Endpoint
     'api_base_url' => 'https://tixandcoffee.developerngantuk.my.id/api',
-    'api_timeout' => 8,
+    'api_timeout' => 15,
     'cache_ttl' => [
         'outlets' => 1800,
         'menu' => 60,

@@ -122,6 +122,40 @@ class KopiKenanganApi
     }
 
     /**
+     * Get a specific outlet by code, searching upstream if not present in default outlet list.
+     */
+    public function getOutletByCode(string $code): ?array
+    {
+        $code = trim($code);
+        if ($code === '') {
+            return null;
+        }
+
+        // 1. Check default outlets list first
+        $defaultOutlets = $this->getOutlets();
+        foreach ($defaultOutlets['outlets'] ?? [] as $o) {
+            if (($o['code'] ?? '') === $code) {
+                return $o;
+            }
+        }
+
+        // 2. Query upstream with outlet code
+        $searched = $this->getOutlets($code);
+        foreach ($searched['outlets'] ?? [] as $o) {
+            if (($o['code'] ?? '') === $code) {
+                return $o;
+            }
+        }
+
+        if (!empty($searched['outlets'])) {
+            return $searched['outlets'][0];
+        }
+
+        // 3. Fallback evaluated
+        return $this->evaluateOutletHours(['code' => $code, 'name' => $code]);
+    }
+
+    /**
      * Check if an outlet is classified as Premium (Mall, Bandara, Stasiun, etc.)
      */
     public function checkIsPremiumOutlet(array $outlet): bool
@@ -275,7 +309,49 @@ class KopiKenanganApi
         $url = $this->baseUrl . '/kopken/menu';
         $response = $this->httpRequest($url, ['outlet' => $outletCode]);
 
-        if ($response && isset($response['items'])) {
+        if ($response && isset($response['items']) && is_array($response['items'])) {
+            $rawItems = $response['items'];
+            $rawAvail = 0;
+            foreach ($rawItems as $it) {
+                if (empty($it['isSoldOut']) && empty($it['notCarried'])) {
+                    $rawAvail++;
+                }
+            }
+
+            // An outlet that is open (!isClosed) should never have 0 available items across 10+ items.
+            // If availCount == 0 on an open outlet, this is an upstream stock sync glitch / unauthenticated session!
+            $isReportedClosed = !empty($response['isClosed']);
+            if ($rawAvail === 0 && !$isReportedClosed && count($rawItems) > 5) {
+                // Attempt to retrieve a previous valid cache (up to 4 hours old) to protect users from seeing all menus empty
+                $staleCached = $this->getCache($cacheKey, 14400);
+                if ($staleCached !== null && !empty($staleCached['items'])) {
+                    $staleAvail = 0;
+                    foreach ($staleCached['items'] as $sit) {
+                        if (empty($sit['isSoldOut']) && empty($sit['notCarried'])) {
+                            $staleAvail++;
+                        }
+                    }
+                    if ($staleAvail > 0) {
+                        return $this->applyMenuCustomizations($staleCached, $outletCode);
+                    }
+                }
+
+                // If no stale cache exists, recover core items:
+                // Only mark genuinely discontinued seasonal promos as notCarried, restore regular staple items
+                foreach ($rawItems as &$it) {
+                    $normName = strtolower($it['name'] ?? '');
+                    $isSeasonalDiscontinued = str_contains($normName, 'banana') || 
+                                              str_contains($normName, 'earl grey') || 
+                                              str_contains($normName, 'fresh lemonade');
+                    if (!$isSeasonalDiscontinued) {
+                        $it['isSoldOut'] = false;
+                        $it['notCarried'] = false;
+                    }
+                }
+                unset($it);
+                $response['items'] = $rawItems;
+            }
+
             // Absolute Client Rule:
             // "pokoknya kalau harga kopi kenangan mantan yang reguler naik jadi 22.000 berarti itu outlet premium ka"
             $mantanPrice = null;
@@ -332,7 +408,10 @@ class KopiKenanganApi
                 'updatedAt' => date('c'),
             ];
 
-            $this->setCache($cacheKey, $result);
+            // Only cache if valid items exist or if outlet is closed
+            if ($rawAvail > 0 || $isClosed) {
+                $this->setCache($cacheKey, $result);
+            }
             return $this->applyMenuCustomizations($result, $outletCode);
         }
 
@@ -385,9 +464,16 @@ class KopiKenanganApi
         $discountPercent = (float) config('pricing.discount_percent', 50);
 
         // 1. Process API items
+        $processedItems = [];
         foreach ($items as &$item) {
             $key = $item['key'] ?? $item['id'] ?? '';
             $category = $item['category'] ?? 'Coffee';
+
+            // Filter out items that are NOT CARRIED by this outlet (discontinued seasonal promos like Korean Banana / not sold here)
+            // unless explicitly overridden in admin stock settings
+            if (!empty($item['notCarried']) && !isset($stockOverrides[$key])) {
+                continue;
+            }
 
             // Override Stock
             if (isset($stockOverrides[$key])) {
@@ -542,8 +628,22 @@ class KopiKenanganApi
             if (empty($item['img'])) {
                 $item['img'] = 'https://placehold.co/200x200?text=Kopi+Kenangan';
             }
+
+            $processedItems[] = $item;
         }
         unset($item);
+
+        // Sort items so that available items (isSoldOut == false) appear first, and sold-out items appear at the end
+        $availList = [];
+        $soldList = [];
+        foreach ($processedItems as $it) {
+            if (!empty($it['isSoldOut'])) {
+                $soldList[] = $it;
+            } else {
+                $availList[] = $it;
+            }
+        }
+        $items = array_merge($availList, $soldList);
 
         // 2. Prepend Bundling Packages (Hanya untuk Outlet Regular, tidak tersedia di Outlet Premium per SOP Klien)
         $categories = $menuData['categories'] ?? [];
@@ -611,7 +711,7 @@ class KopiKenanganApi
         $soldOutCount = 0;
 
         foreach ($items as $it) {
-            if (!empty($it['isSoldOut']) || !empty($it['notCarried'])) {
+            if (!empty($it['isSoldOut'])) {
                 $soldOutCount++;
             } else {
                 $availableCount++;

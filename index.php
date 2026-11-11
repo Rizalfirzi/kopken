@@ -22,12 +22,21 @@ $defaultOutletCode = isset($_GET['outlet']) ? trim((string)$_GET['outlet']) : co
 $outletsData = $api->getOutlets();
 $initialOutlets = $outletsData['outlets'] ?? [];
 
-// Match requested outlet or fallback to first
+// Match requested outlet or search upstream if not in default 40 outlets
 $initialOutlet = null;
 foreach ($initialOutlets as $outlet) {
     if ($outlet['code'] === $defaultOutletCode) {
         $initialOutlet = $outlet;
         break;
+    }
+}
+
+if (!$initialOutlet && !empty($defaultOutletCode)) {
+    $foundOutlet = $api->getOutletByCode($defaultOutletCode);
+    if ($foundOutlet) {
+        $initialOutlet = $foundOutlet;
+        $defaultOutletCode = $foundOutlet['code'];
+        array_unshift($initialOutlets, $foundOutlet);
     }
 }
 
