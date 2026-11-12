@@ -3820,7 +3820,7 @@ function initWebHoursFeature() {
 function initReviewsFeature() {
     const openHubBtn = document.getElementById('openReviewsHubBtn');
     const openNavBtn = document.getElementById('openReviewsNavBtn');
-    const closeBtn = document.getElementById('closeReviewSheetBtn');
+    const closeBtn = document.querySelector('[data-close="reviewSheet"]') || document.getElementById('closeReviewSheetBtn');
 
     const handleOpenReviews = () => {
         openSheet('reviewSheet');
@@ -3831,20 +3831,58 @@ function initReviewsFeature() {
     if (openNavBtn) openNavBtn.addEventListener('click', handleOpenReviews);
     if (closeBtn) closeBtn.addEventListener('click', () => closeSheet('reviewSheet'));
 
+    // Toggle Write Review Form Box
+    const toggleWriteBtn = document.getElementById('toggleWriteReviewBtn');
+    const writeReviewBox = document.getElementById('writeReviewBox');
+    const closeWriteBtn = document.getElementById('closeWriteReviewBtn');
+    const cancelReviewBtn = document.getElementById('cancelReviewBtn');
+
+    if (toggleWriteBtn && writeReviewBox) {
+        toggleWriteBtn.addEventListener('click', () => {
+            const isHidden = writeReviewBox.style.display === 'none' || !writeReviewBox.style.display;
+            writeReviewBox.style.display = isHidden ? 'block' : 'none';
+            if (isHidden) {
+                document.getElementById('revInputName')?.focus();
+            }
+        });
+    }
+
+    if (closeWriteBtn && writeReviewBox) {
+        closeWriteBtn.addEventListener('click', () => {
+            writeReviewBox.style.display = 'none';
+        });
+    }
+
+    if (cancelReviewBtn && writeReviewBox) {
+        cancelReviewBtn.addEventListener('click', () => {
+            writeReviewBox.style.display = 'none';
+        });
+    }
+
     // Interactive Star Rating Picker
-    const starPicker = document.getElementById('reviewStarPicker');
-    const ratingInput = document.getElementById('reviewRatingInput');
+    const starPicker = document.getElementById('starRatingPicker') || document.getElementById('reviewStarPicker');
+    const starRatingLabel = document.getElementById('starRatingLabel');
     let currentRating = 5;
+
+    const ratingDescriptions = {
+        1: '⭐ Kecewa',
+        2: '⭐⭐ Kurang Puas',
+        3: '⭐⭐⭐ Cukup Baik',
+        4: '⭐⭐⭐⭐ Puas!',
+        5: '⭐⭐⭐⭐⭐ Sangat Puas!'
+    };
 
     if (starPicker) {
         const starBtns = starPicker.querySelectorAll('.star-pick-btn');
         starBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                currentRating = parseInt(btn.dataset.star, 10) || 5;
-                if (ratingInput) ratingInput.value = currentRating;
+                currentRating = parseInt(btn.dataset.val || btn.dataset.star, 10) || 5;
+                if (starRatingLabel) {
+                    starRatingLabel.textContent = ratingDescriptions[currentRating] || '⭐⭐⭐⭐⭐ Sangat Puas!';
+                }
                 starBtns.forEach(b => {
-                    const s = parseInt(b.dataset.star, 10);
+                    const s = parseInt(b.dataset.val || b.dataset.star, 10);
                     b.classList.toggle('active', s <= currentRating);
                 });
             });
@@ -3856,16 +3894,15 @@ function initReviewsFeature() {
     if (submitBtn) {
         submitBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            const nameInput = document.getElementById('reviewNameInput');
-            const commentInput = document.getElementById('reviewCommentInput');
-            const roleInput = document.getElementById('reviewRoleInput');
-            const tagInput = document.getElementById('reviewTagSelect');
+            const nameInput = document.getElementById('revInputName') || document.getElementById('reviewNameInput');
+            const menuInput = document.getElementById('revInputMenu');
+            const commentInput = document.getElementById('revInputComment') || document.getElementById('reviewCommentInput');
 
             const name = (nameInput?.value || '').trim();
+            const menu = (menuInput?.value || '').trim() || 'Menu Kopi Kenangan';
             const comment = (commentInput?.value || '').trim();
-            const role = (roleInput?.value || '').trim() || 'Sahabat Kyuti';
-            const tag = tagInput?.value || 'Pelayanan Cepat';
-            const rating = parseInt(ratingInput?.value, 10) || currentRating || 5;
+            const rating = currentRating || 5;
+            const outletName = AppState.outlet?.name || 'Outlet Kopi Kenangan';
 
             if (!name || name.length < 2) {
                 showToast('Silakan isi nama kamu (minimal 2 huruf)');
@@ -3884,13 +3921,21 @@ function initReviewsFeature() {
             fetch('api/reviews.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, comment, role, tag, rating })
+                body: JSON.stringify({
+                    name: name,
+                    rating: rating,
+                    menu: menu,
+                    comment: comment,
+                    outlet: outletName
+                })
             })
                 .then(r => r.json())
                 .then(res => {
                     if (res.success) {
                         showToast('✓ Ulasan kamu berhasil dikirim! Terima kasih sahabat Kyuti ♡');
                         if (commentInput) commentInput.value = '';
+                        if (menuInput) menuInput.value = '';
+                        if (writeReviewBox) writeReviewBox.style.display = 'none';
                         fetchReviews();
                     } else {
                         showToast(`✕ ${res.message || 'Gagal mengirim ulasan'}`);
@@ -3901,16 +3946,16 @@ function initReviewsFeature() {
                 })
                 .finally(() => {
                     submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<span>Kirim Ulasan Sekarang ♡</span>';
+                    submitBtn.innerHTML = '<span>Kirim Ulasan 🌸</span>';
                 });
         });
     }
 }
 
 function fetchReviews() {
-    const listContainer = document.getElementById('reviewListContainer');
-    const scoreElem = document.getElementById('reviewSummaryScore');
-    const totalElem = document.getElementById('reviewSummaryTotal');
+    const listContainer = document.getElementById('reviewsListWrap') || document.getElementById('reviewListContainer');
+    const scoreElem = document.getElementById('reviewAvgScore') || document.getElementById('reviewSummaryScore');
+    const totalElem = document.getElementById('reviewTotalCount') || document.getElementById('reviewSummaryTotal');
 
     fetch('api/reviews.php')
         .then(r => r.json())
@@ -3919,8 +3964,8 @@ function fetchReviews() {
             const stats = res.stats || {};
             const reviews = res.reviews || [];
 
-            if (scoreElem) scoreElem.textContent = Number(stats.average_rating || 4.9).toFixed(1);
-            if (totalElem) totalElem.textContent = `${stats.total_reviews || reviews.length}+ ulasan dari sahabat Kyuti`;
+            if (scoreElem) scoreElem.textContent = Number(stats.average || stats.average_rating || 4.9).toFixed(1);
+            if (totalElem) totalElem.textContent = `${stats.total || stats.total_reviews || reviews.length}+ Ulasan Sahabat Kyuti`;
 
             if (listContainer) {
                 if (reviews.length === 0) {
@@ -3928,9 +3973,11 @@ function fetchReviews() {
                     return;
                 }
                 listContainer.innerHTML = reviews.map(rev => {
-                    const stars = '★'.repeat(rev.rating || 5) + '☆'.repeat(Math.max(0, 5 - (rev.rating || 5)));
+                    const ratingVal = parseInt(rev.rating, 10) || 5;
+                    const stars = '★'.repeat(ratingVal) + '☆'.repeat(Math.max(0, 5 - ratingVal));
                     const initial = (rev.name || 'S').trim().charAt(0).toUpperCase();
-                    const tagHtml = rev.tag ? `<span class="ric-tag">✨ ${escapeHtml(rev.tag)}</span>` : '';
+                    const menuText = rev.menu || rev.role || 'Sahabat Kyuti';
+                    const outletBadge = rev.outlet ? `<span class="ric-tag">☕ Outlet ${escapeHtml(rev.outlet)}</span>` : '';
                     const dateText = rev.date || 'Baru saja';
                     return `
                         <div class="review-item-card">
@@ -3942,19 +3989,23 @@ function fetchReviews() {
                                             <span>${escapeHtml(rev.name)}</span>
                                             <span class="ric-badge-verified">✓ Terverifikasi</span>
                                         </div>
-                                        <span class="ric-date">${escapeHtml(rev.role || 'Sahabat Kyuti')} • ${escapeHtml(dateText)}</span>
+                                        <span class="ric-date">${escapeHtml(menuText)} • ${escapeHtml(dateText)}</span>
                                     </div>
                                 </div>
-                                <div class="ric-stars" title="${rev.rating} Bintang">${stars}</div>
+                                <div class="ric-stars" title="${ratingVal} Bintang">${stars}</div>
                             </div>
-                            ${tagHtml}
+                            ${outletBadge}
                             <div class="ric-comment">${escapeHtml(rev.comment)}</div>
                         </div>
                     `;
                 }).join('');
             }
         })
-        .catch(() => {});
+        .catch(() => {
+            if (listContainer) {
+                listContainer.innerHTML = '<div style="text-align:center;padding:16px;color:#DC2626;font-size:12px;">✕ Gagal memuat ulasan. Coba refresh halaman.</div>';
+            }
+        });
 }
 
 // =========================================================================

@@ -2530,12 +2530,98 @@ body {
 .review-summary-card {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 16px;
     padding: 16px 18px;
     background: linear-gradient(135deg, #FFF5F7 0%, #FCE7F3 100%);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     margin-bottom: 20px;
+}
+
+.rsc-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.rsc-big-score {
+    font-family: 'Playfair Display', serif;
+    font-size: 32px;
+    font-weight: 900;
+    color: var(--brand-primary-dark);
+    line-height: 1;
+}
+
+.rsc-stars {
+    font-size: 13px;
+    letter-spacing: 2px;
+}
+
+.rsc-count {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.rsc-right {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rsc-highlight-item {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.rsc-badge {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--brand-primary-dark);
+}
+
+.rsc-highlight-item small {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.telegram-testi-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #F0F9FF;
+    border: 1px solid #BAE6FD;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+    text-decoration: none;
+    color: #0369A1;
+    transition: var(--transition);
+}
+
+.telegram-testi-banner:hover {
+    background: #E0F2FE;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.ttb-icon {
+    font-size: 22px;
+}
+
+.ttb-info strong {
+    font-size: 12px;
+    display: block;
+    color: #0284C7;
+}
+
+.ttb-info small {
+    font-size: 11px;
+    color: #0369A1;
+    opacity: 0.85;
 }
 
 .rsc-score-box {
@@ -2549,14 +2635,6 @@ body {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
-}
-
-.rsc-big-score {
-    font-family: 'Playfair Display', serif;
-    font-size: 30px;
-    font-weight: 800;
-    color: var(--brand-primary-dark);
-    line-height: 1;
 }
 
 .rsc-stars-hero {
@@ -2610,7 +2688,8 @@ body {
 }
 
 /* Review Cards List */
-.review-list-wrap {
+.review-list-wrap,
+.reviews-list-wrap {
     display: flex;
     flex-direction: column;
     gap: 12px;
