@@ -3106,6 +3106,77 @@ function initAdminPricingFeature() {
         });
     }
 
+    // Auto-Sync TikTok Viral Hits via Spotify API (#btnSyncTikTokHits)
+    const syncTikTokBtn = document.getElementById('btnSyncTikTokHits');
+    const syncTikTokMsg = document.getElementById('syncTikTokMsg');
+    const syncTikTokText = document.getElementById('btnSyncTikTokHitsText');
+
+    if (syncTikTokBtn) {
+        syncTikTokBtn.addEventListener('click', () => {
+            const code = adminPricingState.activePasscode || sessionStorage.getItem('kyuti_admin_code') || '';
+            if (!code) {
+                showToast('✕ Sesi admin telah berakhir. Silakan masukkan passcode kembali.');
+                return;
+            }
+
+            syncTikTokBtn.disabled = true;
+            if (syncTikTokText) syncTikTokText.textContent = '⏳ Menarik Lagu Viral TikTok...';
+            if (syncTikTokMsg) {
+                syncTikTokMsg.style.display = 'block';
+                syncTikTokMsg.style.color = '#1DB954';
+                syncTikTokMsg.textContent = 'Sedang menghubungkan ke Spotify API & menarik playlist trending...';
+            }
+
+            fetch('api/sync_tiktok_hits.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Code': code
+                },
+                body: JSON.stringify({
+                    passcode: code,
+                    limit: 15
+                })
+            })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success && Array.isArray(res.playlist)) {
+                        adminPricingState.bgmPlaylist = [...res.playlist];
+                        renderAdminBgmPlaylist();
+                        if (typeof window.reloadBgmPlayer === 'function') {
+                            window.reloadBgmPlayer({
+                                enabled: true,
+                                playlist: res.playlist
+                            });
+                        }
+                        if (syncTikTokMsg) {
+                            syncTikTokMsg.style.color = '#15803D';
+                            syncTikTokMsg.textContent = `✓ ${res.message || 'Lagu viral TikTok berhasil disinkronkan!'}`;
+                        }
+                        showToast(`✓ Berhasil sync ${res.count || res.playlist.length} lagu viral TikTok!`);
+                    } else {
+                        if (syncTikTokMsg) {
+                            syncTikTokMsg.style.color = '#DC2626';
+                            syncTikTokMsg.textContent = `✕ ${res.message || 'Gagal sinkronisasi lagu viral'}`;
+                        }
+                        showToast(`✕ ${res.message || 'Gagal sinkronisasi'}`);
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    if (syncTikTokMsg) {
+                        syncTikTokMsg.style.color = '#DC2626';
+                        syncTikTokMsg.textContent = '✕ Gagal menghubungi server sinkronisasi.';
+                    }
+                    showToast('✕ Gagal menghubungi server.');
+                })
+                .finally(() => {
+                    syncTikTokBtn.disabled = false;
+                    if (syncTikTokText) syncTikTokText.textContent = '🔄 Tarik Lagu Viral TikTok Sekarang';
+                });
+        });
+    }
+
     // Save Admin Pricing Changes
     const saveBtn = document.getElementById('saveAdminPricingBtn');
     if (saveBtn) {

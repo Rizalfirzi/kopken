@@ -33,26 +33,117 @@
             {
                 "title": "Negoro Angin (Trending TikTok ♫)",
                 "artist": "Denny Caknan",
-                "src": "https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/empty-mind-118973.mp3",
-                "spotify_url": "https://open.spotify.com/intl-id/track/3kfVlzPUsy7x1MiPHRuFr0?si=798585022f7e4349",
+                "src": "https:\/\/raw.githubusercontent.com\/riccardobertolini\/lofi-music\/main\/public\/audio\/empty-mind-118973.mp3",
+                "spotify_url": "https:\/\/open.spotify.com\/intl-id\/track\/3kfVlzPUsy7x1MiPHRuFr0?si=798585022f7e4349",
                 "spotify_id": "3kfVlzPUsy7x1MiPHRuFr0"
             },
             {
-                "title": "Kedai Kyuti Lo-Fi Café Vibes",
-                "artist": "Chill Lofi Beats ♫",
-                "src": "https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/piano.mp3",
-                "spotify_url": "",
-                "spotify_id": ""
+                "title": "Nicole Kidman",
+                "artist": "ADÉLA",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/68bc3cb0611cfe6569ce56eeb025359233168a69",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/70cHKK8bHAfJrOGVnfRG9J",
+                "spotify_id": "70cHKK8bHAfJrOGVnfRG9J"
             },
             {
-                "title": "Pink Pastel Blossom",
-                "artist": "Cozy Lounge Relaxing 🌸",
-                "src": "https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/relaxing.mp3",
-                "spotify_url": "",
-                "spotify_id": ""
+                "title": "STORM II",
+                "artist": "GENER8ION, Yung Lean",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/369b246146e99c2f6ebabf5dfb9e20df98b8fe65",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/0FZd4IaxB12sUTKSUUGwWq",
+                "spotify_id": "0FZd4IaxB12sUTKSUUGwWq"
+            },
+            {
+                "title": "Housewife",
+                "artist": "Tate McRae",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/724b097d9dc53e0541de27d199adfe3f610944ba",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/2sFepQNyl1WjpROruP8bJ0",
+                "spotify_id": "2sFepQNyl1WjpROruP8bJ0"
+            },
+            {
+                "title": "Training Season",
+                "artist": "Dua Lipa",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/18939cfc406c70ae954d4a384434ee7744d7e194",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/5b5cPscqVEMChvDqscVw26",
+                "spotify_id": "5b5cPscqVEMChvDqscVw26"
+            },
+            {
+                "title": "Coming Up Roses",
+                "artist": "Harry Styles",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/03a64c71a3d7477335cd39a069e0e175e65798b6",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/0QPdjsMOUhwouq1NS3HwfQ",
+                "spotify_id": "0QPdjsMOUhwouq1NS3HwfQ"
+            },
+            {
+                "title": "UNETHICAL",
+                "artist": "Faouzia",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/7600d81f153683eb1265f92aa5567cc313658481",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/6QKpHmO41jkd9pTp0FfmHs",
+                "spotify_id": "6QKpHmO41jkd9pTp0FfmHs"
+            },
+            {
+                "title": "Obsessica",
+                "artist": "Malcolm Todd",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/c85b7fb115a4531478221a67736a94c000e0f04e",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/77Jy02wGI2iU5HCcynsBmS",
+                "spotify_id": "77Jy02wGI2iU5HCcynsBmS"
+            },
+            {
+                "title": "IMPULSIVE",
+                "artist": "Thekidszn",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/8cdc36cf5964488aa7c4740cab8dcf4512f802d4",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/4TnnvhiNjsYdcHxODzNiKA",
+                "spotify_id": "4TnnvhiNjsYdcHxODzNiKA"
+            },
+            {
+                "title": "Fancy Footwork",
+                "artist": "Chromeo",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/b4607fd01774aaba9db5c7d752a2f5a5ee25a357",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/2kBt8AO9HZn8VvtyPhWX1o",
+                "spotify_id": "2kBt8AO9HZn8VvtyPhWX1o"
+            },
+            {
+                "title": "Stop The Wedding!",
+                "artist": "Ashe",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/8a374e33d78679e1143d7a07797ddfa0225f8586",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/3zOYmiNOuyDL0ClxJcEJ0T",
+                "spotify_id": "3zOYmiNOuyDL0ClxJcEJ0T"
+            },
+            {
+                "title": "Babydoll",
+                "artist": "Jamie Miller",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/aaf6fc2f4516963243325a71453dd8582cb4dacf",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/1o9mAOmNm3wT2NdyGV1Ard",
+                "spotify_id": "1o9mAOmNm3wT2NdyGV1Ard"
+            },
+            {
+                "title": "BbY WOW",
+                "artist": "KAROL G, Judeline, rusowsky",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/f6ab45a8375c5bcf6f03161edd9f44c1fad501c8",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/3h5T5JypYU7huFiVYhv1dr",
+                "spotify_id": "3h5T5JypYU7huFiVYhv1dr"
+            },
+            {
+                "title": "So Good (feat. Kendrick Lamar)",
+                "artist": "Jhené Aiko, Kendrick Lamar",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/2e99ab678e6ff4db09b7fe51009f19fb073914c7",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/3Yd3J42s3GZaYty4Iy4ewT",
+                "spotify_id": "3Yd3J42s3GZaYty4Iy4ewT"
+            },
+            {
+                "title": "brand new chanel$",
+                "artist": "Slayyyter",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/e7adcb7738b065e09c2681133c76aed911e7bc77",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/3FZoov0ORtnr8TznSNI1y2",
+                "spotify_id": "3FZoov0ORtnr8TznSNI1y2"
+            },
+            {
+                "title": "Talking Body",
+                "artist": "Tove Lo",
+                "src": "https:\/\/p.scdn.co\/mp3-preview\/76efda4eefc53d9d4feb72a8104b225dae63c31d",
+                "spotify_url": "https:\/\/open.spotify.com\/track\/2tpfxAXiI52znho4WE3XFA",
+                "spotify_id": "2tpfxAXiI52znho4WE3XFA"
             }
         ]
     },
     "admin_passcode": "WHOSUTII26",
-    "updated_at": "2026-10-27T16:04:27+07:00"
+    "updated_at": "2026-11-12T15:35:31+07:00"
 }
