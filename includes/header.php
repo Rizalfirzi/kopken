@@ -20,6 +20,17 @@ $borderColor = config('theme.border_color', '#FBCFE8');
 <html lang="id" data-theme="light">
 <head>
     <meta charset="UTF-8">
+    <!-- Anti-flicker pre-paint theme boot script (twinsjasdor style) -->
+    <script>
+        (function() {
+            try {
+                var saved = localStorage.getItem('kyuti_theme');
+                var isDark = saved ? saved === 'dark' : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            } catch(e) {}
+        })();
+    </script>
+    <meta name="theme-color" id="metaThemeColor" content="#FFF5F7">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><?= htmlspecialchars($storeTitle) ?> (<?= htmlspecialchars($domainName) ?>) — <?= htmlspecialchars($tagline) ?></title>
     <meta name="description" content="Kedai Kyuti (kedaikyuti.my.id) - Jasa Titip Order (Jasdor) Kopi Kenangan Murah. Diskon 50% + fee hemat, stok real-time, pesan via WhatsApp.">
@@ -41,15 +52,17 @@ $borderColor = config('theme.border_color', '#FBCFE8');
     <!-- Dynamic Theme Customization (from config.php) -->
     <style>
         :root {
-            --brand-primary: <?= htmlspecialchars($primaryColor) ?> !important;
-            --brand-primary-dark: <?= htmlspecialchars($primaryDark) ?> !important;
-            --brand-primary-light: <?= htmlspecialchars($primaryLight) ?> !important;
-            --brand-accent: <?= htmlspecialchars($accentColor) ?> !important;
-            --brand-gold: <?= htmlspecialchars($goldColor) ?> !important;
-            --bg-page: <?= htmlspecialchars($bgPage) ?> !important;
-            --bg-card: <?= htmlspecialchars($bgCard) ?> !important;
-            --bg-card-subtle: <?= htmlspecialchars($bgCardSubtle) ?> !important;
-            --border-color: <?= htmlspecialchars($borderColor) ?> !important;
+            --brand-primary: <?= htmlspecialchars($primaryColor) ?>;
+            --brand-primary-dark: <?= htmlspecialchars($primaryDark) ?>;
+            --brand-primary-light: <?= htmlspecialchars($primaryLight) ?>;
+            --brand-accent: <?= htmlspecialchars($accentColor) ?>;
+            --brand-gold: <?= htmlspecialchars($goldColor) ?>;
+        }
+        :root:not([data-theme="dark"]), [data-theme="light"] {
+            --bg-page: <?= htmlspecialchars($bgPage) ?>;
+            --bg-card: <?= htmlspecialchars($bgCard) ?>;
+            --bg-card-subtle: <?= htmlspecialchars($bgCardSubtle) ?>;
+            --border-color: <?= htmlspecialchars($borderColor) ?>;
         }
         .custom-brand-logo {
             max-height: 38px;
@@ -90,8 +103,9 @@ $borderColor = config('theme.border_color', '#FBCFE8');
             <button class="icon-btn" id="trackOrderBtn" title="Lacak Pesanan" aria-label="Lacak Pesanan">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6a8.3 8.3 0 0 1-1.1-4.4A8.5 8.5 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg>
             </button>
-            <button class="icon-btn" id="themeToggleBtn" title="Ganti Tema" aria-label="Ganti Tema">
-                <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v2.2M12 20.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M1.5 12h2.2M20.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>
+            <button class="icon-btn" id="themeToggleBtn" type="button" title="Ganti Tema" aria-label="Ganti Tema">
+                <svg class="theme-sun theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v2.2M12 20.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M1.5 12h2.2M20.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>
+                <svg class="theme-moon theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             </button>
         </div>
     </header>

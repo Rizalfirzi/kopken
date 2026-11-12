@@ -151,19 +151,34 @@ document.querySelectorAll('.sheet-backdrop').forEach(backdrop => {
     });
 });
 
-// Theme Controller (Light / Dark)
+// Theme Controller (Light / Dark) ala twinsjasdor
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.dataset.theme = theme;
+    const metaTheme = document.getElementById('metaThemeColor') || document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+        metaTheme.content = theme === 'dark' ? '#190D13' : '#FFF5F7';
+    }
+}
+
 function initTheme() {
-    const saved = localStorage.getItem('kyuti_theme') || 'light';
-    document.documentElement.setAttribute('data-theme', saved);
+    const saved = localStorage.getItem('kyuti_theme');
+    const isDark = saved ? saved === 'dark' : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    applyTheme(isDark ? 'dark' : 'light');
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    try {
+        localStorage.setItem('kyuti_theme', next);
+    } catch (e) {}
 }
 
 const themeToggleBtn = document.getElementById('themeToggleBtn');
 if (themeToggleBtn) {
-    themeToggleBtn.addEventListener('click', () => {
-        const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', current);
-        localStorage.setItem('kyuti_theme', current);
-    });
+    themeToggleBtn.addEventListener('click', toggleTheme);
 }
 initTheme();
 
