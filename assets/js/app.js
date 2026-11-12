@@ -1326,28 +1326,19 @@ function defaultAddons(item) {
     }
     return [
         {
-            id: '2905',
+            id: 'topping',
             name: 'Topping',
             hint: 'opsional, boleh lebih dari satu',
             values: [
-                { id: '4099', text: 'Espresso Shot Kenangan Blend', price: 6000 },
-                { id: '4100', text: 'Boba', price: 5000 },
-                { id: '4101', text: 'Grass Jelly', price: 5000 },
-                { id: '4102', text: 'Coconut Jelly', price: 5000 },
-                { id: '4103', text: 'Coffee Jelly', price: 5000 },
-            ]
-        },
-        {
-            id: '2904',
-            name: 'Syrup',
-            hint: 'opsional, boleh lebih dari satu',
-            values: [
-                { id: '4079', text: 'Vanilla Syrup', price: 6000 },
-                { id: '4080', text: 'Hazelnut Syrup', price: 6000 },
-                { id: '4081', text: 'Caramel Syrup', price: 6000 },
-                { id: '4082', text: 'Salted Caramel Sauce', price: 6000 },
-                { id: '4083', text: 'Choco Sauce', price: 6000 },
-                { id: '4084', text: 'Butterscotch Sauce', price: 6000 },
+                { id: 'espresso_kenangan', text: 'Espresso Shot Kenangan Blend', price: 6000 },
+                { id: 'espresso_juwara', text: 'Espresso Shot Juwara Beans', price: 6000 },
+                { id: 'golden_boba', text: 'Golden Boba', price: 6000 },
+                { id: 'grass_jelly', text: 'Grass Jelly', price: 6000 },
+                { id: 'oreo', text: 'Oreo', price: 6000 },
+                { id: 'whipped_cream_choco', text: 'Whipped Cream Chocolate', price: 6000 },
+                { id: 'whipped_cream_vanilla', text: 'Whipped Cream Vanilla', price: 6000 },
+                { id: 'caramel_crumble', text: 'Caramel Crumble', price: 6000 },
+                { id: 'gula_aren', text: 'Gula Aren', price: 6000 },
             ]
         }
     ];
@@ -2338,7 +2329,7 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
         }
         if (item.addons && Array.isArray(item.addons) && item.addons.length) {
             const addonStrings = item.addons.map(a => `${a.name || a.text || 'Addon'} (+Rp ${Number(a.price || 0).toLocaleString('id-ID')})`);
-            msg += `    + Topping/Syrup: _${addonStrings.join(', ')}_\n`;
+            msg += `    + Topping: _${addonStrings.join(', ')}_\n`;
         }
         msg += `    Harga: Rp ${Number(itemPrice).toLocaleString('id-ID')} | Subtotal: Rp ${Number(itemSubtotal).toLocaleString('id-ID')}\n`;
         if (item.note) {

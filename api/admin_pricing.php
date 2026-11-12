@@ -60,6 +60,7 @@ function getCurrentPricing() {
             'default_volume' => 0.4,
             'playlist' => [],
         ]),
+        'addons' => config('addons', []),
         'admin_passcode' => (string) config('admin.passcode', 'WHOSUTII26'),
     ];
 
@@ -125,6 +126,9 @@ function getCurrentPricing() {
         }
         if (isset($loaded['web_hours']) && is_array($loaded['web_hours'])) {
             $default['web_hours'] = array_merge($default['web_hours'], $loaded['web_hours']);
+        }
+        if (isset($loaded['addons']) && is_array($loaded['addons'])) {
+            $default['addons'] = $loaded['addons'];
         }
         if (!empty($loaded['admin_passcode'])) {
             $default['admin_passcode'] = trim((string)$loaded['admin_passcode']);
@@ -271,6 +275,11 @@ try {
                 'default_volume' => isset($bgmIn['default_volume']) ? max(0.05, min(1.0, (float)$bgmIn['default_volume'])) : 0.4,
                 'playlist' => $cleanPlaylist,
             ];
+        }
+
+        // Sanitize & Update Addons / Toppings
+        if (isset($input['addons']) && is_array($input['addons'])) {
+            $current['addons'] = $input['addons'];
         }
 
         $current['updated_at'] = date('c');

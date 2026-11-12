@@ -345,7 +345,7 @@ $config = [
     ],
 
     // =========================================================================
-    // 5B. ADDONS OPSIONAL (TOPPING & SYRUP - Boleh Lebih Dari Satu)
+    // 5B. ADDONS OPSIONAL (TOPPING RESMI KOPI KENANGAN - Boleh Lebih Dari Satu)
     // =========================================================================
     'addons' => [
         [
@@ -353,23 +353,15 @@ $config = [
             'name' => 'Topping',
             'hint' => 'opsional, boleh lebih dari satu',
             'values' => [
-                ['id' => 'boba', 'text' => 'Boba', 'price' => 4000],
-                ['id' => 'grass_jelly', 'text' => 'Grass Jelly', 'price' => 4000],
-                ['id' => 'coffee_jelly', 'text' => 'Coffee Jelly', 'price' => 4000],
-                ['id' => 'coconut_jelly', 'text' => 'Coconut Jelly', 'price' => 4000],
-                ['id' => 'extra_shot', 'text' => 'Extra Espresso Shot', 'price' => 5000],
-                ['id' => 'oat_milk', 'text' => 'Oat Milk (Substitusi)', 'price' => 6000],
-            ],
-        ],
-        [
-            'id' => 'syrup',
-            'name' => 'Syrup',
-            'hint' => 'opsional, boleh lebih dari satu',
-            'values' => [
-                ['id' => 'caramel', 'text' => 'Caramel Syrup', 'price' => 5000],
-                ['id' => 'vanilla', 'text' => 'Vanilla Syrup', 'price' => 5000],
-                ['id' => 'hazelnut', 'text' => 'Hazelnut Syrup', 'price' => 5000],
-                ['id' => 'aren', 'text' => 'Gula Aren Extra', 'price' => 3000],
+                ['id' => 'espresso_kenangan', 'text' => 'Espresso Shot Kenangan Blend', 'price' => 6000],
+                ['id' => 'espresso_juwara', 'text' => 'Espresso Shot Juwara Beans', 'price' => 6000],
+                ['id' => 'golden_boba', 'text' => 'Golden Boba', 'price' => 6000],
+                ['id' => 'grass_jelly', 'text' => 'Grass Jelly', 'price' => 6000],
+                ['id' => 'oreo', 'text' => 'Oreo', 'price' => 6000],
+                ['id' => 'whipped_cream_choco', 'text' => 'Whipped Cream Chocolate', 'price' => 6000],
+                ['id' => 'whipped_cream_vanilla', 'text' => 'Whipped Cream Vanilla', 'price' => 6000],
+                ['id' => 'caramel_crumble', 'text' => 'Caramel Crumble', 'price' => 6000],
+                ['id' => 'gula_aren', 'text' => 'Gula Aren', 'price' => 6000],
             ],
         ],
     ],
@@ -677,6 +669,9 @@ if (is_array($dynamicData)) {
     }
     if (isset($dynamicData['bgm']) && is_array($dynamicData['bgm'])) {
         $config['bgm'] = array_merge($config['bgm'] ?? [], $dynamicData['bgm']);
+    }
+    if (isset($dynamicData['addons']) && is_array($dynamicData['addons'])) {
+        $config['addons'] = $dynamicData['addons'];
     }
 }
 

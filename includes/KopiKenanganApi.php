@@ -1175,7 +1175,7 @@ class KopiKenanganApi
                     $addonStrings[] = ($ad['name'] ?? 'Addon') . ' (+Rp ' . number_format($ad['price'] ?? 0, 0, ',', '.') . ')';
                 }
                 if (!empty($addonStrings)) {
-                    $waMessage .= "    + Topping/Syrup: _" . implode(', ', $addonStrings) . "_\n";
+                    $waMessage .= "    + Topping: _" . implode(', ', $addonStrings) . "_\n";
                 }
             }
             $waMessage .= "    Harga: Rp " . $priceFormatted . " | Subtotal: Rp " . $subtotalFormatted . "\n";
