@@ -64,6 +64,11 @@
 
     <!-- Hidden Native Audio Tag -->
     <audio id="bgmAudio" preload="none"></audio>
+
+    <!-- Hidden YouTube Background Audio Player Container (Full Playback Engine) -->
+    <div id="bgmYtContainer" style="position:fixed;top:-9999px;left:-9999px;width:200px;height:200px;opacity:0.001;pointer-events:none;z-index:-9999">
+        <div id="bgmYtPlayer"></div>
+    </div>
 </div>
 
 <!-- Toast Container -->
@@ -103,6 +108,9 @@ window.INITIAL_DATA = {
     reviewsUrl: 'api/reviews.php'
 };
 </script>
+
+<!-- YouTube Iframe API for Full Background Music Playback -->
+<script src="https://www.youtube.com/iframe_api"></script>
 
 <!-- Native App Script with Cache Buster -->
 <?php $jsVer = file_exists(__DIR__ . '/../assets/js/app.js') ? filemtime(__DIR__ . '/../assets/js/app.js') : time(); ?>

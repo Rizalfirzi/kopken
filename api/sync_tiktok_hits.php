@@ -46,20 +46,22 @@ if ($providedCode !== $passcode && empty($_SESSION['kyuti_admin_auth'])) {
 
 $limit = isset($input['limit']) ? max(5, min(30, (int)$input['limit'])) : 15;
 
-// Denny Caknan - Negoro Angin (Track Pembuka Wajib dengan Audio Preview Asli Spotify)
+// Denny Caknan - Negoro Angin (Track Pembuka Wajib dengan Full Playback Engine & Audio Preview)
 $dennyTrack = [
     'title' => 'Negoro Angin (Trending TikTok ♫)',
     'artist' => 'Denny Caknan',
+    'youtube_id' => 'WZYUSaHlGlk',
     'src' => 'https://p.scdn.co/mp3-preview/6945ec27f637b0b94fe6667b22331aa87dd61919',
     'spotify_url' => 'https://open.spotify.com/intl-id/track/3kfVlzPUsy7x1MiPHRuFr0?si=798585022f7e4349',
     'spotify_id' => '3kfVlzPUsy7x1MiPHRuFr0',
 ];
 
-// Curated verified pool Lagu Viral TikTok Indonesia (100% verified Spotify Preview MP3)
+// Curated verified pool Lagu Viral TikTok Indonesia (Full Lagu Playback + Spotify Preview MP3)
 $curatedIndoHits = [
     [
         'title' => 'Sesi Potret',
         'artist' => 'eńau ft. Ari Lesmana',
+        'youtube_id' => 'Nskf70DMR60',
         'src' => 'https://p.scdn.co/mp3-preview/6732c1a991a5b86cb440bd31d837709cc43e4d7b',
         'spotify_url' => 'https://open.spotify.com/track/4xoY4lZNoTjEuHsSmhgF1G',
         'spotify_id' => '4xoY4lZNoTjEuHsSmhgF1G',
@@ -67,6 +69,7 @@ $curatedIndoHits = [
     [
         'title' => 'Dunia Yang Nanti',
         'artist' => 'Raim Laode',
+        'youtube_id' => 'awWKxGftWh4',
         'src' => 'https://p.scdn.co/mp3-preview/55e3c2391a3da57c8401740495e79adcbe2bbf55',
         'spotify_url' => 'https://open.spotify.com/track/1sVQuuvFDKu6vklPVeiUXT',
         'spotify_id' => '1sVQuuvFDKu6vklPVeiUXT',
@@ -74,6 +77,7 @@ $curatedIndoHits = [
     [
         'title' => 'bergema sampai selamanya',
         'artist' => 'Nadhif Basalamah',
+        'youtube_id' => 'g0c7FeMn5lE',
         'src' => 'https://p.scdn.co/mp3-preview/845fe1cefc94e3212577d094cb734ac285e03847',
         'spotify_url' => 'https://open.spotify.com/track/0ql6fgz8qk0pAEKrGeSppJ',
         'spotify_id' => '0ql6fgz8qk0pAEKrGeSppJ',
@@ -81,6 +85,7 @@ $curatedIndoHits = [
     [
         'title' => 'Teh Hijau',
         'artist' => 'Tulus',
+        'youtube_id' => 'RO75uUZiAw0',
         'src' => 'https://p.scdn.co/mp3-preview/21f73dbf8d76b6e9429737a1e1e04222c88c1fbb',
         'spotify_url' => 'https://open.spotify.com/track/4R9G7azXaZe93KTX65P9fU',
         'spotify_id' => '4R9G7azXaZe93KTX65P9fU',
@@ -88,6 +93,7 @@ $curatedIndoHits = [
     [
         'title' => 'Jatuh Suka',
         'artist' => 'Tulus',
+        'youtube_id' => '2uJut6USftQ',
         'src' => 'https://p.scdn.co/mp3-preview/73e5752501d7fa89afdbf66c827b19bfb07c7263',
         'spotify_url' => 'https://open.spotify.com/track/6PqWdGIYq5xdLaa4zCZfRp',
         'spotify_id' => '6PqWdGIYq5xdLaa4zCZfRp',
@@ -95,6 +101,7 @@ $curatedIndoHits = [
     [
         'title' => 'Amnesia',
         'artist' => 'Al-Ghazali',
+        'youtube_id' => 'R5VqY5TVYF8',
         'src' => 'https://p.scdn.co/mp3-preview/7541f2a776c67cc9717efac645fe8807751f8ba0',
         'spotify_url' => 'https://open.spotify.com/track/5yUjO084QWrMxM4EqpgWFr',
         'spotify_id' => '5yUjO084QWrMxM4EqpgWFr',
@@ -102,6 +109,7 @@ $curatedIndoHits = [
     [
         'title' => 'Iqro\'',
         'artist' => 'Raim Laode',
+        'youtube_id' => '9WHWkEJLKJM',
         'src' => 'https://p.scdn.co/mp3-preview/acc1f9c50f7ad189391a6bb72b98592b92a765ad',
         'spotify_url' => 'https://open.spotify.com/track/2ImWVGyYTRMi64861WCCcq',
         'spotify_id' => '2ImWVGyYTRMi64861WCCcq',
@@ -109,6 +117,7 @@ $curatedIndoHits = [
     [
         'title' => 'Terbelah Jadi Dua',
         'artist' => 'Gloria Jessica',
+        'youtube_id' => 'ks27-0q-Hrc',
         'src' => 'https://p.scdn.co/mp3-preview/e45bdda64df81b475c0ca7364df71ffdefcd59a9',
         'spotify_url' => 'https://open.spotify.com/track/2wAa43qM16H0PWAwiHTk5S',
         'spotify_id' => '2wAa43qM16H0PWAwiHTk5S',
@@ -116,6 +125,7 @@ $curatedIndoHits = [
     [
         'title' => 'Separuh Aku',
         'artist' => 'Noah',
+        'youtube_id' => 'b0ZBBjViV8Y',
         'src' => 'https://p.scdn.co/mp3-preview/5c7cb0bd2c458e1abdf0dbcc63fbb849241dbd51',
         'spotify_url' => 'https://open.spotify.com/track/4sJmv194lQKWjytpaxH1Vj',
         'spotify_id' => '4sJmv194lQKWjytpaxH1Vj',
@@ -123,6 +133,7 @@ $curatedIndoHits = [
     [
         'title' => 'Titik Nadir',
         'artist' => 'Kahitna',
+        'youtube_id' => 'OQNu-iB2tE8',
         'src' => 'https://p.scdn.co/mp3-preview/d8e118faa9e87c34f69f269b509b1b2dc567e006',
         'spotify_url' => 'https://open.spotify.com/track/52m690jqpxP1tHHkRNdl5p',
         'spotify_id' => '52m690jqpxP1tHHkRNdl5p',
@@ -130,6 +141,7 @@ $curatedIndoHits = [
     [
         'title' => 'Bersenja Gurau',
         'artist' => 'Raim Laode',
+        'youtube_id' => 'jmvX6XyvCy0',
         'src' => 'https://p.scdn.co/mp3-preview/3babaa3e942f6360a8706e7b9bd2173aa7d774de',
         'spotify_url' => 'https://open.spotify.com/track/4DrJqdZgPBHoMNVG5iOLlG',
         'spotify_id' => '4DrJqdZgPBHoMNVG5iOLlG',
@@ -137,6 +149,7 @@ $curatedIndoHits = [
     [
         'title' => 'Monolog',
         'artist' => 'Pamungkas',
+        'youtube_id' => '-mwsPoerFWU',
         'src' => 'https://p.scdn.co/mp3-preview/f56125670323983790e173de5840cbca0842ce14',
         'spotify_url' => 'https://open.spotify.com/track/1zu5ZpnrSArdoaT6Qq3yo9',
         'spotify_id' => '1zu5ZpnrSArdoaT6Qq3yo9',
@@ -144,6 +157,7 @@ $curatedIndoHits = [
     [
         'title' => 'Ini Abadi',
         'artist' => 'Perunggu',
+        'youtube_id' => 'qQDaxjLReck',
         'src' => 'https://p.scdn.co/mp3-preview/8455004c75fb9fbf904475fabfdf24b1f5d7797e',
         'spotify_url' => 'https://open.spotify.com/track/6v5RJuJ9yhvaXkMXMeMZBw',
         'spotify_id' => '6v5RJuJ9yhvaXkMXMeMZBw',
@@ -151,6 +165,7 @@ $curatedIndoHits = [
     [
         'title' => 'Bahagia Lagi',
         'artist' => 'Piche Kota',
+        'youtube_id' => 'liVmYVkSV1M',
         'src' => 'https://p.scdn.co/mp3-preview/15c4fa72950ba107d1148cae5998d7292fcb204a',
         'spotify_url' => 'https://open.spotify.com/track/5tZaKZPJtiHh6teQfVEHB5',
         'spotify_id' => '5tZaKZPJtiHh6teQfVEHB5',
@@ -158,6 +173,7 @@ $curatedIndoHits = [
     [
         'title' => 'Ada titik-titik di ujung doa',
         'artist' => 'Sal Priadi',
+        'youtube_id' => '1E7zLPDdqo0OvzVmGj5aoV',
         'src' => 'https://p.scdn.co/mp3-preview/15ce12fe0e8fe5f1dd15b39ed8f0f37ae1ff1c87',
         'spotify_url' => 'https://open.spotify.com/track/1E7zLPDdqo0OvzVmGj5aoV',
         'spotify_id' => '1E7zLPDdqo0OvzVmGj5aoV',
@@ -165,6 +181,7 @@ $curatedIndoHits = [
     [
         'title' => 'Sisa Rasa',
         'artist' => 'Mahalini',
+        'youtube_id' => '326c19a66310cad958375a2d249209c1c82c7885',
         'src' => 'https://p.scdn.co/mp3-preview/326c19a66310cad958375a2d249209c1c82c7885',
         'spotify_url' => 'https://open.spotify.com/track/0R6KCq5TLJB3gi2ragMrXZ',
         'spotify_id' => '0R6KCq5TLJB3gi2ragMrXZ',
@@ -172,6 +189,7 @@ $curatedIndoHits = [
     [
         'title' => 'everything u are',
         'artist' => 'Hindia',
+        'youtube_id' => '600581384f3aa95661b6a2f74dc242432d295df3',
         'src' => 'https://p.scdn.co/mp3-preview/600581384f3aa95661b6a2f74dc242432d295df3',
         'spotify_url' => 'https://open.spotify.com/track/5WOSNVChcadlsCRiqXE45K',
         'spotify_id' => '5WOSNVChcadlsCRiqXE45K',
@@ -179,6 +197,7 @@ $curatedIndoHits = [
     [
         'title' => 'Serana',
         'artist' => 'For Revenge',
+        'youtube_id' => '4e00c0c026dfee369545e2fd88b2f11ac71507aa',
         'src' => 'https://p.scdn.co/mp3-preview/4e00c0c026dfee369545e2fd88b2f11ac71507aa',
         'spotify_url' => 'https://open.spotify.com/track/0PtJbtW50jcvvswNPn3QGd',
         'spotify_id' => '0PtJbtW50jcvvswNPn3QGd',
@@ -186,6 +205,7 @@ $curatedIndoHits = [
     [
         'title' => 'Nina',
         'artist' => '.Feast',
+        'youtube_id' => '66bb1ca58e670373f4aff7878fe5ed2485e2e439',
         'src' => 'https://p.scdn.co/mp3-preview/66bb1ca58e670373f4aff7878fe5ed2485e2e439',
         'spotify_url' => 'https://open.spotify.com/track/0daEJMXc3b4ZMTnvtHpuTt',
         'spotify_id' => '0daEJMXc3b4ZMTnvtHpuTt',
@@ -193,6 +213,7 @@ $curatedIndoHits = [
     [
         'title' => 'Kangen',
         'artist' => 'Dewa 19',
+        'youtube_id' => 'f9ade56b686a0f49c7b6142920ef5dad9bd05ec2',
         'src' => 'https://p.scdn.co/mp3-preview/f9ade56b686a0f49c7b6142920ef5dad9bd05ec2',
         'spotify_url' => 'https://open.spotify.com/track/3ZyMRe0jlSqffPBMeHUZFX',
         'spotify_id' => '3ZyMRe0jlSqffPBMeHUZFX',
@@ -200,6 +221,7 @@ $curatedIndoHits = [
     [
         'title' => 'Soulmate',
         'artist' => 'Kahitna',
+        'youtube_id' => 'a4b98c75685a0f20a2e4304bc0c8830574de8537',
         'src' => 'https://p.scdn.co/mp3-preview/a4b98c75685a0f20a2e4304bc0c8830574de8537',
         'spotify_url' => 'https://open.spotify.com/track/1rwGbGLDE0AkaH1UgUbufL',
         'spotify_id' => '1rwGbGLDE0AkaH1UgUbufL',
