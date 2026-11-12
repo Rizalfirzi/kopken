@@ -563,8 +563,36 @@ class KopiKenanganApi
             $item['price'] = $calculatedPrice;
             $item['normalPrice'] = $origPrice;
 
-            // Handle Large Price if available or if size options include Large
-            $hasLargeSize = !empty($item['largePrice']) || (isset($item['options']['sizes']) && in_array('Large', (array)$item['options']['sizes'], true));
+            // Menu khusus ukuran Regular saja (misal: Butterscotch Sea Salt Crumble tidak ada ukuran Large)
+            $regularOnlyList = config('store.regular_only_items', [
+                'Butterscotch Sea Salt Crumble',
+                'butterscotchseasaltcrumble',
+            ]);
+            $isRegularOnly = false;
+            foreach ($regularOnlyList as $regItem) {
+                $normReg = strtolower(str_replace([' ', '_', '-'], '', (string)$regItem));
+                if ($normName === $normReg || $normKey === $normReg || str_contains($normName, $normReg) || str_contains($normKey, $normReg)) {
+                    $isRegularOnly = true;
+                    break;
+                }
+            }
+
+            if ($isRegularOnly) {
+                $hasLargeSize = false;
+                $item['noLarge'] = true;
+                unset($item['largePrice'], $item['largeNormal']);
+                if (isset($item['options']['sizes'])) {
+                    $item['options']['sizes'] = array_values(array_filter((array)$item['options']['sizes'], function($s) {
+                        return strtolower($s) !== 'large';
+                    }));
+                    if (empty($item['options']['sizes'])) {
+                        $item['options']['sizes'] = ['Regular'];
+                    }
+                }
+            } else {
+                // Handle Large Price if available or if size options include Large
+                $hasLargeSize = !empty($item['largePrice']) || (isset($item['options']['sizes']) && in_array('Large', (array)$item['options']['sizes'], true));
+            }
 
             if ($hasLargeSize) {
                 // Check if there is an override specifically for Large size (e.g. "Kopi Kenangan Mantan (Large)")
@@ -805,6 +833,60 @@ class KopiKenanganApi
                             unset($response['prices'][$cKey]);
                             if (isset($response['normals'][$cKey])) {
                                 unset($response['normals'][$cKey]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check if regular only item (e.g. Butterscotch Sea Salt Crumble)
+            $isRegularOnly = false;
+            $regularOnlyList = config('store.regular_only_items', [
+                'Butterscotch Sea Salt Crumble',
+                'butterscotchseasaltcrumble',
+            ]);
+            $normCheckKey = strtolower(str_replace([' ', '_', '-'], '', (string)$itemKey));
+            foreach ($regularOnlyList as $regItem) {
+                $normReg = strtolower(str_replace([' ', '_', '-'], '', (string)$regItem));
+                if ($normCheckKey === $normReg || str_contains($normCheckKey, $normReg)) {
+                    $isRegularOnly = true;
+                    break;
+                }
+            }
+
+            // Remove Large if item is regular only
+            if ($isRegularOnly) {
+                if (!empty($response['groups']) && is_array($response['groups'])) {
+                    foreach ($response['groups'] as &$group) {
+                        $gKey = strtolower($group['key'] ?? '');
+                        $gName = strtolower($group['name'] ?? '');
+                        if ($gKey === 'size' || $gName === 'size' || $gName === 'ukuran') {
+                            $group['values'] = array_values(array_filter($group['values'], function($val) use (&$largeIds) {
+                                $t = strtolower($val['text'] ?? '');
+                                $vId = strtolower((string)($val['id'] ?? ''));
+                                if ($t === 'large' || $vId === 'large' || str_contains($t, 'large')) {
+                                    $largeIds[] = (string)$val['id'];
+                                    return false;
+                                }
+                                return true;
+                            }));
+                            if (!empty($group['values'])) {
+                                $group['default'] = $group['values'][0]['id'];
+                            }
+                        }
+                    }
+                    unset($group);
+                }
+
+                if (!empty($largeIds) && !empty($response['prices']) && is_array($response['prices'])) {
+                    foreach ($largeIds as $lId) {
+                        foreach (array_keys($response['prices']) as $cKey) {
+                            $parts = explode('|', (string)$cKey);
+                            if (in_array((string)$lId, $parts, true)) {
+                                unset($response['prices'][$cKey]);
+                                if (isset($response['normals'][$cKey])) {
+                                    unset($response['normals'][$cKey]);
+                                }
                             }
                         }
                     }

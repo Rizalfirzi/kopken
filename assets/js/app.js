@@ -1356,8 +1356,22 @@ function defaultAddons(item) {
 function staticGroups(item) {
     const o = item.options || {};
     const isFood = item.isFood || (item.category && item.category.toLowerCase().includes('food'));
+    const isNoLarge = Boolean(item.noLarge) ||
+        (item.name && item.name.toLowerCase().includes('butterscotch sea salt crumble')) ||
+        (item.key && item.key.toLowerCase().includes('butterscotchseasaltcrumble'));
+
     const groups = [];
-    const sizes = (o.sizes?.length ? o.sizes : (!isFood ? ['Regular', 'Large'] : [])).filter(s => s && s.toLowerCase() !== 'jumbo');
+    let rawSizes = (o.sizes?.length ? o.sizes : (!isFood ? ['Regular', 'Large'] : []));
+    if (isNoLarge) {
+        rawSizes = ['Regular'];
+    }
+    const sizes = rawSizes.filter(s => {
+        if (!s) return false;
+        const low = s.toLowerCase();
+        if (low === 'jumbo' || low.includes('jumbo')) return false;
+        if (isNoLarge && (low === 'large' || low.includes('large'))) return false;
+        return true;
+    });
     if (sizes.length) {
         groups.push({ id: 'size', key: 'size', name: 'Ukuran', values: sizes.map((v) => ({ id: v, text: v })), default: sizes[0], impact: true });
     }
@@ -1420,7 +1434,11 @@ function unitPrice(sel = AppState.sheet?.sel) {
         const key = comboKey(sel);
         if (prices[key] != null) return prices[key];
     }
-    const isLarge = sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large');
+    const isNoLarge = Boolean(item.noLarge) ||
+        (item.name && item.name.toLowerCase().includes('butterscotch sea salt crumble')) ||
+        (item.key && item.key.toLowerCase().includes('butterscotchseasaltcrumble'));
+
+    const isLarge = !isNoLarge && (sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large'));
     if (isLarge) {
         if (item.largePrice) return item.largePrice;
         // Fallback if largePrice was not pre-calculated
@@ -1443,7 +1461,11 @@ function normalPrice(sel = AppState.sheet?.sel) {
         const key = comboKey(sel);
         if (normals[key] != null) return normals[key];
     }
-    const isLarge = sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large');
+    const isNoLarge = Boolean(item.noLarge) ||
+        (item.name && item.name.toLowerCase().includes('butterscotch sea salt crumble')) ||
+        (item.key && item.key.toLowerCase().includes('butterscotchseasaltcrumble'));
+
+    const isLarge = !isNoLarge && (sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large'));
     if (isLarge) return item.largeNormal || (item.normalPrice ? item.normalPrice + 6000 : null);
     return item.normalPrice || null;
 }
@@ -1566,7 +1588,11 @@ async function loadItemDetail(item, line) {
             return;
         }
         if (d.groups?.length && d.prices && Object.keys(d.prices).length) {
-            // Filter out 'Jumbo' from groups
+            const isNoLarge = Boolean(item.noLarge) ||
+                (item.name && item.name.toLowerCase().includes('butterscotch sea salt crumble')) ||
+                (item.key && item.key.toLowerCase().includes('butterscotchseasaltcrumble'));
+
+            // Filter out 'Jumbo' (and 'Large' for regular-only items) from groups
             sheet.groups = d.groups.map(g => {
                 const gKey = (g.key || '').toLowerCase();
                 const gName = (g.name || '').toLowerCase();
@@ -1576,7 +1602,9 @@ async function loadItemDetail(item, line) {
                         values: (g.values || []).filter(v => {
                             const t = (v.text || '').toLowerCase();
                             const vId = (v.id || '').toLowerCase();
-                            return t !== 'jumbo' && vId !== 'jumbo' && !t.includes('jumbo');
+                            if (t === 'jumbo' || vId === 'jumbo' || t.includes('jumbo')) return false;
+                            if (isNoLarge && (t === 'large' || vId === 'large' || t.includes('large'))) return false;
+                            return true;
                         })
                     };
                 }

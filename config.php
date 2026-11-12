@@ -68,6 +68,12 @@ $config = [
             'x_twitter' => 'https://x.com/lolaloliyo?s=11',
             'wa_channel' => 'https://whatsapp.com/channel/0029VbDgR1s6BIEb4d0JWl26',
         ],
+
+        // Menu yang hanya tersedia ukuran Regular saja (tidak ada ukuran Large)
+        'regular_only_items' => [
+            'Butterscotch Sea Salt Crumble',
+            'butterscotchseasaltcrumble',
+        ],
     ],
 
     // =========================================================================
