@@ -481,7 +481,7 @@ $config = [
     ],
 
     // =========================================================================
-    // 11. BACKGROUND MUSIC (BGM) PLAYLIST (Aesthetic Cafe Vibes)
+    // 11. BACKGROUND MUSIC (BGM) PLAYLIST (Aesthetic Cafe Vibes & Trending TikTok)
     // =========================================================================
     'bgm' => [
         'enabled' => true,
@@ -489,19 +489,25 @@ $config = [
         'default_volume' => 0.4,
         'playlist' => [
             [
-                'title' => 'Kedai Kyuti Lo-Fi Café Vibes',
-                'artist' => 'Chill Lofi Beats ♫',
+                'title' => 'Negoro Angin (Trending TikTok ♫)',
+                'artist' => 'Denny Caknan',
                 'src' => 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/empty-mind-118973.mp3',
+                'spotify_url' => 'https://open.spotify.com/intl-id/track/3kfVlzPUsy7x1MiPHRuFr0?si=798585022f7e4349',
+                'spotify_id' => '3kfVlzPUsy7x1MiPHRuFr0',
             ],
             [
-                'title' => 'Sweet Morning Coffee',
-                'artist' => 'Soft Piano & Acoustic ☕',
+                'title' => 'Kedai Kyuti Lo-Fi Café Vibes',
+                'artist' => 'Chill Lofi Beats ♫',
                 'src' => 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/piano.mp3',
+                'spotify_url' => '',
+                'spotify_id' => '',
             ],
             [
                 'title' => 'Pink Pastel Blossom',
                 'artist' => 'Cozy Lounge Relaxing 🌸',
                 'src' => 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/relaxing.mp3',
+                'spotify_url' => '',
+                'spotify_id' => '',
             ],
         ],
     ],

@@ -2988,6 +2988,30 @@ function initAdminPricingFeature() {
                 url = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
             }
 
+            // Auto convert Spotify links:
+            let spotifyUrl = '';
+            let spotifyId = '';
+            const spotifyMatch = url.match(/spotify\.com\/(?:[a-z]{2}(?:-[a-z]+)?\/)?track\/([a-zA-Z0-9]+)/i);
+            if (spotifyMatch && spotifyMatch[1]) {
+                spotifyId = spotifyMatch[1];
+                spotifyUrl = url;
+                // If title is empty and this is Denny Caknan track
+                if (!linkTitleInput?.value?.trim()) {
+                    if (spotifyId === '3kfVlzPUsy7x1MiPHRuFr0') {
+                        linkTitleInput.value = 'Negoro Angin (Trending TikTok ♫)';
+                    }
+                }
+                if (!linkArtistInput?.value?.trim()) {
+                    if (spotifyId === '3kfVlzPUsy7x1MiPHRuFr0') {
+                        linkArtistInput.value = 'Denny Caknan';
+                    }
+                }
+                // Spotify web page is DRM protected; assign audio stream fallback for background player
+                if (!url.match(/\.(mp3|m4a|aac|wav|ogg)(\?|$)/i)) {
+                    url = 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/empty-mind-118973.mp3';
+                }
+            }
+
             // Auto convert Dropbox links:
             if (url.includes('dropbox.com')) {
                 url = url.replace(/[?&]dl=0/, '?raw=1');
@@ -3002,11 +3026,15 @@ function initAdminPricingFeature() {
             if (!Array.isArray(adminPricingState.bgmPlaylist)) {
                 adminPricingState.bgmPlaylist = [];
             }
-            adminPricingState.bgmPlaylist.push({
+            const newTrack = {
                 title: title,
                 artist: artist,
                 src: url
-            });
+            };
+            if (spotifyUrl) newTrack.spotify_url = spotifyUrl;
+            if (spotifyId) newTrack.spotify_id = spotifyId;
+
+            adminPricingState.bgmPlaylist.push(newTrack);
             renderAdminBgmPlaylist();
 
             linkUrlInput.value = '';
@@ -3021,22 +3049,28 @@ function initAdminPricingFeature() {
     const resetBgmBtn = document.getElementById('cfgBgmResetBtn');
     if (resetBgmBtn) {
         resetBgmBtn.addEventListener('click', () => {
-            if (!confirm('Kembalikan daftar lagu ke musik lofi café bawaan?')) return;
+            if (!confirm('Kembalikan daftar lagu ke musik bawaan Kedai Kyuti?')) return;
             adminPricingState.bgmPlaylist = [
+                {
+                    title: 'Negoro Angin (Trending TikTok ♫)',
+                    artist: 'Denny Caknan',
+                    src: 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/empty-mind-118973.mp3',
+                    spotify_url: 'https://open.spotify.com/intl-id/track/3kfVlzPUsy7x1MiPHRuFr0?si=798585022f7e4349',
+                    spotify_id: '3kfVlzPUsy7x1MiPHRuFr0'
+                },
                 {
                     title: 'Kedai Kyuti Lo-Fi Café Vibes',
                     artist: 'Chill Lofi Beats ♫',
-                    src: 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/empty-mind-118973.mp3'
-                },
-                {
-                    title: 'Sweet Morning Coffee',
-                    artist: 'Soft Piano & Acoustic ☕',
-                    src: 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/piano.mp3'
+                    src: 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/piano.mp3',
+                    spotify_url: '',
+                    spotify_id: ''
                 },
                 {
                     title: 'Pink Pastel Blossom',
                     artist: 'Cozy Lounge Relaxing 🌸',
-                    src: 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/relaxing.mp3'
+                    src: 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/relaxing.mp3',
+                    spotify_url: '',
+                    spotify_id: ''
                 }
             ];
             renderAdminBgmPlaylist();
@@ -3777,15 +3811,15 @@ function updateWebHoursBanners() {
 
 function openWebClosedModal() {
     const status = checkWebHoursStatusNow();
-    const hoursTextEl = document.getElementById('webClosedHoursText');
-    const customMsgEl = document.getElementById('webClosedCustomMsg');
+    const hoursTextEl = document.getElementById('webClosedHoursLabel') || document.getElementById('webClosedHoursText');
+    const customMsgEl = document.getElementById('webClosedMessageText') || document.getElementById('webClosedCustomMsg');
     const badgeEl = document.getElementById('webClosedBadge');
 
     if (hoursTextEl) {
-        hoursTextEl.textContent = `Jam Operasional: ${status.open} - ${status.close} WIB`;
+        hoursTextEl.textContent = `${status.open} - ${status.close} WIB`;
     }
     if (customMsgEl) {
-        customMsgEl.textContent = status.message || `Pemesanan dibuka setiap hari pukul ${status.open} - ${status.close} WIB. Anda tetap dapat menjelajahi seluruh menu dan melihat promo kami!`;
+        customMsgEl.textContent = status.message || `♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Pemesanan dibuka pukul ${status.open} - ${status.close} WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡`;
     }
     if (badgeEl) {
         badgeEl.textContent = status.isOpen ? '🟢 Buka' : '🔴 Tutup';
@@ -3796,6 +3830,14 @@ function openWebClosedModal() {
 
 function initWebHoursFeature() {
     updateWebHoursBanners();
+
+    // Auto Notif: Jika toko sedang tutup, langsung munculkan notifikasi modal saat buka web
+    const status = checkWebHoursStatusNow();
+    if (!status.isOpen) {
+        setTimeout(() => {
+            openWebClosedModal();
+        }, 600);
+    }
 
     // Re-check periodically every 30 seconds so time transitions automatically
     setInterval(() => {
@@ -3889,6 +3931,102 @@ function initReviewsFeature() {
         });
     }
 
+    // Shopee-Style Photo Upload & Canvas Compression
+    let currentReviewPhotoBase64 = '';
+    const photoInput = document.getElementById('revInputPhoto');
+    const photoPickLabel = document.getElementById('revPhotoPickLabel');
+    const photoPreviewWrap = document.getElementById('revPhotoPreviewWrap');
+    const photoPreviewImg = document.getElementById('revPhotoPreviewImg');
+    const photoDelBtn = document.getElementById('revPhotoDelBtn');
+
+    const compressImage = (file, maxWidth, maxHeight, quality) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width = Math.round((width * maxHeight) / height);
+                            height = maxHeight;
+                        }
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    resolve(dataUrl);
+                };
+                img.onerror = reject;
+                img.src = e.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
+    if (photoInput) {
+        photoInput.addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            if (!file.type.match(/^image\//)) {
+                showToast('✕ File harus berupa gambar (JPG, PNG, WebP)');
+                photoInput.value = '';
+                return;
+            }
+
+            try {
+                showToast('⏳ Memproses foto pesanan...');
+                const compressed = await compressImage(file, 800, 800, 0.82);
+                currentReviewPhotoBase64 = compressed;
+                if (photoPreviewImg) photoPreviewImg.src = compressed;
+                if (photoPreviewWrap) photoPreviewWrap.style.display = 'block';
+                if (photoPickLabel) {
+                    photoPickLabel.innerHTML = `
+                        <span style="font-size:18px">🔄</span>
+                        <span style="font-size:10px;font-weight:800">Ganti Foto</span>
+                        <small style="font-size:8.5px;color:var(--text-muted)">Siap kirim</small>
+                    `;
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('✕ Gagal memproses gambar. Coba gambar lain.');
+                currentReviewPhotoBase64 = '';
+            }
+        });
+    }
+
+    if (photoDelBtn) {
+        photoDelBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            currentReviewPhotoBase64 = '';
+            if (photoInput) photoInput.value = '';
+            if (photoPreviewWrap) photoPreviewWrap.style.display = 'none';
+            if (photoPreviewImg) photoPreviewImg.src = '';
+            if (photoPickLabel) {
+                photoPickLabel.innerHTML = `
+                    <span style="font-size:20px">📷</span>
+                    <span style="font-size:10.5px;font-weight:800">+ Foto Pesanan</span>
+                    <small style="font-size:9px;color:var(--text-muted)">Kamera / Galeri</small>
+                `;
+            }
+        });
+    }
+
     // Submit Review Form
     const submitBtn = document.getElementById('submitReviewBtn');
     if (submitBtn) {
@@ -3926,7 +4064,8 @@ function initReviewsFeature() {
                     rating: rating,
                     menu: menu,
                     comment: comment,
-                    outlet: outletName
+                    outlet: outletName,
+                    photo: currentReviewPhotoBase64
                 })
             })
                 .then(r => r.json())
@@ -3935,6 +4074,17 @@ function initReviewsFeature() {
                         showToast('✓ Ulasan kamu berhasil dikirim! Terima kasih sahabat Kyuti ♡');
                         if (commentInput) commentInput.value = '';
                         if (menuInput) menuInput.value = '';
+                        currentReviewPhotoBase64 = '';
+                        if (photoInput) photoInput.value = '';
+                        if (photoPreviewWrap) photoPreviewWrap.style.display = 'none';
+                        if (photoPreviewImg) photoPreviewImg.src = '';
+                        if (photoPickLabel) {
+                            photoPickLabel.innerHTML = `
+                                <span style="font-size:20px">📷</span>
+                                <span style="font-size:10.5px;font-weight:800">+ Foto Pesanan</span>
+                                <small style="font-size:9px;color:var(--text-muted)">Kamera / Galeri</small>
+                            `;
+                        }
                         if (writeReviewBox) writeReviewBox.style.display = 'none';
                         fetchReviews();
                     } else {
@@ -3950,7 +4100,35 @@ function initReviewsFeature() {
                 });
         });
     }
+
+    // Lightbox modal close handlers
+    const closeLightboxBtn = document.getElementById('closeReviewLightboxBtn');
+    if (closeLightboxBtn) {
+        closeLightboxBtn.addEventListener('click', () => {
+            const modal = document.getElementById('reviewPhotoLightboxModal');
+            if (modal) modal.style.display = 'none';
+        });
+    }
+
+    const lightboxModal = document.getElementById('reviewPhotoLightboxModal');
+    if (lightboxModal) {
+        lightboxModal.addEventListener('click', (e) => {
+            if (e.target === lightboxModal) {
+                lightboxModal.style.display = 'none';
+            }
+        });
+    }
 }
+
+// Global function to open Review Photo in Lightbox modal
+window.openReviewPhotoLightbox = (src) => {
+    const modal = document.getElementById('reviewPhotoLightboxModal');
+    const img = document.getElementById('lightboxImg');
+    if (modal && img) {
+        img.src = src;
+        modal.style.display = 'flex';
+    }
+};
 
 function fetchReviews() {
     const listContainer = document.getElementById('reviewsListWrap') || document.getElementById('reviewListContainer');
@@ -3979,6 +4157,12 @@ function fetchReviews() {
                     const menuText = rev.menu || rev.role || 'Sahabat Kyuti';
                     const outletBadge = rev.outlet ? `<span class="ric-tag">☕ Outlet ${escapeHtml(rev.outlet)}</span>` : '';
                     const dateText = rev.date || 'Baru saja';
+                    const photoHtml = rev.photo ? `
+                        <div class="ric-photos">
+                            <img src="${escapeHtml(rev.photo)}" class="ric-photo-thumb" alt="Foto Pesanan ${escapeHtml(rev.name)}" loading="lazy" onclick="window.openReviewPhotoLightbox('${escapeHtml(rev.photo)}')">
+                        </div>
+                    ` : '';
+
                     return `
                         <div class="review-item-card">
                             <div class="ric-header">
@@ -3996,6 +4180,7 @@ function fetchReviews() {
                             </div>
                             ${outletBadge}
                             <div class="ric-comment">${escapeHtml(rev.comment)}</div>
+                            ${photoHtml}
                         </div>
                     `;
                 }).join('');
@@ -4051,11 +4236,48 @@ function initBgmPlayer() {
 
     audio.volume = AppState.bgm?.default_volume ?? bgmCfg.default_volume ?? 0.4;
 
+    const extractSpotifyId = (url) => {
+        if (!url) return '';
+        const match = url.match(/track\/([a-zA-Z0-9]+)/i);
+        return match ? match[1] : '';
+    };
+
     const updateTrackMeta = () => {
         const track = playlist[currentIdx];
         if (!track) return;
         if (titleEl) titleEl.textContent = track.title || 'Musik Café';
         if (artistEl) artistEl.textContent = track.artist || 'Kedai Kyuti';
+
+        // Spotify Link & Spotify Embed Widget
+        const spotifyBtn = document.getElementById('bgmSpotifyLink');
+        const spotifyIframeWrap = document.getElementById('bgmSpotifyIframeWrap');
+        const spotifyUrl = track.spotify_url || (track.src && track.src.includes('spotify.com') ? track.src : '');
+        const spotifyId = track.spotify_id || extractSpotifyId(spotifyUrl);
+
+        if (spotifyBtn) {
+            if (spotifyUrl) {
+                spotifyBtn.href = spotifyUrl;
+                spotifyBtn.style.display = 'inline-flex';
+            } else {
+                spotifyBtn.style.display = 'none';
+            }
+        }
+
+        if (spotifyIframeWrap) {
+            if (spotifyId) {
+                spotifyIframeWrap.style.display = 'block';
+                spotifyIframeWrap.innerHTML = `
+                    <iframe style="border-radius:12px;display:block" 
+                        src="https://open.spotify.com/embed/track/${encodeURIComponent(spotifyId)}?utm_source=generator&theme=0" 
+                        width="100%" height="80" frameBorder="0" 
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                        loading="lazy"></iframe>
+                `;
+            } else {
+                spotifyIframeWrap.style.display = 'none';
+                spotifyIframeWrap.innerHTML = '';
+            }
+        }
     };
 
     const loadTrack = (idx, startPlay = false) => {
@@ -4104,6 +4326,30 @@ function initBgmPlayer() {
         }
     };
 
+    // Autoplay Otomatis saat buka web tanpa harus di-play:
+    // 1. Coba play langsung
+    // 2. Jika browser butuh gesture, dengarkan touch/scroll/click pertama dan langsung bunyikan musik
+    const attemptAutoPlay = () => {
+        if (AppState.bgm?.enabled === false || bgmCfg.enabled === false) return;
+
+        playTrack();
+
+        const onFirstInteraction = () => {
+            if (!isPlaying) {
+                playTrack();
+            }
+            ['touchstart', 'touchend', 'click', 'scroll', 'keydown', 'wheel'].forEach(evt => {
+                window.removeEventListener(evt, onFirstInteraction, { capture: true });
+                document.removeEventListener(evt, onFirstInteraction, { capture: true });
+            });
+        };
+
+        ['touchstart', 'touchend', 'click', 'scroll', 'keydown', 'wheel'].forEach(evt => {
+            window.addEventListener(evt, onFirstInteraction, { capture: true, once: true, passive: true });
+            document.addEventListener(evt, onFirstInteraction, { capture: true, once: true, passive: true });
+        });
+    };
+
     // Hot-reload player state when changed by admin
     window.reloadBgmPlayer = (newBgm) => {
         if (!newBgm) return;
@@ -4126,8 +4372,9 @@ function initBgmPlayer() {
         }
     };
 
-    // Initial track metadata
-    updateTrackMeta();
+    // Initial track load & autoplay
+    loadTrack(0, false);
+    attemptAutoPlay();
 
     // Disc click toggles popup drawer & plays if not playing
     discBtn?.addEventListener('click', (e) => {

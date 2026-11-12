@@ -921,6 +921,27 @@
                         <textarea class="form-input" id="revInputComment" rows="3" placeholder="Tuliskan pengalaman manismu pesan di Kedai Kyuti..." required maxlength="400" style="font-size:12px;line-height:1.4"></textarea>
                     </div>
 
+                    <!-- Input Foto Pesanan ala Shopee (Fitur Baru) -->
+                    <div style="margin-bottom:14px">
+                        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">
+                            📷 Foto Pesanan Kamu (Opsional - ala Shopee)
+                        </label>
+                        <div class="review-photo-upload-wrap">
+                            <label for="revInputPhoto" class="rev-photo-pick-box" id="revPhotoPickLabel">
+                                <span style="font-size:20px">📷</span>
+                                <span style="font-size:10.5px;font-weight:800">+ Foto Pesanan</span>
+                                <small style="font-size:9px;color:var(--text-muted)">Kamera / Galeri</small>
+                            </label>
+                            <input type="file" id="revInputPhoto" accept="image/png,image/jpeg,image/webp,image/jpg" style="display:none">
+                            
+                            <!-- Thumbnail Preview (Hidden until image selected) -->
+                            <div class="rev-photo-preview-wrap" id="revPhotoPreviewWrap" style="display:none">
+                                <img src="" id="revPhotoPreviewImg" alt="Preview Foto">
+                                <button type="button" class="rev-photo-del-btn" id="revPhotoDelBtn" title="Hapus Foto">&times;</button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div style="display:flex;gap:8px">
                         <button type="button" class="btn btn-secondary" id="cancelReviewBtn" style="flex:1;font-size:12px">Batal</button>
                         <button type="submit" class="btn btn-primary" id="submitReviewBtn" style="flex:2;font-size:13px;font-weight:800">
@@ -946,6 +967,17 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+</div>
+
+<!-- Modal Lightbox Preview Foto Review ala Shopee -->
+<div class="sheet-backdrop dialog-backdrop" id="reviewPhotoLightboxModal" style="display:none">
+    <div class="dialog" style="max-width:400px;padding:12px;background:#18181B;border-radius:var(--radius-lg);position:relative">
+        <button type="button" class="sheet-close" id="closeReviewLightboxBtn" style="position:absolute;top:10px;right:10px;background:rgba(255,255,255,0.25);color:#fff;border:none;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">&times;</button>
+        <img src="" id="lightboxImg" style="width:100%;max-height:75vh;object-fit:contain;border-radius:var(--radius-md);display:block" alt="Foto Pesanan Customer">
+        <div style="text-align:center;padding:10px 0 2px;color:#E4E4E7;font-size:12px;font-weight:700">
+            📸 Foto Pesanan Asli Sahabat Kedai Kyuti
         </div>
     </div>
 </div>

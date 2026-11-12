@@ -118,6 +118,7 @@ try {
         $menu = trim((string)($input['menu'] ?? ''));
         $comment = trim((string)($input['comment'] ?? ''));
         $outlet = trim((string)($input['outlet'] ?? ''));
+        $photo = trim((string)($input['photo'] ?? ''));
 
         if ($name === '') {
             http_response_code(400);
@@ -133,6 +134,36 @@ try {
 
         if ($rating < 1 || $rating > 5) {
             $rating = 5;
+        }
+
+        // Handle Photo Upload (Shopee-style review photo)
+        $cleanPhoto = '';
+        if (!empty($photo)) {
+            if (strpos($photo, 'data:image/') === 0) {
+                $imgDir = __DIR__ . '/../assets/img/reviews';
+                if (!is_dir($imgDir)) {
+                    @mkdir($imgDir, 0755, true);
+                }
+
+                if (preg_match('/^data:image\/(\w+);base64,/', $photo, $match)) {
+                    $ext = strtolower($match[1]);
+                    if ($ext === 'jpeg') $ext = 'jpg';
+                    $base64Data = substr($photo, strpos($photo, ',') + 1);
+                    $decoded = base64_decode($base64Data);
+                    if ($decoded !== false) {
+                        $imgName = 'rev_' . time() . '_' . substr(md5(uniqid()), 0, 6) . '.' . $ext;
+                        $targetPath = $imgDir . DIRECTORY_SEPARATOR . $imgName;
+                        if (is_writable($imgDir) && @file_put_contents($targetPath, $decoded)) {
+                            $cleanPhoto = 'assets/img/reviews/' . $imgName;
+                        } else {
+                            // Serverless fallback (Data URI)
+                            $cleanPhoto = $photo;
+                        }
+                    }
+                }
+            } elseif (filter_var($photo, FILTER_VALIDATE_URL) || strpos($photo, 'assets/') === 0) {
+                $cleanPhoto = htmlspecialchars($photo);
+            }
         }
 
         // Sanitize
@@ -159,6 +190,10 @@ try {
             'verified' => true,
             'outlet' => $cleanOutlet,
         ];
+
+        if (!empty($cleanPhoto)) {
+            $newReview['photo'] = $cleanPhoto;
+        }
 
         // Prepend new review to top of list
         array_unshift($reviews, $newReview);
