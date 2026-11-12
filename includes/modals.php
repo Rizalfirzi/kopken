@@ -906,13 +906,13 @@
                     <!-- Input Nama -->
                     <div style="margin-bottom:10px">
                         <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:3px">Nama Panggilan / Inisial</label>
-                        <input type="text" class="form-input" id="revInputName" placeholder="Contoh: Salsabila 🌸" required maxlength="50" style="font-size:13px">
+                        <input type="text" class="form-input" id="revInputName" required maxlength="50" style="font-size:13px">
                     </div>
 
                     <!-- Input Menu -->
                     <div style="margin-bottom:10px">
                         <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:3px">Menu yang Dipesan (Opsional)</label>
-                        <input type="text" class="form-input" id="revInputMenu" placeholder="Contoh: Paket Hemat 3 Item / Mantan Large" maxlength="70" style="font-size:13px">
+                        <input type="text" class="form-input" id="revInputMenu" maxlength="70" style="font-size:13px">
                     </div>
 
                     <!-- Input Ulasan -->

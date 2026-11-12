@@ -1,7 +1,7 @@
 [
     {
         "id": "rev_001",
-        "name": "Salsabila N. 🌸",
+        "name": "Salsabila N",
         "rating": 5,
         "menu": "Paket Bundling 2 Cup Large",
         "comment": "Beneran diskon 50%, adminnya fast respon dan ramah banget! Kopi nyampe masih dingin & manisnya pas. Makasih banyak ya kak, pasti langganan terus! ♡",
@@ -11,7 +11,7 @@
     },
     {
         "id": "rev_002",
-        "name": "Dimas Aditya ✨",
+        "name": "Dimas Aditya",
         "rating": 5,
         "menu": "Kopi Kenangan Mantan + Croissant",
         "comment": "Awalnya sempat ragu karena harganya miring banget dibanding beli langsung, pas nyoba ternyata beneran asli dan amanah 100%. Prosesnya gercep!",
@@ -21,7 +21,7 @@
     },
     {
         "id": "rev_003",
-        "name": "Clarissa Aurelia 🎀",
+        "name": "Clarissa Aurelia",
         "rating": 5,
         "menu": "Paket Hemat 3 Item",
         "comment": "Paket hemat 3 item worth it parah 😭 dapet 2 minuman plus roti choco butter enak bgt! Hemat uang jajan kantor. Sukses terus Kedai Kyuti!",
@@ -31,7 +31,7 @@
     },
     {
         "id": "rev_004",
-        "name": "Kevin Pratama ☕",
+        "name": "Kevin Pratama",
         "rating": 5,
         "menu": "Dua Shot OG Aren (Large)",
         "comment": "Udah sering order dari Telegram @kedaikyuti, sekarang ada webnya jadi makin gampang cek stok live outlet terdekat. Mantappp!",
@@ -41,7 +41,7 @@
     },
     {
         "id": "rev_005",
-        "name": "Nabila Putri 🌷",
+        "name": "Nabila Putri",
         "rating": 5,
         "menu": "Promo Minuman Special & Frappe",
         "comment": "Pesen buat traktiran temen kantor 6 cup, prosesnya cepet bgt ga sampe nunggu lama langsung siap ambil. Hemat banyaaak!",
@@ -51,7 +51,7 @@
     },
     {
         "id": "rev_006",
-        "name": "Tiara Amanda ♡",
+        "name": "Tiara Amanda",
         "rating": 5,
         "menu": "Taro Cloud Milk Tea + Dutch Chocolate",
         "comment": "Taro cloud milk tea-nya creamy bgt, jasdor terpercaya tanpa drama. Adminnya baik dan super helpful. Love Kedai Kyuti so much! 💖",
@@ -60,4 +60,3 @@
         "outlet": "Burangrang Bandung"
     }
 ]
-
