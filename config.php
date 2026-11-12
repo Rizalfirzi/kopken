@@ -275,7 +275,7 @@ $config = [
                     'categorized' => true,
                     'groups' => [
                         '🥤 Minuman' => [
-                            'Americano', 'Caramel Latte', 'Raspberry Hibiscus', 'Lemon Black Tea',
+                            'Americano', 'Fresh Lemonade', 'Raspberry Hibiscus', 'Lemon Black Tea',
                             'OG Thai Tea', 'Taro Cloud Milk Tea', 'Spanish Latte', 'Babyccino',
                             'Pistachio Aren Latte', 'Kopi Kenangan Mantan', 'Taro Milk'
                         ],
@@ -295,7 +295,7 @@ $config = [
                     'categorized' => true,
                     'groups' => [
                         '🥤 Minuman' => [
-                            'Americano', 'Caramel Latte', 'Raspberry Hibiscus', 'Lemon Black Tea',
+                            'Americano', 'Fresh Lemonade', 'Raspberry Hibiscus', 'Lemon Black Tea',
                             'OG Thai Tea', 'Taro Cloud Milk Tea', 'Spanish Latte', 'Babyccino',
                             'Pistachio Aren Latte', 'Kopi Kenangan Mantan', 'Taro Milk'
                         ],
@@ -315,7 +315,7 @@ $config = [
                     'categorized' => true,
                     'groups' => [
                         '🥤 Minuman' => [
-                            'Americano', 'Caramel Latte', 'Raspberry Hibiscus', 'Lemon Black Tea',
+                            'Americano', 'Fresh Lemonade', 'Raspberry Hibiscus', 'Lemon Black Tea',
                             'OG Thai Tea', 'Taro Cloud Milk Tea', 'Spanish Latte', 'Babyccino',
                             'Pistachio Aren Latte', 'Kopi Kenangan Mantan', 'Taro Milk'
                         ],
