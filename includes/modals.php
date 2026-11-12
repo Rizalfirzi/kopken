@@ -766,6 +766,29 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 8. Kelola & Hapus Ulasan Customer (Fitur Baru Permintaan Client) -->
+            <div class="admin-setting-section" style="margin-bottom:18px;background:var(--bg-page);border:1.5px solid var(--border-color);border-radius:var(--radius-md);padding:14px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <label style="font-size:13px;font-weight:800;color:var(--text-main);display:flex;align-items:center;gap:6px">
+                        <span>⭐ 8. Kelola &amp; Hapus Ulasan Customer</span>
+                    </label>
+                    <span class="badge" id="adminReviewCountBadge" style="background:#FCE7F3;color:var(--brand-primary-dark);font-size:10.5px;font-weight:800;padding:3px 10px;border-radius:12px">
+                        0 Ulasan
+                    </span>
+                </div>
+                <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.4">
+                    Admin dapat menghapus ulasan customer yang tidak pantas, spam, atau ingin dibersihkan. Ulasan yang dihapus akan langsung terhapus permanen dari website.
+                </p>
+
+                <!-- Container List Ulasan di Panel Admin -->
+                <div id="adminReviewsList" style="display:flex;flex-direction:column;gap:10px;max-height:360px;overflow-y:auto;padding-right:4px">
+                    <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11px">
+                        <span class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid var(--brand-primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:4px"></span>
+                        Memuat data ulasan...
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="sheet-actions" style="border-top:1px solid var(--border-color);padding:14px 18px;background:var(--bg-card)">

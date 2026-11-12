@@ -6,8 +6,8 @@
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Code');
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
@@ -20,6 +20,18 @@ require_once __DIR__ . '/../includes/SimpleRedis.php';
 
 $dataPath = __DIR__ . '/../data/reviews.json';
 $tempPath = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'reviews.json';
+
+function getAdminPasscode(): string {
+    $code = (string)config('admin.passcode', 'WHOSUTII26');
+    $pricingPath = __DIR__ . '/../data/pricing_settings.json';
+    if (file_exists($pricingPath)) {
+        $pData = json_decode(@file_get_contents($pricingPath), true);
+        if (!empty($pData['admin_passcode'])) {
+            $code = trim((string)$pData['admin_passcode']);
+        }
+    }
+    return $code;
+}
 
 function getReviewsList(): array {
     global $dataPath, $tempPath;
@@ -106,13 +118,86 @@ function computeStats(array $reviews): array {
 try {
     $reviews = getReviewsList();
 
-    if ($method === 'POST') {
-        $rawInput = file_get_contents('php://input');
-        $input = json_decode($rawInput, true);
-        if (!is_array($input)) {
-            $input = $_POST;
+    $rawInput = file_get_contents('php://input');
+    $input = json_decode($rawInput, true);
+    if (!is_array($input)) {
+        $input = $_POST;
+    }
+
+    // 1. DELETE ACTION (Admin only)
+    $isDelete = ($method === 'DELETE') || ($method === 'POST' && ($input['action'] ?? '') === 'delete');
+
+    if ($isDelete) {
+        $validPasscode = getAdminPasscode();
+        $providedCode = trim((string)(
+            $_SERVER['HTTP_X_ADMIN_CODE']
+            ?? $input['passcode']
+            ?? $input['code']
+            ?? $_GET['code']
+            ?? $_SESSION['kyuti_admin_auth']
+            ?? ''
+        ));
+
+        if ($providedCode !== $validPasscode && empty($_SESSION['kyuti_admin_auth'])) {
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Passcode admin salah atau tidak valid! Hanya admin yang dapat menghapus ulasan.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
         }
 
+        $reviewId = trim((string)($input['id'] ?? $_GET['id'] ?? ''));
+        if ($reviewId === '') {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'ID ulasan tidak valid atau tidak ditemukan.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $found = false;
+        $deletedName = '';
+        $newReviews = [];
+        foreach ($reviews as $rev) {
+            if (($rev['id'] ?? '') === $reviewId) {
+                $found = true;
+                $deletedName = $rev['name'] ?? 'Customer';
+                // Delete photo file if locally stored
+                if (!empty($rev['photo']) && strpos($rev['photo'], 'assets/img/reviews/') === 0) {
+                    $localImg = __DIR__ . '/../' . $rev['photo'];
+                    if (file_exists($localImg)) {
+                        @unlink($localImg);
+                    }
+                }
+            } else {
+                $newReviews[] = $rev;
+            }
+        }
+
+        if (!$found) {
+            http_response_code(404);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Ulasan dengan ID tersebut tidak ditemukan atau sudah dihapus.',
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        saveReviewsList($newReviews);
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Ulasan dari {$deletedName} berhasil dihapus.",
+            'reviews' => $newReviews,
+            'stats' => computeStats($newReviews),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    // 2. CREATE REVIEW (POST)
+    if ($method === 'POST') {
         $name = trim((string)($input['name'] ?? ''));
         $rating = (int)($input['rating'] ?? 5);
         $menu = trim((string)($input['menu'] ?? ''));

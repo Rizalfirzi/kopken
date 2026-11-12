@@ -3387,6 +3387,7 @@ function populateAdminPricingForm(data, dbInfo) {
     populateBundlingOptionsDropdown();
     renderDisabledBundlingOptionsList();
     populateMenuDropdown();
+    loadAdminReviewsList();
 }
 
 function renderAdminBgmPlaylist() {
@@ -4196,6 +4197,123 @@ window.openReviewPhotoLightbox = (src) => {
     }
 };
 
+function handleAdminDeleteReview(id, name) {
+    if (!id) return;
+    let code = adminPricingState?.activePasscode || sessionStorage.getItem('kyuti_admin_code') || '';
+    if (!code) {
+        code = prompt(`[Akses Khusus Admin Kedai Kyuti]\nMasukkan Passcode Admin untuk menghapus ulasan dari "${name}":`);
+        if (!code) return;
+    }
+
+    if (!confirm(`Yakin ingin menghapus permanen ulasan dari "${name}"?`)) return;
+
+    fetch('api/reviews.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Code': code
+        },
+        body: JSON.stringify({
+            action: 'delete',
+            id: id,
+            code: code
+        })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            sessionStorage.setItem('kyuti_admin_code', code);
+            sessionStorage.setItem('kyuti_admin_auth', '1');
+            if (typeof adminPricingState !== 'undefined') {
+                adminPricingState.activePasscode = code;
+            }
+            showToast(`✓ Ulasan dari "${name}" berhasil dihapus.`);
+            fetchReviews();
+            if (typeof renderAdminReviewsList === 'function' && Array.isArray(res.reviews)) {
+                renderAdminReviewsList(res.reviews);
+            }
+        } else {
+            showToast(`✕ ${res.message || 'Gagal menghapus ulasan'}`);
+        }
+    })
+    .catch(() => {
+        showToast('✕ Terjadi kesalahan jaringan saat menghapus ulasan.');
+    });
+}
+
+function loadAdminReviewsList() {
+    const container = document.getElementById('adminReviewsList');
+    const badge = document.getElementById('adminReviewCountBadge');
+    if (!container) return;
+
+    fetch('api/reviews.php')
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success) return;
+            const reviews = res.reviews || [];
+            if (badge) badge.textContent = `${reviews.length} Ulasan`;
+            renderAdminReviewsList(reviews);
+        })
+        .catch(() => {
+            if (container) {
+                container.innerHTML = '<div style="text-align:center;padding:12px;color:#DC2626;font-size:11px;">✕ Gagal memuat daftar ulasan.</div>';
+            }
+        });
+}
+
+function renderAdminReviewsList(reviews) {
+    const container = document.getElementById('adminReviewsList');
+    const badge = document.getElementById('adminReviewCountBadge');
+    if (!container) return;
+
+    if (badge) badge.textContent = `${reviews.length} Ulasan`;
+
+    if (!reviews || reviews.length === 0) {
+        container.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:16px;text-align:center;background:var(--bg-card);border:1px dashed var(--border-color);border-radius:var(--radius-sm)">Belum ada ulasan customer yang masuk.</div>';
+        return;
+    }
+
+    container.innerHTML = reviews.map(rev => {
+        const ratingVal = parseInt(rev.rating, 10) || 5;
+        const stars = '★'.repeat(ratingVal) + '☆'.repeat(Math.max(0, 5 - ratingVal));
+        const photoThumb = rev.photo ? `
+            <div style="margin-top:4px">
+                <img src="${escapeHtml(rev.photo)}" style="width:42px;height:42px;object-fit:cover;border-radius:var(--radius-sm);border:1px solid var(--border-color);cursor:pointer" alt="Foto Ulasan" onclick="window.openReviewPhotoLightbox('${escapeHtml(rev.photo)}')">
+            </div>
+        ` : '';
+
+        return `
+            <div class="admin-review-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+                    <div style="display:flex;align-items:center;gap:6px">
+                        <span style="font-weight:800;font-size:12px;color:var(--text-main)">${escapeHtml(rev.name)}</span>
+                        <span style="font-size:11px;color:#F59E0B">${stars}</span>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm admin-del-rev-btn" data-id="${escapeHtml(rev.id)}" data-name="${escapeHtml(rev.name)}" style="color:#E11D48;border-color:#FDA4AF;font-size:11px;padding:3px 8px;font-weight:800;cursor:pointer">
+                        🗑️ Hapus
+                    </button>
+                </div>
+                <div style="font-size:10.5px;color:var(--text-muted)">
+                    <span>${escapeHtml(rev.menu || 'Pesanan')}</span> • <span>${escapeHtml(rev.date || 'Baru saja')}</span> ${rev.outlet ? `• ☕ ${escapeHtml(rev.outlet)}` : ''}
+                </div>
+                <div style="font-size:11.5px;color:var(--text-main);line-height:1.4">
+                    "${escapeHtml(rev.comment)}"
+                </div>
+                ${photoThumb}
+            </div>
+        `;
+    }).join('');
+
+    container.querySelectorAll('.admin-del-rev-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.dataset.id;
+            const name = btn.dataset.name;
+            handleAdminDeleteReview(id, name);
+        });
+    });
+}
+
 function fetchReviews() {
     const listContainer = document.getElementById('reviewsListWrap') || document.getElementById('reviewListContainer');
     const scoreElem = document.getElementById('reviewAvgScore') || document.getElementById('reviewSummaryScore');
@@ -4242,7 +4360,10 @@ function fetchReviews() {
                                         <span class="ric-date">${escapeHtml(menuText)} • ${escapeHtml(dateText)}</span>
                                     </div>
                                 </div>
-                                <div class="ric-stars" title="${ratingVal} Bintang">${stars}</div>
+                                <div style="display:flex;align-items:center;gap:6px">
+                                    <div class="ric-stars" title="${ratingVal} Bintang">${stars}</div>
+                                    <button type="button" class="ric-delete-btn" data-id="${escapeHtml(rev.id)}" data-name="${escapeHtml(rev.name)}" title="Hapus Ulasan (Admin)">🗑️</button>
+                                </div>
                             </div>
                             ${outletBadge}
                             <div class="ric-comment">${escapeHtml(rev.comment)}</div>
@@ -4250,6 +4371,15 @@ function fetchReviews() {
                         </div>
                     `;
                 }).join('');
+
+                listContainer.querySelectorAll('.ric-delete-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const id = btn.dataset.id;
+                        const name = btn.dataset.name;
+                        handleAdminDeleteReview(id, name);
+                    });
+                });
             }
         })
         .catch(() => {
