@@ -3023,32 +3023,6 @@ function initAdminPricingFeature() {
                 url = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
             }
 
-            // Auto convert Spotify links:
-            let spotifyUrl = '';
-            let spotifyId = '';
-            const spotifyMatch = url.match(/spotify\.com\/(?:[a-z]{2}(?:-[a-z]+)?\/)?track\/([a-zA-Z0-9]+)/i);
-            if (spotifyMatch && spotifyMatch[1]) {
-                spotifyId = spotifyMatch[1];
-                spotifyUrl = url;
-                // If title is empty and this is Denny Caknan track
-                if (!linkTitleInput?.value?.trim()) {
-                    if (spotifyId === '3kfVlzPUsy7x1MiPHRuFr0') {
-                        linkTitleInput.value = 'Negoro Angin (Trending TikTok ♫)';
-                    }
-                }
-                if (!linkArtistInput?.value?.trim()) {
-                    if (spotifyId === '3kfVlzPUsy7x1MiPHRuFr0') {
-                        linkArtistInput.value = 'Denny Caknan';
-                    }
-                }
-                if (spotifyId === '3kfVlzPUsy7x1MiPHRuFr0') {
-                    youtubeId = 'WZYUSaHlGlk';
-                    url = 'https://p.scdn.co/mp3-preview/6945ec27f637b0b94fe6667b22331aa87dd61919';
-                } else if (!url.match(/\.(mp3|m4a|aac|wav|ogg)(\?|$)/i)) {
-                    url = 'https://p.scdn.co/mp3-preview/6945ec27f637b0b94fe6667b22331aa87dd61919';
-                }
-            }
-
             // Auto convert Dropbox links:
             if (url.includes('dropbox.com')) {
                 url = url.replace(/[?&]dl=0/, '?raw=1');
@@ -3069,8 +3043,6 @@ function initAdminPricingFeature() {
                 src: url
             };
             if (youtubeId) newTrack.youtube_id = youtubeId;
-            if (spotifyUrl) newTrack.spotify_url = spotifyUrl;
-            if (spotifyId) newTrack.spotify_id = spotifyId;
 
             adminPricingState.bgmPlaylist.push(newTrack);
             renderAdminBgmPlaylist();
@@ -3092,23 +3064,8 @@ function initAdminPricingFeature() {
                 {
                     title: 'Negoro Angin (Trending TikTok ♫)',
                     artist: 'Denny Caknan',
-                    src: 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/empty-mind-118973.mp3',
-                    spotify_url: 'https://open.spotify.com/intl-id/track/3kfVlzPUsy7x1MiPHRuFr0?si=798585022f7e4349',
-                    spotify_id: '3kfVlzPUsy7x1MiPHRuFr0'
-                },
-                {
-                    title: 'Kedai Kyuti Lo-Fi Café Vibes',
-                    artist: 'Chill Lofi Beats ♫',
-                    src: 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/piano.mp3',
-                    spotify_url: '',
-                    spotify_id: ''
-                },
-                {
-                    title: 'Pink Pastel Blossom',
-                    artist: 'Cozy Lounge Relaxing 🌸',
-                    src: 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/relaxing.mp3',
-                    spotify_url: '',
-                    spotify_id: ''
+                    youtube_id: '6kKuzB_YOmc',
+                    src: 'https://p.scdn.co/mp3-preview/6945ec27f637b0b94fe6667b22331aa87dd61919'
                 }
             ];
             renderAdminBgmPlaylist();
@@ -3116,7 +3073,7 @@ function initAdminPricingFeature() {
         });
     }
 
-    // Auto-Sync TikTok Viral Hits via Spotify API (#btnSyncTikTokHits)
+    // Auto-Sync TikTok Viral Hits (#btnSyncTikTokHits)
     const syncTikTokBtn = document.getElementById('btnSyncTikTokHits');
     const syncTikTokMsg = document.getElementById('syncTikTokMsg');
     const syncTikTokText = document.getElementById('btnSyncTikTokHitsText');
@@ -3133,8 +3090,8 @@ function initAdminPricingFeature() {
             if (syncTikTokText) syncTikTokText.textContent = '⏳ Menarik Lagu Viral TikTok...';
             if (syncTikTokMsg) {
                 syncTikTokMsg.style.display = 'block';
-                syncTikTokMsg.style.color = '#1DB954';
-                syncTikTokMsg.textContent = 'Sedang menghubungkan ke Spotify API & menarik playlist trending...';
+                syncTikTokMsg.style.color = 'var(--brand-primary)';
+                syncTikTokMsg.textContent = 'Sedang menarik daftar lagu viral TikTok versi lirik audio full...';
             }
 
             fetch('api/sync_tiktok_hits.php', {
@@ -4433,48 +4390,11 @@ function initBgmPlayer() {
         };
     }
 
-    const extractSpotifyId = (url) => {
-        if (!url) return '';
-        const match = url.match(/track\/([a-zA-Z0-9]+)/i);
-        return match ? match[1] : '';
-    };
-
     const updateTrackMeta = () => {
         const track = playlist[currentIdx];
         if (!track) return;
         if (titleEl) titleEl.textContent = track.title || 'Musik Café';
         if (artistEl) artistEl.textContent = track.artist || 'Kedai Kyuti';
-
-        // Spotify Link & Spotify Embed Widget
-        const spotifyBtn = document.getElementById('bgmSpotifyLink');
-        const spotifyIframeWrap = document.getElementById('bgmSpotifyIframeWrap');
-        const spotifyUrl = track.spotify_url || (track.src && track.src.includes('spotify.com') ? track.src : '');
-        const spotifyId = track.spotify_id || extractSpotifyId(spotifyUrl);
-
-        if (spotifyBtn) {
-            if (spotifyUrl) {
-                spotifyBtn.href = spotifyUrl;
-                spotifyBtn.style.display = 'inline-flex';
-            } else {
-                spotifyBtn.style.display = 'none';
-            }
-        }
-
-        if (spotifyIframeWrap) {
-            if (spotifyId) {
-                spotifyIframeWrap.style.display = 'block';
-                spotifyIframeWrap.innerHTML = `
-                    <iframe style="border-radius:12px;display:block" 
-                        src="https://open.spotify.com/embed/track/${encodeURIComponent(spotifyId)}?utm_source=generator&theme=0" 
-                        width="100%" height="80" frameBorder="0" 
-                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-                        loading="lazy"></iframe>
-                `;
-            } else {
-                spotifyIframeWrap.style.display = 'none';
-                spotifyIframeWrap.innerHTML = '';
-            }
-        }
     };
 
     const loadTrack = (idx, startPlay = false) => {

@@ -253,17 +253,14 @@ try {
             $cleanPlaylist = [];
             if (!empty($bgmIn['playlist']) && is_array($bgmIn['playlist'])) {
                 foreach ($bgmIn['playlist'] as $track) {
-                    if (is_array($track) && !empty($track['src'])) {
+                    if (is_array($track) && (!empty($track['src']) || !empty($track['youtube_id']))) {
                         $cleanTrack = [
                             'title' => trim((string)($track['title'] ?? 'Lagu Café')),
                             'artist' => trim((string)($track['artist'] ?? 'Kedai Kyuti')),
-                            'src' => trim((string)$track['src']),
+                            'src' => trim((string)($track['src'] ?? '')),
                         ];
-                        if (!empty($track['spotify_url'])) {
-                            $cleanTrack['spotify_url'] = trim((string)$track['spotify_url']);
-                        }
-                        if (!empty($track['spotify_id'])) {
-                            $cleanTrack['spotify_id'] = trim((string)$track['spotify_id']);
+                        if (!empty($track['youtube_id'])) {
+                            $cleanTrack['youtube_id'] = trim((string)$track['youtube_id']);
                         }
                         $cleanPlaylist[] = $cleanTrack;
                     }

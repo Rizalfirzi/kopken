@@ -674,22 +674,21 @@
                     <input type="range" id="cfgBgmVolume" min="5" max="100" value="40" style="width:100%;accent-color:var(--brand-primary);cursor:pointer">
                 </div>
 
-                <!-- Auto-Sync TikTok Viral Hits Card (Spotify API) -->
-                <div style="background:linear-gradient(135deg, rgba(29, 185, 84, 0.08) 0%, rgba(244, 114, 182, 0.12) 100%);border:1.5px solid #1DB954;border-radius:var(--radius-md);padding:12px;margin-bottom:14px">
+                <!-- Auto-Sync TikTok Viral Hits Card (Full Song / Versi Lirik) -->
+                <div style="background:linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(244, 114, 182, 0.12) 100%);border:1.5px solid var(--brand-primary);border-radius:var(--radius-md);padding:12px;margin-bottom:14px">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
                         <div style="display:flex;align-items:center;gap:6px">
                             <span style="font-size:16px">🔥</span>
-                            <b style="font-size:12px;color:var(--text-main)">Auto-Sync Lagu Viral TikTok</b>
+                            <b style="font-size:12px;color:var(--text-main)">Auto-Sync Lagu Viral TikTok (Versi Lirik / Full)</b>
                         </div>
-                        <span class="pill" style="background:#1DB954;color:#fff;font-size:10px;font-weight:800;padding:2px 8px">Spotify API</span>
+                        <span class="pill" style="background:var(--brand-primary);color:#fff;font-size:10px;font-weight:800;padding:2px 8px">Full Audio</span>
                     </div>
                     <p style="font-size:11px;color:var(--text-muted);line-height:1.4;margin-bottom:10px">
-                        Tarik otomatis 10–20 daftar lagu yang lagi viral & trending di TikTok (termasuk track TikTok Denny Caknan) lengkap dengan audio player dan link resmi.
+                        Tarik otomatis 10–20 daftar lagu yang lagi viral & trending di TikTok (termasuk track TikTok Denny Caknan) versi lirik audio langsung tanpa dialog/drama video klip.
                     </p>
                     <div style="display:flex;gap:8px">
-                        <button type="button" class="btn btn-block" id="btnSyncTikTokHits" style="background:#1DB954;color:#fff;font-weight:800;font-size:12px;padding:9px 12px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;gap:6px;border:none;cursor:pointer">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.434-5.308-1.758-8.793-.963-.335.077-.67-.133-.746-.468-.077-.334.132-.67.467-.746 3.808-.87 7.076-.51 9.722 1.113.294.18.386.563.207.857zm1.224-2.719c-.226.367-.706.482-1.072.257-2.687-1.652-6.785-2.131-9.965-1.166-.413.127-.848-.106-.973-.517-.125-.413.108-.848.52-.973 3.632-1.102 8.147-.568 11.233 1.328.366.226.481.707.257 1.071zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71c-.494.15-1.016-.129-1.166-.624-.149-.495.13-1.016.624-1.167 3.532-1.073 9.404-.866 13.115 1.337.445.264.59.838.327 1.282-.264.443-.838.59-1.282.326z"/></svg>
-                            <span id="btnSyncTikTokHitsText">🔄 Tarik Lagu Viral TikTok Sekarang</span>
+                        <button type="button" class="btn btn-primary btn-block" id="btnSyncTikTokHits" style="font-weight:800;font-size:12px;padding:9px 12px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;gap:6px;border:none;cursor:pointer">
+                            <span>🔄 Tarik Lagu Viral TikTok (Versi Lirik Full)</span>
                         </button>
                     </div>
                     <div id="syncTikTokMsg" style="display:none;font-size:11px;margin-top:8px;text-align:center;font-weight:700"></div>

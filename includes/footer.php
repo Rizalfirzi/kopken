@@ -50,14 +50,10 @@
                     <span id="bgmMuteIcon" style="font-size:14px">🔊</span>
                 </button>
             </div>
-            
-            <!-- Link Spotify & Spotify Player Widget -->
-            <div style="margin-top:10px;text-align:center" id="bgmSpotifyArea">
-                <a href="#" id="bgmSpotifyLink" target="_blank" rel="noopener" class="bgm-spotify-link-btn" style="display:none">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.434-5.308-1.758-8.793-.963-.335.077-.67-.133-.746-.468-.077-.334.132-.67.467-.746 3.808-.87 7.076-.51 9.722 1.113.294.18.386.563.207.857zm1.224-2.719c-.226.367-.706.482-1.072.257-2.687-1.652-6.785-2.131-9.965-1.166-.413.127-.848-.106-.973-.517-.125-.413.108-.848.52-.973 3.632-1.102 8.147-.568 11.233 1.328.366.226.481.707.257 1.071zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71c-.494.15-1.016-.129-1.166-.624-.149-.495.13-1.016.624-1.167 3.532-1.073 9.404-.866 13.115 1.337.445.264.59.838.327 1.282-.264.443-.838.59-1.282.326z"/></svg>
-                    <span>Buka Lagu di Spotify</span>
-                </a>
-                <div id="bgmSpotifyIframeWrap" style="display:none;margin-top:6px;border-radius:12px;overflow:hidden"></div>
+            <div style="margin-top:8px;text-align:center">
+                <span style="font-size:10px;font-weight:700;color:var(--brand-primary-dark);background:var(--brand-primary-light);padding:3px 10px;border-radius:20px;display:inline-block">
+                    ♫ Pemutaran Otomatis Versi Full / Lirik
+                </span>
             </div>
         </div>
     </div>
