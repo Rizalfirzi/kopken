@@ -62,7 +62,7 @@
     <audio id="bgmAudio" preload="none"></audio>
 
     <!-- Hidden YouTube Background Audio Player Container (Full Playback Engine) -->
-    <div id="bgmYtContainer" style="position:fixed;top:-9999px;left:-9999px;width:200px;height:200px;opacity:0.001;pointer-events:none;z-index:-9999">
+    <div id="bgmYtContainer" style="position:fixed;bottom:0;right:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:-1;overflow:hidden">
         <div id="bgmYtPlayer"></div>
     </div>
 </div>

@@ -3065,7 +3065,7 @@ function initAdminPricingFeature() {
                     title: 'Negoro Angin (Trending TikTok ♫)',
                     artist: 'Denny Caknan',
                     youtube_id: '6kKuzB_YOmc',
-                    src: 'https://p.scdn.co/mp3-preview/6945ec27f637b0b94fe6667b22331aa87dd61919'
+                    src: ''
                 }
             ];
             renderAdminBgmPlaylist();
@@ -4283,7 +4283,7 @@ function initBgmPlayer() {
     let isPlaying = false;
     let isMuted = false;
     let currentVolume = AppState.bgm?.default_volume ?? bgmCfg.default_volume ?? 0.4;
-    let activeEngine = 'audio'; // 'youtube' or 'audio'
+    let activeEngine = playlist[0]?.youtube_id ? 'youtube' : 'audio';
 
     const audio = document.getElementById('bgmAudio');
     const disc = document.getElementById('bgmDisc');
@@ -4304,6 +4304,19 @@ function initBgmPlayer() {
         audio.volume = currentVolume;
     }
 
+    const setPlaybackUI = (playing) => {
+        isPlaying = !!playing;
+        if (isPlaying) {
+            disc?.classList.add('spinning');
+            if (playIcon) playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+            if (navIcon) navIcon.textContent = '🎶';
+        } else {
+            disc?.classList.remove('spinning');
+            if (playIcon) playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+            if (navIcon) navIcon.textContent = '🎵';
+        }
+    };
+
     // =========================================================================
     // YouTube Background Player Engine (Full Duration Playback 3-5 Mins)
     // =========================================================================
@@ -4317,25 +4330,28 @@ function initBgmPlayer() {
         if (!target) return;
 
         try {
+            const currentTrack = playlist[currentIdx];
             ytPlayer = new window.YT.Player('bgmYtPlayer', {
                 height: '200',
                 width: '200',
-                videoId: playlist[currentIdx]?.youtube_id || 'WZYUSaHlGlk',
+                videoId: currentTrack?.youtube_id || '6kKuzB_YOmc',
                 playerVars: {
-                    autoplay: 0,
+                    autoplay: 1,
                     controls: 0,
                     disablekb: 1,
                     fs: 0,
                     modestbranding: 1,
                     playsinline: 1,
-                    rel: 0
+                    rel: 0,
+                    enablejsapi: 1,
+                    origin: window.location.origin
                 },
                 events: {
                     onReady: (event) => {
                         ytReady = true;
                         try {
                             event.target.setVolume(Math.round(currentVolume * 100));
-                            if (isMuted) event.target.mute();
+                            if (isMuted) event.target.mute(); else event.target.unMute();
                         } catch (e) {}
                         if (pendingPlay) {
                             pendingPlay = false;
@@ -4346,31 +4362,28 @@ function initBgmPlayer() {
                         // 1: PLAYING, 2: PAUSED, 0: ENDED
                         if (event.data === window.YT.PlayerState.PLAYING) {
                             if (activeEngine === 'youtube') {
-                                isPlaying = true;
                                 if (audio) audio.pause();
-                                disc?.classList.add('spinning');
-                                if (playIcon) playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-                                if (navIcon) navIcon.textContent = '🎶';
+                                setPlaybackUI(true);
                             }
                         } else if (event.data === window.YT.PlayerState.PAUSED) {
-                            if (activeEngine === 'youtube' && isPlaying) {
-                                isPlaying = false;
-                                disc?.classList.remove('spinning');
-                                if (playIcon) playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
-                                if (navIcon) navIcon.textContent = '🎵';
+                            if (activeEngine === 'youtube') {
+                                setPlaybackUI(false);
                             }
                         } else if (event.data === window.YT.PlayerState.ENDED) {
                             // Full song finished! Play next full song automatically
+                            setPlaybackUI(false);
                             loadTrack(currentIdx + 1, true);
                         }
                     },
                     onError: (err) => {
-                        console.warn('YouTube playback fallback to audio:', err);
+                        console.warn('YouTube playback error:', err);
                         const fallbackTrack = playlist[currentIdx];
                         if (fallbackTrack && fallbackTrack.src && audio) {
                             activeEngine = 'audio';
                             audio.src = fallbackTrack.src;
                             audio.play().catch(() => {});
+                        } else {
+                            setTimeout(() => loadTrack(currentIdx + 1, true), 1000);
                         }
                     }
                 }
@@ -4405,17 +4418,25 @@ function initBgmPlayer() {
 
         updateTrackMeta();
 
-        if (track.youtube_id && ytPlayer && ytReady) {
+        if (track.youtube_id) {
             activeEngine = 'youtube';
             if (audio) audio.pause();
-            try {
-                ytPlayer.loadVideoById(track.youtube_id);
-                if (!startPlay) {
-                    ytPlayer.pauseVideo();
-                }
-            } catch (e) {}
+            if (ytPlayer && ytReady) {
+                try {
+                    ytPlayer.loadVideoById({
+                        videoId: track.youtube_id,
+                        startSeconds: 0
+                    });
+                    if (!startPlay) {
+                        ytPlayer.pauseVideo();
+                    }
+                } catch (e) {}
+            }
         } else if (track.src && audio) {
             activeEngine = 'audio';
+            if (ytPlayer && ytReady) {
+                try { ytPlayer.pauseVideo(); } catch (e) {}
+            }
             audio.src = track.src;
         }
 
@@ -4435,33 +4456,27 @@ function initBgmPlayer() {
 
             if (ytPlayer && ytReady) {
                 try {
+                    ytPlayer.setVolume(Math.round(currentVolume * 100));
+                    if (isMuted) ytPlayer.mute(); else ytPlayer.unMute();
                     const loadedUrl = ytPlayer.getVideoUrl ? (ytPlayer.getVideoUrl() || '') : '';
                     if (!loadedUrl.includes(track.youtube_id)) {
-                        ytPlayer.loadVideoById(track.youtube_id);
+                        ytPlayer.loadVideoById({
+                            videoId: track.youtube_id,
+                            startSeconds: 0
+                        });
                     } else {
                         ytPlayer.playVideo();
                     }
-                    ytPlayer.setVolume(Math.round(currentVolume * 100));
-                    if (isMuted) ytPlayer.mute(); else ytPlayer.unMute();
                 } catch (e) {
                     console.warn(e);
                 }
-                isPlaying = true;
-                disc?.classList.add('spinning');
-                if (playIcon) playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-                if (navIcon) navIcon.textContent = '🎶';
             } else {
                 pendingPlay = true;
                 initYt();
-                // Temporary sound fallback while YT iframe initializes
                 if (track.src && audio) {
                     if (audio.src !== track.src) audio.src = track.src;
                     audio.play().catch(() => {});
                 }
-                isPlaying = true;
-                disc?.classList.add('spinning');
-                if (playIcon) playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-                if (navIcon) navIcon.textContent = '🎶';
             }
         } else if (track.src && audio) {
             activeEngine = 'audio';
@@ -4472,13 +4487,10 @@ function initBgmPlayer() {
                 audio.src = track.src;
             }
             audio.play().then(() => {
-                isPlaying = true;
-                disc?.classList.add('spinning');
-                if (playIcon) playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-                if (navIcon) navIcon.textContent = '🎶';
-            }).catch(() => {
-                isPlaying = false;
-                disc?.classList.remove('spinning');
+                setPlaybackUI(true);
+            }).catch(e => {
+                setPlaybackUI(false);
+                console.warn('Audio play blocked:', e);
             });
         }
     };
@@ -4490,10 +4502,7 @@ function initBgmPlayer() {
         if (audio) {
             audio.pause();
         }
-        isPlaying = false;
-        disc?.classList.remove('spinning');
-        if (playIcon) playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
-        if (navIcon) navIcon.textContent = '🎵';
+        setPlaybackUI(false);
     };
 
     const togglePlay = () => {
@@ -4508,21 +4517,35 @@ function initBgmPlayer() {
     const attemptAutoPlay = () => {
         if (AppState.bgm?.enabled === false || bgmCfg.enabled === false) return;
 
+        // 1. Initial attempt: Try to play immediately
         playTrack();
 
-        const onFirstInteraction = () => {
+        // 2. User Gesture Fallback for strict browser autoplay policies:
+        // Automatically unmute & play on the very first touch, click, or scroll anywhere
+        const interactionEvents = ['pointerdown', 'touchstart', 'touchend', 'click', 'scroll', 'keydown', 'wheel'];
+
+        const onUserGesture = () => {
             if (!isPlaying) {
+                if (ytPlayer && ytReady) {
+                    try {
+                        if (!isMuted) ytPlayer.unMute();
+                        ytPlayer.setVolume(Math.round(currentVolume * 100));
+                        ytPlayer.playVideo();
+                    } catch (e) {}
+                }
                 playTrack();
             }
-            ['touchstart', 'touchend', 'click', 'scroll', 'keydown', 'wheel'].forEach(evt => {
-                window.removeEventListener(evt, onFirstInteraction, { capture: true });
-                document.removeEventListener(evt, onFirstInteraction, { capture: true });
-            });
+            if (isPlaying) {
+                interactionEvents.forEach(evt => {
+                    window.removeEventListener(evt, onUserGesture, { capture: true });
+                    document.removeEventListener(evt, onUserGesture, { capture: true });
+                });
+            }
         };
 
-        ['touchstart', 'touchend', 'click', 'scroll', 'keydown', 'wheel'].forEach(evt => {
-            window.addEventListener(evt, onFirstInteraction, { capture: true, once: true, passive: true });
-            document.addEventListener(evt, onFirstInteraction, { capture: true, once: true, passive: true });
+        interactionEvents.forEach(evt => {
+            window.addEventListener(evt, onUserGesture, { capture: true, passive: true });
+            document.addEventListener(evt, onUserGesture, { capture: true, passive: true });
         });
     };
 
@@ -4614,8 +4637,17 @@ function initBgmPlayer() {
 
     // Native audio finished -> automatically play next track
     if (audio) {
+        audio.addEventListener('playing', () => {
+            if (activeEngine === 'audio') setPlaybackUI(true);
+        });
+        audio.addEventListener('pause', () => {
+            if (activeEngine === 'audio') setPlaybackUI(false);
+        });
         audio.addEventListener('ended', () => {
-            loadTrack(currentIdx + 1, true);
+            if (activeEngine === 'audio') {
+                setPlaybackUI(false);
+                loadTrack(currentIdx + 1, true);
+            }
         });
     }
 
