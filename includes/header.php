@@ -78,6 +78,12 @@ $borderColor = config('theme.border_color', '#FBCFE8');
             </button>
         </div>
         <div class="topnav-actions">
+            <button class="icon-btn" id="openReviewsNavBtn" title="Review Customer" aria-label="Review Customer">
+                <span style="font-size:16px;">⭐</span>
+            </button>
+            <button class="icon-btn" id="bgmNavBtn" title="Musik Café (BGM)" aria-label="Musik Café">
+                <span style="font-size:16px;" id="bgmNavIcon">🎵</span>
+            </button>
             <button class="icon-btn" id="openWelcomeBtn" title="Baca Informasi / Aturan Order" aria-label="Info Order">
                 <span style="font-size:16px;">🌷</span>
             </button>

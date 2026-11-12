@@ -53,6 +53,19 @@ const AppState = {
 
     // Pending Single Item for 1pcs Fee Modal
     pendingCartItem: null,
+
+    // Jam Operasional Web Kedai Kyuti (Fitur Baru)
+    webHours: window.INITIAL_DATA?.webHours || {
+        enabled: true,
+        open: '09:00',
+        close: '12:00',
+        force_status: 'auto',
+        isOpen: true,
+        statusText: 'Buka'
+    },
+
+    // Background Music (BGM) Playlist (Fitur Baru)
+    bgm: window.INITIAL_DATA?.bgm || { enabled: true, playlist: [] },
 };
 
 // Global Outlet Store Map for Fast Lookups
@@ -1779,6 +1792,14 @@ if (addToCartBtn) {
  * tampilkan popup "Ada Fee Tambahan +2.000" sebelum masuk ke keranjang!
  */
 function triggerAddToCartWithFeeCheck(item) {
+    // 1. Cek Jam Operasional Web Kedai Kyuti
+    const whStatus = checkWebHoursStatusNow();
+    if (!whStatus.isOpen) {
+        showToast(`⚠️ Maaf, Kedai Kyuti sedang di luar jam operasional.`);
+        openWebClosedModal();
+        return;
+    }
+
     if (isOutletClosed()) {
         showToast(`⚠️ Maaf, tidak dapat menambah menu karena outlet sedang tutup.`);
         openSheet('outletSheet');
@@ -1914,16 +1935,24 @@ function updateCartUI() {
     // Update Plastic Bag UI controls & hints
     updatePlasticBagUI();
 
-    // Update Checkout Button if Outlet Closed
+    // Update Checkout Button if Web Closed or Outlet Closed
     const checkoutWaBtn = document.getElementById('checkoutWaBtn');
     if (checkoutWaBtn) {
-        if (isOutletClosed()) {
+        const whStatus = checkWebHoursStatusNow();
+        if (!whStatus.isOpen) {
+            checkoutWaBtn.disabled = false;
+            checkoutWaBtn.style.opacity = '0.95';
+            checkoutWaBtn.style.background = '#E11D48';
+            checkoutWaBtn.innerHTML = `<span>⚠️ Toko Tutup (Buka ${whStatus.open} - ${whStatus.close} WIB)</span>`;
+        } else if (isOutletClosed()) {
             checkoutWaBtn.disabled = true;
             checkoutWaBtn.style.opacity = '0.7';
+            checkoutWaBtn.style.background = '';
             checkoutWaBtn.innerHTML = `<span>⚠️ Outlet Sedang Tutup (Ganti Outlet)</span>`;
         } else {
             checkoutWaBtn.disabled = false;
             checkoutWaBtn.style.opacity = '1';
+            checkoutWaBtn.style.background = '';
             checkoutWaBtn.innerHTML = `
                 <span>Kirim Pesanan ke WhatsApp</span>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -2360,6 +2389,12 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
 const checkoutWaBtn = document.getElementById('checkoutWaBtn');
 if (checkoutWaBtn) {
     checkoutWaBtn.addEventListener('click', () => {
+        const whStatus = checkWebHoursStatusNow();
+        if (!whStatus.isOpen) {
+            openWebClosedModal();
+            return;
+        }
+
         if (isOutletClosed()) {
             alert(`Maaf, Outlet ${AppState.outlet?.name || ''} saat ini sedang tutup. Silakan pilih outlet lain yang sedang buka untuk memesan.`);
             openSheet('outletSheet');
@@ -2808,6 +2843,13 @@ function initAdminPricingFeature() {
             const singleFee = parseFloat(document.getElementById('cfgSingleItemFee')?.value || '2000');
             const plasticFee = parseFloat(document.getElementById('cfgPlasticBagFee')?.value || '1000');
 
+            // Web Operating Hours Settings
+            const webHoursEnabled = document.getElementById('cfgWebHoursEnabled')?.checked ?? true;
+            const webHoursOpen = document.getElementById('cfgWebHoursOpen')?.value || '09:00';
+            const webHoursClose = document.getElementById('cfgWebHoursClose')?.value || '12:00';
+            const webHoursForce = document.getElementById('cfgWebHoursForce')?.value || 'auto';
+            const webHoursMsg = document.getElementById('cfgWebHoursMsg')?.value || '';
+
             saveBtn.disabled = true;
             saveBtn.innerHTML = '<span>Menyimpan pengaturan...</span>';
 
@@ -2828,6 +2870,13 @@ function initAdminPricingFeature() {
                 plastic_bag_fee: plasticFee,
                 bundling_status: adminPricingState.bundlingStatus,
                 disabled_bundling_options: adminPricingState.disabledBundlingOptions,
+                web_hours: {
+                    enabled: webHoursEnabled,
+                    open: webHoursOpen,
+                    close: webHoursClose,
+                    force_status: webHoursForce,
+                    custom_closed_message: webHoursMsg
+                }
             };
 
             fetch('api/admin_pricing.php', {
@@ -2871,6 +2920,14 @@ function initAdminPricingFeature() {
                             const cookieData = encodeURIComponent(JSON.stringify(res.data || payload));
                             document.cookie = `kyuti_custom_pricing=${cookieData}; path=/; max-age=31536000; SameSite=Lax`;
                         } catch (e) {}
+
+                        // Update Web Operating Hours in AppState
+                        if (res.data?.web_hours) {
+                            AppState.webHours = Object.assign({}, AppState.webHours, res.data.web_hours);
+                        } else {
+                            AppState.webHours = Object.assign({}, AppState.webHours, payload.web_hours);
+                        }
+                        updateWebHoursBanners();
 
                         updateCartUI();
                         renderMenu();
@@ -2931,6 +2988,26 @@ function populateAdminPricingForm(data, dbInfo) {
     if (foodInput) foodInput.value = data.category_markups?.Food ?? data.category_markups?.Makanan ?? 4500;
     if (singleInput) singleInput.value = data.single_item_fee ?? 2000;
     if (plasticInput) plasticInput.value = data.plastic_bag_fee ?? 1000;
+
+    // Populate Section 6: Jam Operasional Web
+    const hoursData = data.web_hours || AppState.webHours || {};
+    const hoursEnabledInput = document.getElementById('cfgWebHoursEnabled');
+    const hoursOpenInput = document.getElementById('cfgWebHoursOpen');
+    const hoursCloseInput = document.getElementById('cfgWebHoursClose');
+    const hoursForceSelect = document.getElementById('cfgWebHoursForce');
+    const hoursMsgInput = document.getElementById('cfgWebHoursMsg');
+    const hoursBadge = document.getElementById('adminWebHoursBadge');
+
+    if (hoursEnabledInput) hoursEnabledInput.checked = hoursData.enabled !== false;
+    if (hoursOpenInput) hoursOpenInput.value = hoursData.open || '09:00';
+    if (hoursCloseInput) hoursCloseInput.value = hoursData.close || '12:00';
+    if (hoursForceSelect) hoursForceSelect.value = hoursData.force_status || 'auto';
+    if (hoursMsgInput) hoursMsgInput.value = hoursData.custom_closed_message || '';
+    if (hoursBadge) {
+        const status = checkWebHoursStatusNow();
+        hoursBadge.textContent = status.isOpen ? `● Status Saat Ini: Buka (${status.open} - ${status.close} WIB)` : `✕ Status Saat Ini: Tutup (${status.open} - ${status.close} WIB)`;
+        hoursBadge.style.color = status.isOpen ? '#059669' : '#DC2626';
+    }
 
     const dbBadge = document.getElementById('adminDbStatusBadge');
     if (dbBadge) {
@@ -3277,6 +3354,448 @@ function initWifiFeature() {
     });
 }
 
+// =========================================================================
+// 12. HELPER FUNCTIONS & WEB HOURS CONTROLLER (Fitur Baru)
+// =========================================================================
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+}
+
+function checkWebHoursStatusNow() {
+    if (!AppState.webHours || !AppState.webHours.enabled) {
+        return { isOpen: true, statusText: 'Buka', open: '00:00', close: '23:59', message: '' };
+    }
+
+    const openHM = AppState.webHours.open || '09:00';
+    const closeHM = AppState.webHours.close || '12:00';
+    const customMsg = AppState.webHours.custom_closed_message || '';
+
+    if (AppState.webHours.force_status === 'open') {
+        return {
+            isOpen: true,
+            statusText: `Buka (Paksa Buka Admin) • ${openHM} - ${closeHM} WIB`,
+            open: openHM,
+            close: closeHM,
+            message: customMsg
+        };
+    }
+    if (AppState.webHours.force_status === 'closed') {
+        return {
+            isOpen: false,
+            statusText: `Toko Tutup Sementara • Jam Operasional: ${openHM} - ${closeHM} WIB`,
+            open: openHM,
+            close: closeHM,
+            message: customMsg || 'Pemesanan sementara sedang ditutup oleh admin.'
+        };
+    }
+
+    try {
+        const parts = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Asia/Jakarta',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        }).formatToParts(new Date());
+
+        const hour = parts.find(p => p.type === 'hour')?.value || '00';
+        const minute = parts.find(p => p.type === 'minute')?.value || '00';
+        const nowHM = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
+
+        let isOpen = false;
+        if (openHM <= closeHM) {
+            isOpen = (nowHM >= openHM && nowHM < closeHM);
+        } else {
+            // Operasional melewati tengah malam
+            isOpen = (nowHM >= openHM || nowHM < closeHM);
+        }
+
+        const statusText = isOpen
+            ? `Buka Sekarang • Jam Operasional: ${openHM} - ${closeHM} WIB`
+            : `Sedang Tutup • Jam Operasional: ${openHM} - ${closeHM} WIB`;
+
+        return {
+            isOpen,
+            statusText,
+            open: openHM,
+            close: closeHM,
+            now: nowHM,
+            message: customMsg
+        };
+    } catch (e) {
+        return Object.assign({
+            isOpen: true,
+            statusText: 'Buka',
+            open: openHM,
+            close: closeHM,
+            message: customMsg
+        }, AppState.webHours);
+    }
+}
+
+function updateWebHoursBanners() {
+    const status = checkWebHoursStatusNow();
+    const hubBanner = document.getElementById('hubWebHoursBanner');
+    const storeBanner = document.getElementById('storeWebHoursBanner');
+
+    const updateBannerEl = (el, isStore) => {
+        if (!el) return;
+        el.classList.toggle('whb-open', status.isOpen);
+        el.classList.toggle('whb-closed', !status.isOpen);
+
+        const statusEl = el.querySelector('.whb-status');
+        const subEl = el.querySelector('.whb-sub');
+
+        if (statusEl) statusEl.textContent = status.statusText;
+        if (subEl) {
+            if (status.isOpen) {
+                subEl.textContent = isStore ? 'Outlet & keranjang aktif untuk checkout WhatsApp' : 'Terima pesanan sekarang via WhatsApp ♡';
+            } else {
+                subEl.textContent = status.message || `Katalog tetap bisa dilihat, pemesanan dibuka pukul ${status.open} - ${status.close} WIB`;
+            }
+        }
+    };
+
+    updateBannerEl(hubBanner, false);
+    updateBannerEl(storeBanner, true);
+}
+
+function openWebClosedModal() {
+    const status = checkWebHoursStatusNow();
+    const hoursTextEl = document.getElementById('webClosedHoursText');
+    const customMsgEl = document.getElementById('webClosedCustomMsg');
+    const badgeEl = document.getElementById('webClosedBadge');
+
+    if (hoursTextEl) {
+        hoursTextEl.textContent = `Jam Operasional: ${status.open} - ${status.close} WIB`;
+    }
+    if (customMsgEl) {
+        customMsgEl.textContent = status.message || `Pemesanan dibuka setiap hari pukul ${status.open} - ${status.close} WIB. Anda tetap dapat menjelajahi seluruh menu dan melihat promo kami!`;
+    }
+    if (badgeEl) {
+        badgeEl.textContent = status.isOpen ? '🟢 Buka' : '🔴 Tutup';
+    }
+
+    openSheet('webClosedModal');
+}
+
+function initWebHoursFeature() {
+    updateWebHoursBanners();
+
+    // Re-check periodically every 30 seconds so time transitions automatically
+    setInterval(() => {
+        updateWebHoursBanners();
+        updateCartUI();
+    }, 30000);
+
+    // Close button for webClosedModal
+    document.getElementById('closeWebClosedModalBtn')?.addEventListener('click', () => {
+        closeSheet('webClosedModal');
+    });
+
+    // Clicking banners opens the info popup
+    document.getElementById('hubWebHoursBanner')?.addEventListener('click', openWebClosedModal);
+    document.getElementById('storeWebHoursBanner')?.addEventListener('click', openWebClosedModal);
+}
+
+// =========================================================================
+// 13. HALAMAN REVIEW & TESTIMONI CUSTOMER (Fitur Baru)
+// =========================================================================
+
+function initReviewsFeature() {
+    const openHubBtn = document.getElementById('openReviewsHubBtn');
+    const openNavBtn = document.getElementById('openReviewsNavBtn');
+    const closeBtn = document.getElementById('closeReviewSheetBtn');
+
+    const handleOpenReviews = () => {
+        openSheet('reviewSheet');
+        fetchReviews();
+    };
+
+    if (openHubBtn) openHubBtn.addEventListener('click', handleOpenReviews);
+    if (openNavBtn) openNavBtn.addEventListener('click', handleOpenReviews);
+    if (closeBtn) closeBtn.addEventListener('click', () => closeSheet('reviewSheet'));
+
+    // Interactive Star Rating Picker
+    const starPicker = document.getElementById('reviewStarPicker');
+    const ratingInput = document.getElementById('reviewRatingInput');
+    let currentRating = 5;
+
+    if (starPicker) {
+        const starBtns = starPicker.querySelectorAll('.star-pick-btn');
+        starBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                currentRating = parseInt(btn.dataset.star, 10) || 5;
+                if (ratingInput) ratingInput.value = currentRating;
+                starBtns.forEach(b => {
+                    const s = parseInt(b.dataset.star, 10);
+                    b.classList.toggle('active', s <= currentRating);
+                });
+            });
+        });
+    }
+
+    // Submit Review Form
+    const submitBtn = document.getElementById('submitReviewBtn');
+    if (submitBtn) {
+        submitBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const nameInput = document.getElementById('reviewNameInput');
+            const commentInput = document.getElementById('reviewCommentInput');
+            const roleInput = document.getElementById('reviewRoleInput');
+            const tagInput = document.getElementById('reviewTagSelect');
+
+            const name = (nameInput?.value || '').trim();
+            const comment = (commentInput?.value || '').trim();
+            const role = (roleInput?.value || '').trim() || 'Sahabat Kyuti';
+            const tag = tagInput?.value || 'Pelayanan Cepat';
+            const rating = parseInt(ratingInput?.value, 10) || currentRating || 5;
+
+            if (!name || name.length < 2) {
+                showToast('Silakan isi nama kamu (minimal 2 huruf)');
+                nameInput?.focus();
+                return;
+            }
+            if (!comment || comment.length < 4) {
+                showToast('Silakan tulis ulasan kamu (minimal 4 karakter)');
+                commentInput?.focus();
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span>Mengirim ulasan...</span>';
+
+            fetch('api/reviews.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, comment, role, tag, rating })
+            })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        showToast('✓ Ulasan kamu berhasil dikirim! Terima kasih sahabat Kyuti ♡');
+                        if (commentInput) commentInput.value = '';
+                        fetchReviews();
+                    } else {
+                        showToast(`✕ ${res.message || 'Gagal mengirim ulasan'}`);
+                    }
+                })
+                .catch(() => {
+                    showToast('✕ Gagal menghubungi server ulasan.');
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<span>Kirim Ulasan Sekarang ♡</span>';
+                });
+        });
+    }
+}
+
+function fetchReviews() {
+    const listContainer = document.getElementById('reviewListContainer');
+    const scoreElem = document.getElementById('reviewSummaryScore');
+    const totalElem = document.getElementById('reviewSummaryTotal');
+
+    fetch('api/reviews.php')
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success) return;
+            const stats = res.stats || {};
+            const reviews = res.reviews || [];
+
+            if (scoreElem) scoreElem.textContent = Number(stats.average_rating || 4.9).toFixed(1);
+            if (totalElem) totalElem.textContent = `${stats.total_reviews || reviews.length}+ ulasan dari sahabat Kyuti`;
+
+            if (listContainer) {
+                if (reviews.length === 0) {
+                    listContainer.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">Belum ada ulasan. Jadilah yang pertama memberi ulasan! ♡</div>';
+                    return;
+                }
+                listContainer.innerHTML = reviews.map(rev => {
+                    const stars = '★'.repeat(rev.rating || 5) + '☆'.repeat(Math.max(0, 5 - (rev.rating || 5)));
+                    const initial = (rev.name || 'S').trim().charAt(0).toUpperCase();
+                    const tagHtml = rev.tag ? `<span class="ric-tag">✨ ${escapeHtml(rev.tag)}</span>` : '';
+                    const dateText = rev.date || 'Baru saja';
+                    return `
+                        <div class="review-item-card">
+                            <div class="ric-header">
+                                <div class="ric-user-info">
+                                    <div class="ric-avatar">${escapeHtml(initial)}</div>
+                                    <div class="ric-name-row">
+                                        <div class="ric-name">
+                                            <span>${escapeHtml(rev.name)}</span>
+                                            <span class="ric-badge-verified">✓ Terverifikasi</span>
+                                        </div>
+                                        <span class="ric-date">${escapeHtml(rev.role || 'Sahabat Kyuti')} • ${escapeHtml(dateText)}</span>
+                                    </div>
+                                </div>
+                                <div class="ric-stars" title="${rev.rating} Bintang">${stars}</div>
+                            </div>
+                            ${tagHtml}
+                            <div class="ric-comment">${escapeHtml(rev.comment)}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        })
+        .catch(() => {});
+}
+
+// =========================================================================
+// 14. FITUR LAGU / BGM CAFE LOFI PLAYER (Fitur Baru)
+// =========================================================================
+
+function initBgmPlayer() {
+    const bgmCfg = window.INITIAL_DATA?.bgm || {};
+    const playlist = bgmCfg.playlist || [];
+    if (!playlist.length) return;
+
+    let currentIdx = 0;
+    let isPlaying = false;
+    let isMuted = false;
+
+    const audio = document.getElementById('bgmAudio');
+    const disc = document.getElementById('bgmDisc');
+    const discBtn = document.getElementById('bgmDiscBtn');
+    const navBtn = document.getElementById('bgmNavBtn');
+    const navIcon = document.getElementById('bgmNavIcon');
+    const popup = document.getElementById('bgmPopup');
+    const titleEl = document.getElementById('bgmCurrentTitle');
+    const artistEl = document.getElementById('bgmCurrentArtist');
+    const playToggleBtn = document.getElementById('bgmPlayToggleBtn');
+    const playIcon = document.getElementById('bgmPlayIcon');
+    const nextBtn = document.getElementById('bgmNextBtn');
+    const prevBtn = document.getElementById('bgmPrevBtn');
+    const muteBtn = document.getElementById('bgmMuteBtn');
+    const muteIcon = document.getElementById('bgmMuteIcon');
+    const closePopupBtn = document.getElementById('bgmClosePopupBtn');
+
+    if (!audio) return;
+
+    audio.volume = bgmCfg.default_volume ?? 0.4;
+
+    const updateTrackMeta = () => {
+        const track = playlist[currentIdx];
+        if (!track) return;
+        if (titleEl) titleEl.textContent = track.title || 'Musik Café';
+        if (artistEl) artistEl.textContent = track.artist || 'Kedai Kyuti';
+    };
+
+    const loadTrack = (idx, startPlay = false) => {
+        currentIdx = (idx + playlist.length) % playlist.length;
+        const track = playlist[currentIdx];
+        if (!track) return;
+
+        audio.src = track.src;
+        updateTrackMeta();
+
+        if (startPlay) {
+            playTrack();
+        }
+    };
+
+    const playTrack = () => {
+        if (!audio.src) {
+            loadTrack(currentIdx, false);
+        }
+        audio.play().then(() => {
+            isPlaying = true;
+            disc?.classList.add('spinning');
+            if (playIcon) playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+            if (navIcon) navIcon.textContent = '🎶';
+        }).catch(() => {
+            isPlaying = false;
+            disc?.classList.remove('spinning');
+        });
+    };
+
+    const pauseTrack = () => {
+        audio.pause();
+        isPlaying = false;
+        disc?.classList.remove('spinning');
+        if (playIcon) playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+        if (navIcon) navIcon.textContent = '🎵';
+    };
+
+    const togglePlay = () => {
+        if (isPlaying) {
+            pauseTrack();
+        } else {
+            playTrack();
+        }
+    };
+
+    // Initial track metadata
+    updateTrackMeta();
+
+    // Disc click toggles popup drawer & plays if not playing
+    discBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (popup) {
+            const isShown = popup.style.display !== 'none';
+            popup.style.display = isShown ? 'none' : 'block';
+        }
+        if (!isPlaying) {
+            playTrack();
+        }
+    });
+
+    // Topnav BGM icon toggles playback
+    navBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePlay();
+        if (popup) popup.style.display = 'block';
+    });
+
+    // Play/Pause button
+    playToggleBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePlay();
+    });
+
+    // Next track
+    nextBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        loadTrack(currentIdx + 1, isPlaying);
+    });
+
+    // Previous track
+    prevBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        loadTrack(currentIdx - 1, isPlaying);
+    });
+
+    // Mute toggle
+    muteBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        isMuted = !isMuted;
+        audio.muted = isMuted;
+        if (muteIcon) muteIcon.textContent = isMuted ? '🔇' : '🔊';
+    });
+
+    // Close mini popup
+    closePopupBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (popup) popup.style.display = 'none';
+    });
+
+    // Audio finished -> automatically play next track
+    audio.addEventListener('ended', () => {
+        loadTrack(currentIdx + 1, true);
+    });
+
+    // Close popup on outside click
+    document.addEventListener('click', (e) => {
+        if (popup && popup.style.display !== 'none' && !popup.contains(e.target) && !discBtn?.contains(e.target) && !navBtn?.contains(e.target)) {
+            popup.style.display = 'none';
+        }
+    });
+}
+
 // Initial Boot
 document.addEventListener('DOMContentLoaded', () => {
     updateOutletHeader();
@@ -3285,4 +3804,7 @@ document.addEventListener('DOMContentLoaded', () => {
     checkWelcomePopup();
     initAdminPricingFeature();
     initWifiFeature();
+    initWebHoursFeature();
+    initReviewsFeature();
+    initBgmPlayer();
 });

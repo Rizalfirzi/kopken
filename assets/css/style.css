@@ -2456,3 +2456,481 @@ body {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
+
+/* =========================================================================
+ * 14. FITUR BARU: JAM OPERASIONAL WEB (09.00 - 12.00 WIB)
+ * ========================================================================= */
+.web-hours-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    margin: 12px 0 16px;
+    font-size: 12px;
+    transition: var(--transition);
+}
+
+.web-hours-banner.whb-open {
+    background: #ECFDF5;
+    border: 1px solid #A7F3D0;
+    color: #065F46;
+}
+
+.web-hours-banner.whb-closed {
+    background: #FFF1F2;
+    border: 1px solid #FECDD3;
+    color: #9F1239;
+}
+
+.whb-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.whb-open .whb-dot {
+    background: #10B981;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+    animation: pulseGlow 2s infinite;
+}
+
+.whb-closed .whb-dot {
+    background: #F43F5E;
+    box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.2);
+}
+
+.whb-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.35;
+}
+
+.whb-status {
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.whb-sub {
+    font-size: 11px;
+    opacity: 0.88;
+}
+
+@keyframes pulseGlow {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* =========================================================================
+ * 15. FITUR BARU: HALAMAN REVIEW & TESTIMONI CUSTOMER
+ * ========================================================================= */
+.review-summary-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, #FFF5F7 0%, #FCE7F3 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+}
+
+.rsc-score-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    padding: 8px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.rsc-big-score {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--brand-primary-dark);
+    line-height: 1;
+}
+
+.rsc-stars-hero {
+    color: #F59E0B;
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin-top: 4px;
+}
+
+.rsc-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rsc-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-main);
+}
+
+.rsc-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* Star Rating Picker */
+.star-rating-picker {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+}
+
+.star-pick-btn {
+    background: transparent;
+    border: none;
+    font-size: 26px;
+    color: #D1D5DB;
+    cursor: pointer;
+    transition: transform 0.15s ease, color 0.15s ease;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.star-pick-btn:hover,
+.star-pick-btn.active {
+    color: #F59E0B;
+    transform: scale(1.15);
+}
+
+/* Review Cards List */
+.review-list-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.review-item-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+}
+
+.review-item-card:hover {
+    border-color: var(--brand-primary);
+    box-shadow: var(--shadow-md);
+}
+
+.ric-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.ric-user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ric-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--brand-primary-light);
+    color: var(--brand-primary-dark);
+    font-weight: 800;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+}
+
+.ric-name-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.ric-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ric-badge-verified {
+    font-size: 9px;
+    background: #DCFCE7;
+    color: #15803D;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+}
+
+.ric-date {
+    font-size: 10px;
+    color: var(--text-light);
+}
+
+.ric-stars {
+    color: #F59E0B;
+    font-size: 13px;
+    letter-spacing: 1px;
+}
+
+.ric-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--brand-primary-light);
+    color: var(--brand-primary-dark);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    margin-bottom: 6px;
+}
+
+.ric-comment {
+    font-size: 12px;
+    color: var(--text-main);
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+/* =========================================================================
+ * 16. FITUR BARU: FLOATING BGM PLAYER (LOFI CAFÉ VIBES)
+ * ========================================================================= */
+.floating-bgm-player {
+    position: fixed;
+    bottom: 24px;
+    left: 20px;
+    z-index: 99;
+}
+
+.bgm-disc-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-card);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-full);
+    padding: 6px 12px 6px 6px;
+    box-shadow: var(--shadow-float);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.bgm-disc-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    border-color: var(--brand-primary);
+}
+
+.bgm-disc {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #2B1820 0%, #150B10 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #523543;
+    position: relative;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.bgm-disc:before {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+.bgm-disc-core {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--brand-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+}
+
+.bgm-disc.spinning {
+    animation: spin 3.5s linear infinite;
+}
+
+.bgm-wave {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 16px;
+}
+
+.bgm-wave span {
+    width: 3px;
+    height: 4px;
+    background: var(--brand-primary);
+    border-radius: 2px;
+    transition: height 0.2s ease;
+}
+
+.bgm-disc.spinning + .bgm-wave span:nth-child(1) {
+    animation: waveBounce 0.8s ease-in-out infinite alternate;
+}
+.bgm-disc.spinning + .bgm-wave span:nth-child(2) {
+    animation: waveBounce 0.8s ease-in-out 0.2s infinite alternate;
+}
+.bgm-disc.spinning + .bgm-wave span:nth-child(3) {
+    animation: waveBounce 0.8s ease-in-out 0.4s infinite alternate;
+}
+
+@keyframes waveBounce {
+    0% { height: 4px; }
+    100% { height: 16px; }
+}
+
+/* Mini Popup Controls Drawer */
+.bgm-popup {
+    position: absolute;
+    bottom: 56px;
+    left: 0;
+    width: 250px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 14px;
+    animation: slideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bgm-popup-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.bgm-track-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 190px;
+}
+
+.bgm-badge {
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--brand-primary-dark);
+    letter-spacing: 0.5px;
+}
+
+.bgm-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bgm-artist {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.bgm-close-mini-btn {
+    background: transparent;
+    border: none;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+}
+
+.bgm-popup-ctrls {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.bgm-ctrl-btn {
+    background: var(--bg-page);
+    border: 1px solid var(--border-color);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.bgm-ctrl-btn:hover {
+    background: var(--brand-primary-light);
+    color: var(--brand-primary-dark);
+    border-color: var(--brand-primary);
+}
+
+.bgm-ctrl-btn.bgm-play-btn {
+    width: 38px;
+    height: 38px;
+    background: var(--brand-primary);
+    color: #FFFFFF;
+    border-color: var(--brand-primary-dark);
+    box-shadow: 0 4px 12px rgba(244, 114, 182, 0.4);
+}
+
+.bgm-ctrl-btn.bgm-play-btn:hover {
+    background: var(--brand-primary-dark);
+    transform: scale(1.05);
+}
+
+/* Dark Mode Overrides for New Features */
+[data-theme="dark"] .web-hours-banner.whb-open {
+    background: #064E3B;
+    border-color: #059669;
+    color: #A7F3D0;
+}
+
+[data-theme="dark"] .web-hours-banner.whb-closed {
+    background: #4C0519;
+    border-color: #9F1239;
+    color: #FECDD3;
+}
+
+[data-theme="dark"] .review-summary-card {
+    background: linear-gradient(135deg, #25141D 0%, #331C28 100%);
+}
+
+[data-theme="dark"] .rsc-score-box {
+    background: #190D13;
+}
+
+[data-theme="dark"] .review-item-card {
+    background: #25141D;
+}
+
+[data-theme="dark"] .bgm-popup {
+    background: #25141D;
+}

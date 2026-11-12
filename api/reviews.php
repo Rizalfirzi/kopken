@@ -1,0 +1,196 @@
+<?php
+/**
+ * API Endpoint: Customer Reviews & Ratings
+ * Handles listing reviews and customer review submissions.
+ */
+
+header('Content-Type: application/json; charset=UTF-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+if ($method === 'OPTIONS') {
+    exit(0);
+}
+
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/SimpleRedis.php';
+
+$dataPath = __DIR__ . '/../data/reviews.json';
+$tempPath = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'reviews.json';
+
+function getReviewsList(): array {
+    global $dataPath, $tempPath;
+
+    $loaded = null;
+
+    // Check Cloud Database via SimpleRedis first
+    $redis = new SimpleRedis();
+    if ($redis->isConnected()) {
+        $cachedVal = $redis->get('customer_reviews');
+        if (!empty($cachedVal)) {
+            $raw = is_string($cachedVal) ? json_decode($cachedVal, true) : $cachedVal;
+            if (is_array($raw)) {
+                $loaded = $raw;
+            }
+        }
+    }
+
+    if (!is_array($loaded) && file_exists($tempPath)) {
+        $loaded = json_decode(@file_get_contents($tempPath), true);
+    }
+
+    if (!is_array($loaded) && file_exists($dataPath)) {
+        $loaded = json_decode(@file_get_contents($dataPath), true);
+    }
+
+    if (!is_array($loaded)) {
+        $loaded = [];
+    }
+
+    return $loaded;
+}
+
+function saveReviewsList(array $reviews): bool {
+    global $dataPath, $tempPath;
+
+    $json = json_encode($reviews, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    // Save to local data
+    @file_put_contents($dataPath, $json);
+
+    // Save to temp cache
+    @file_put_contents($tempPath, $json);
+
+    // Save to Cloud Redis if connected
+    $redis = new SimpleRedis();
+    if ($redis->isConnected()) {
+        $redis->set('customer_reviews', $json);
+    }
+
+    return true;
+}
+
+function computeStats(array $reviews): array {
+    $total = count($reviews);
+    if ($total === 0) {
+        return [
+            'total' => 0,
+            'average' => 5.0,
+            'stars' => [5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0],
+            'satisfactionPercent' => 100,
+        ];
+    }
+
+    $sum = 0;
+    $stars = [5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0];
+    foreach ($reviews as $r) {
+        $rating = max(1, min(5, (int)($r['rating'] ?? 5)));
+        $sum += $rating;
+        $stars[$rating] = ($stars[$rating] ?? 0) + 1;
+    }
+
+    $avg = round($sum / $total, 1);
+    $satPercent = round((($stars[5] + $stars[4]) / $total) * 100);
+
+    return [
+        'total' => $total,
+        'average' => $avg,
+        'stars' => $stars,
+        'satisfactionPercent' => $satPercent,
+    ];
+}
+
+try {
+    $reviews = getReviewsList();
+
+    if ($method === 'POST') {
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true);
+        if (!is_array($input)) {
+            $input = $_POST;
+        }
+
+        $name = trim((string)($input['name'] ?? ''));
+        $rating = (int)($input['rating'] ?? 5);
+        $menu = trim((string)($input['menu'] ?? ''));
+        $comment = trim((string)($input['comment'] ?? ''));
+        $outlet = trim((string)($input['outlet'] ?? ''));
+
+        if ($name === '') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Nama tidak boleh kosong.']);
+            exit;
+        }
+
+        if ($comment === '') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Ulasan tidak boleh kosong.']);
+            exit;
+        }
+
+        if ($rating < 1 || $rating > 5) {
+            $rating = 5;
+        }
+
+        // Sanitize
+        $cleanName = htmlspecialchars(strip_tags($name));
+        $cleanComment = htmlspecialchars(strip_tags($comment));
+        $cleanMenu = htmlspecialchars(strip_tags($menu ?: 'Menu Kopi Kenangan'));
+        $cleanOutlet = htmlspecialchars(strip_tags($outlet ?: 'Kedai Kyuti'));
+
+        // Indonesian date format
+        $months = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+        $todayDate = date('j') . ' ' . ($months[(int)date('n')] ?? date('F')) . ' ' . date('Y');
+
+        $newReview = [
+            'id' => 'rev_' . time() . '_' . substr(md5(uniqid()), 0, 4),
+            'name' => $cleanName,
+            'rating' => $rating,
+            'menu' => $cleanMenu,
+            'comment' => $cleanComment,
+            'date' => $todayDate,
+            'verified' => true,
+            'outlet' => $cleanOutlet,
+        ];
+
+        // Prepend new review to top of list
+        array_unshift($reviews, $newReview);
+
+        // Keep maximum 100 reviews
+        if (count($reviews) > 100) {
+            $reviews = array_slice($reviews, 0, 100);
+        }
+
+        saveReviewsList($reviews);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Terima kasih atas ulasan manis kamu! ♡ Ulasan kamu sudah ditampilkan.',
+            'review' => $newReview,
+            'reviews' => $reviews,
+            'stats' => computeStats($reviews),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    // Default GET
+    echo json_encode([
+        'success' => true,
+        'reviews' => $reviews,
+        'stats' => computeStats($reviews),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Gagal memproses review: ' . $e->getMessage(),
+    ]);
+}

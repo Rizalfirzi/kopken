@@ -587,6 +587,59 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 6. Jam Operasional Web (Fitur Baru Permintaan Client) -->
+            <div class="admin-setting-section" style="margin-bottom:18px;background:var(--bg-page);border:1.5px solid var(--border-color);border-radius:var(--radius-md);padding:14px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <label style="font-size:13px;font-weight:800;color:var(--text-main);display:flex;align-items:center;gap:6px">
+                        <span>⏰ 6. Jam Operasional Web Kedai Kyuti</span>
+                    </label>
+                    <span id="cfgWebHoursLiveBadge" class="pill pill-open" style="font-size:11px">Live: Buka</span>
+                </div>
+                <small style="color:var(--text-muted);font-size:11px;display:block;margin-bottom:12px">
+                    Atur jam operasional pemesanan online Kedai Kyuti (misal <b>09.00 - 12.00 WIB</b>). Di luar jam ini, pelanggan tetap bisa browsing menu namun checkout akan diarahkan sesuai jam buka.
+                </small>
+
+                <!-- Toggle Aktifkan Jam Operasional -->
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;background:var(--bg-card);padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-color)">
+                    <div>
+                        <b style="font-size:12px;color:var(--text-main);display:block">Batasi Sesuai Jam Operasional</b>
+                        <small style="font-size:11px;color:var(--text-muted)">Nonaktifkan jika ingin web buka 24 jam</small>
+                    </div>
+                    <label class="switch-toggle" style="cursor:pointer">
+                        <input type="checkbox" id="cfgWebHoursEnabled" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Input Jam Buka & Jam Tutup -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+                    <div>
+                        <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Jam Buka (WIB)</small>
+                        <input type="time" class="form-input" id="cfgWebHoursOpen" value="09:00" style="font-weight:800;text-align:center">
+                    </div>
+                    <div>
+                        <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Jam Tutup (WIB)</small>
+                        <input type="time" class="form-input" id="cfgWebHoursClose" value="12:00" style="font-weight:800;text-align:center">
+                    </div>
+                </div>
+
+                <!-- Mode Override Status -->
+                <div style="margin-bottom:12px">
+                    <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Status Khusus / Override Manual</small>
+                    <select class="form-input" id="cfgWebHoursForce" style="font-size:12px;font-weight:700">
+                        <option value="auto">⚡ Otomatis (Sesuai Jam Buka &amp; Tutup di atas)</option>
+                        <option value="open">🟢 Paksa Selalu Buka (Abaikan Jam)</option>
+                        <option value="closed">🔴 Paksa Tutup Sementara Sekarang</option>
+                    </select>
+                </div>
+
+                <!-- Pesan Saat Tutup -->
+                <div>
+                    <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Pesan Saat Web Tutup</small>
+                    <textarea class="form-input" id="cfgWebHoursMsg" rows="2" style="font-size:11px;line-height:1.4" placeholder="Pesan ramah untuk customer saat web tutup..."></textarea>
+                </div>
+            </div>
         </div>
 
         <div class="sheet-actions" style="border-top:1px solid var(--border-color);padding:14px 18px;background:var(--bg-card)">
@@ -681,4 +734,149 @@
         </div>
     </div>
 </div>
+
+<!-- ============================================================= -->
+<!-- 12. MODAL REVIEW & TESTIMONI CUSTOMER (Fitur Baru Permintaan Client) -->
+<!-- ============================================================= -->
+<div class="sheet-backdrop" id="reviewSheet">
+    <div class="sheet review-sheet" style="max-height:92vh">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+            <div class="sheet-title">
+                <h3>⭐ Ulasan &amp; Testimoni Customer</h3>
+                <small>Cerita &amp; pengalaman manis para sahabat Kedai Kyuti ♡</small>
+            </div>
+            <button class="sheet-close" data-close="reviewSheet" aria-label="Tutup">✕</button>
+        </div>
+        <div class="sheet-body" style="padding-bottom:80px">
+            
+            <!-- Summary Rating Box -->
+            <div class="review-summary-card">
+                <div class="rsc-left">
+                    <div class="rsc-big-score" id="reviewAvgScore">4.9</div>
+                    <div class="rsc-stars">⭐⭐⭐⭐⭐</div>
+                    <div class="rsc-count" id="reviewTotalCount">120+ Ulasan Sahabat Kyuti</div>
+                </div>
+                <div class="rsc-right">
+                    <div class="rsc-highlight-item">
+                        <span class="rsc-badge">🌸 100% Amanah</span>
+                        <small>Jasdor Kopi Kenangan Asli</small>
+                    </div>
+                    <div class="rsc-highlight-item">
+                        <span class="rsc-badge">⚡ Respon Cepat</span>
+                        <small>Proses orderan tanpa ribet</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Button to Open Review Form -->
+            <div style="margin-bottom:14px;display:flex;gap:8px">
+                <button type="button" class="btn btn-primary btn-block" id="toggleWriteReviewBtn" style="font-weight:800;border-radius:var(--radius-full);padding:10px 16px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px">
+                    <span>✨ Tulis Ulasan Kamu ♡</span>
+                </button>
+            </div>
+
+            <!-- Form Tulis Review (Hidden by default, toggles on click) -->
+            <div id="writeReviewBox" style="display:none;background:var(--bg-card);border:1.5px solid var(--brand-primary);border-radius:var(--radius-md);padding:14px;margin-bottom:16px;box-shadow:var(--shadow-sm)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                    <b style="font-size:13px;color:var(--brand-primary-dark)">📝 Kirim Ulasan Pengalamanmu</b>
+                    <button type="button" id="closeWriteReviewBtn" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--text-muted)">&times;</button>
+                </div>
+
+                <form id="customerReviewForm" onsubmit="return false;">
+                    <!-- Rating Star Selector -->
+                    <div style="margin-bottom:12px;text-align:center;background:var(--bg-page);padding:8px;border-radius:var(--radius-sm)">
+                        <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Beri Bintang Kepuasan:</small>
+                        <div class="star-rating-picker" id="starRatingPicker">
+                            <button type="button" class="star-pick-btn active" data-val="1">★</button>
+                            <button type="button" class="star-pick-btn active" data-val="2">★</button>
+                            <button type="button" class="star-pick-btn active" data-val="3">★</button>
+                            <button type="button" class="star-pick-btn active" data-val="4">★</button>
+                            <button type="button" class="star-pick-btn active" data-val="5">★</button>
+                        </div>
+                        <span id="starRatingLabel" style="font-size:11px;font-weight:800;color:var(--brand-primary-dark)">⭐⭐⭐⭐⭐ Sangat Puas!</span>
+                    </div>
+
+                    <!-- Input Nama -->
+                    <div style="margin-bottom:10px">
+                        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:3px">Nama Panggilan / Inisial</label>
+                        <input type="text" class="form-input" id="revInputName" placeholder="Contoh: Salsabila 🌸" required maxlength="50" style="font-size:13px">
+                    </div>
+
+                    <!-- Input Menu -->
+                    <div style="margin-bottom:10px">
+                        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:3px">Menu yang Dipesan (Opsional)</label>
+                        <input type="text" class="form-input" id="revInputMenu" placeholder="Contoh: Paket Hemat 3 Item / Mantan Large" maxlength="70" style="font-size:13px">
+                    </div>
+
+                    <!-- Input Ulasan -->
+                    <div style="margin-bottom:12px">
+                        <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:3px">Ulasan / Testimoni Kamu</label>
+                        <textarea class="form-input" id="revInputComment" rows="3" placeholder="Tuliskan pengalaman manismu pesan di Kedai Kyuti..." required maxlength="400" style="font-size:12px;line-height:1.4"></textarea>
+                    </div>
+
+                    <div style="display:flex;gap:8px">
+                        <button type="button" class="btn btn-secondary" id="cancelReviewBtn" style="flex:1;font-size:12px">Batal</button>
+                        <button type="submit" class="btn btn-primary" id="submitReviewBtn" style="flex:2;font-size:13px;font-weight:800">
+                            <span>Kirim Ulasan 🌸</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Banner Bukti Testimoni Telegram -->
+            <a href="https://t.me/kedaikyuti" target="_blank" rel="noopener" class="telegram-testi-banner">
+                <div class="ttb-icon">📸</div>
+                <div class="ttb-info">
+                    <strong>Channel Telegram Testi @kedaikyuti</strong>
+                    <small>Lihat ratusan foto paket asli &amp; bukti transfer customer ↗</small>
+                </div>
+            </a>
+
+            <!-- Reviews List Container -->
+            <div class="reviews-list-wrap" id="reviewsListWrap">
+                <div style="text-align:center;padding:24px 0;color:var(--text-muted)">
+                    <span class="spinner"></span> Memuat ulasan customer...
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================= -->
+<!-- 13. MODAL JAM OPERASIONAL WEB TUTUP (Fitur Baru Permintaan Client) -->
+<!-- ============================================================= -->
+<div class="sheet-backdrop alert-modal-backdrop" id="webClosedModal">
+    <div class="alert-card" style="max-width:370px;text-align:center">
+        <button class="sheet-close" data-close="webClosedModal" aria-label="Tutup" style="position:absolute;right:14px;top:14px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:var(--bg-card-subtle);border:1px solid var(--border-color);border-radius:var(--radius-full);color:var(--text-muted);font-size:16px;cursor:pointer">&times;</button>
+        
+        <div class="alert-icon-wrap" style="background:#FFE4E6;color:#E11D48;margin:0 auto 12px">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        
+        <h3 class="alert-title" style="margin-bottom:6px;font-size:16px">Di Luar Jam Operasional Web ⏰</h3>
+        
+        <div style="display:inline-flex;align-items:center;gap:6px;background:var(--bg-card-subtle);border:1px solid var(--border-color);border-radius:20px;padding:4px 12px;margin-bottom:12px">
+            <span style="font-size:12px;color:var(--brand-primary-dark);font-weight:800">
+                Jam Layanan: <span id="webClosedHoursLabel">09.00 - 12.00 WIB</span>
+            </span>
+        </div>
+
+        <p class="alert-desc" id="webClosedMessageText" style="font-size:12px;line-height:1.5;margin-bottom:16px;color:var(--text-main)">
+            ♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Pemesanan dibuka pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡
+        </p>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-secondary btn-block" data-close="webClosedModal" type="button" style="padding:10px;font-size:13px;font-weight:700">
+                Lihat-Lihat Menu Dulu ☕
+            </button>
+            <a href="https://wa.me/628972276154" target="_blank" rel="noopener" class="btn btn-wa btn-block" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;font-size:13px;font-weight:800;border-radius:var(--radius-full)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-.9-2.3c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7 6.3 6.3 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .8 2.5.7 3 .6a2.9 2.9 0 0 0 1.9-1.3 2.4 2.4 0 0 0 .2-1.3c-.1-.2-.3-.3-.6-.4zM12 21.8a9.8 9.8 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A9.8 9.8 0 1 1 12 21.8zm8.4-18.2A11.8 11.8 0 0 0 1.7 17.8L0 24l6.4-1.7a11.8 11.8 0 0 0 5.6 1.4A11.8 11.8 0 0 0 20.4 3.6z"/></svg>
+                <span>Tanya Admin di WhatsApp</span>
+            </a>
+        </div>
+    </div>
+</div>
+
 

@@ -19,6 +19,13 @@
         "bundle_hemat_3_item": true
     },
     "disabled_bundling_options": [],
+    "web_hours": {
+        "enabled": true,
+        "open": "09:00",
+        "close": "12:00",
+        "closed_message": "♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Jam layanan pemesanan kami adalah pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡",
+        "force_status": "auto"
+    },
     "admin_passcode": "WHOSUTII26",
     "updated_at": "2026-10-27T16:04:27+07:00"
 }

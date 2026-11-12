@@ -466,6 +466,45 @@ $config = [
         'kv_url' => getenv('KV_REST_API_URL') ?: getenv('UPSTASH_REDIS_REST_URL') ?: '',
         'kv_token' => getenv('KV_REST_API_TOKEN') ?: getenv('UPSTASH_REDIS_REST_TOKEN') ?: '',
     ],
+
+    // =========================================================================
+    // 10. JAM OPERASIONAL WEB (JASA TITIP ORDER KEDAI KYUTI)
+    // Default: 09.00 - 12.00 WIB (Bisa disetting sendiri oleh admin di website ⚙️)
+    // =========================================================================
+    'web_hours' => [
+        'enabled' => true,
+        'open' => '09:00',
+        'close' => '12:00',
+        'closed_message' => '♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Jam layanan pemesanan kami adalah pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡',
+        'allow_browsing' => true,
+        'force_status' => 'auto', // 'auto', 'open', 'closed'
+    ],
+
+    // =========================================================================
+    // 11. BACKGROUND MUSIC (BGM) PLAYLIST (Aesthetic Cafe Vibes)
+    // =========================================================================
+    'bgm' => [
+        'enabled' => true,
+        'autoplay_hint' => true,
+        'default_volume' => 0.4,
+        'playlist' => [
+            [
+                'title' => 'Kedai Kyuti Lo-Fi Café Vibes',
+                'artist' => 'Chill Lofi Beats ♫',
+                'src' => 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/empty-mind-118973.mp3',
+            ],
+            [
+                'title' => 'Sweet Morning Coffee',
+                'artist' => 'Soft Piano & Acoustic ☕',
+                'src' => 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/piano.mp3',
+            ],
+            [
+                'title' => 'Pink Pastel Blossom',
+                'artist' => 'Cozy Lounge Relaxing 🌸',
+                'src' => 'https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/relaxing.mp3',
+            ],
+        ],
+    ],
 ];
 
 // =========================================================================
@@ -552,6 +591,9 @@ if (is_array($dynamicData)) {
     if (!empty($dynamicData['admin_passcode'])) {
         $config['admin']['passcode'] = trim((string)$dynamicData['admin_passcode']);
     }
+    if (isset($dynamicData['web_hours']) && is_array($dynamicData['web_hours'])) {
+        $config['web_hours'] = array_merge($config['web_hours'] ?? [], $dynamicData['web_hours']);
+    }
 }
 
 /**
@@ -572,4 +614,52 @@ function config(string $key, $default = null)
     }
 
     return $current;
+}
+
+/**
+ * Helper function to evaluate current Web Operating Hours in Asia/Jakarta (WIB)
+ */
+function getWebHoursState(): array
+{
+    $wh = config('web_hours', [
+        'enabled' => true,
+        'open' => '09:00',
+        'close' => '12:00',
+        'closed_message' => '♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Jam layanan pemesanan kami adalah pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡',
+        'allow_browsing' => true,
+        'force_status' => 'auto',
+    ]);
+
+    $force = $wh['force_status'] ?? 'auto';
+    $enabled = !empty($wh['enabled']);
+
+    $now = new DateTime('now', new DateTimeZone('Asia/Jakarta'));
+    $currentHi = $now->format('H:i');
+
+    $isOpen = true;
+    if ($force === 'open') {
+        $isOpen = true;
+    } elseif ($force === 'closed') {
+        $isOpen = false;
+    } elseif ($enabled) {
+        $open = $wh['open'] ?? '09:00';
+        $close = $wh['close'] ?? '12:00';
+        if ($open <= $close) {
+            $isOpen = ($currentHi >= $open && $currentHi <= $close);
+        } else {
+            $isOpen = ($currentHi >= $open || $currentHi <= $close);
+        }
+    }
+
+    return [
+        'enabled' => $enabled,
+        'isOpen' => $isOpen,
+        'statusText' => $isOpen ? 'Buka' : 'Tutup',
+        'open' => $wh['open'] ?? '09:00',
+        'close' => $wh['close'] ?? '12:00',
+        'hoursText' => ($wh['open'] ?? '09:00') . ' - ' . ($wh['close'] ?? '12:00') . ' WIB',
+        'closedMessage' => $wh['closed_message'] ?? '',
+        'forceStatus' => $force,
+        'currentWib' => $currentHi,
+    ];
 }

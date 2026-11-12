@@ -9,7 +9,9 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+if ($method === 'OPTIONS') {
     exit(0);
 }
 
@@ -46,6 +48,13 @@ function getCurrentPricing() {
             'bundle_hemat_3_item' => true,
         ]),
         'disabled_bundling_options' => config('pricing.disabled_bundling_options', []),
+        'web_hours' => config('web_hours', [
+            'enabled' => true,
+            'open' => '09:00',
+            'close' => '12:00',
+            'closed_message' => '♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Jam layanan pemesanan kami adalah pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡',
+            'force_status' => 'auto',
+        ]),
         'admin_passcode' => (string) config('admin.passcode', 'WHOSUTII26'),
     ];
 
@@ -109,6 +118,9 @@ function getCurrentPricing() {
         if (isset($loaded['disabled_bundling_options']) && is_array($loaded['disabled_bundling_options'])) {
             $default['disabled_bundling_options'] = $loaded['disabled_bundling_options'];
         }
+        if (isset($loaded['web_hours']) && is_array($loaded['web_hours'])) {
+            $default['web_hours'] = array_merge($default['web_hours'], $loaded['web_hours']);
+        }
         if (!empty($loaded['admin_passcode'])) {
             $default['admin_passcode'] = trim((string)$loaded['admin_passcode']);
         }
@@ -119,7 +131,7 @@ function getCurrentPricing() {
 
 try {
     // 1. GET: Fetch current pricing (requires valid code or session)
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    if ($method === 'GET') {
         $code = trim($_GET['code'] ?? '');
         if ($code !== $validPasscode) {
             http_response_code(403);
@@ -148,7 +160,7 @@ try {
     }
 
     // 2. POST: Save new pricing
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($method === 'POST') {
         $raw = file_get_contents('php://input');
         $input = json_decode($raw, true);
         if (!is_array($input)) {
@@ -217,6 +229,18 @@ try {
                 if ($o !== '') $cleanOpts[] = $o;
             }
             $current['disabled_bundling_options'] = array_values(array_unique($cleanOpts));
+        }
+
+        // Sanitize & Update Web Operating Hours
+        if (isset($input['web_hours']) && is_array($input['web_hours'])) {
+            $wh = $input['web_hours'];
+            $current['web_hours'] = [
+                'enabled' => !empty($wh['enabled']),
+                'open' => !empty($wh['open']) ? trim((string)$wh['open']) : '09:00',
+                'close' => !empty($wh['close']) ? trim((string)$wh['close']) : '12:00',
+                'closed_message' => !empty($wh['closed_message']) ? trim((string)$wh['closed_message']) : '♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Jam layanan pemesanan kami adalah pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡',
+                'force_status' => in_array($wh['force_status'] ?? '', ['auto', 'open', 'closed']) ? $wh['force_status'] : 'auto',
+            ];
         }
 
         $current['updated_at'] = date('c');

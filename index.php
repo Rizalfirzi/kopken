@@ -65,6 +65,9 @@ if ($initialOutlet) {
     }
 }
 
+// Current Web Operating Hours State
+$webHoursState = getWebHoursState();
+
 // Include Header Template
 require_once __DIR__ . '/includes/header.php';
 ?>
@@ -88,6 +91,15 @@ require_once __DIR__ . '/includes/header.php';
             <div class="bio-quote-box">
                 <p class="bio-quote"><?= htmlspecialchars(config('store.bio_quote', '♡ your little corner for daily food & beverage deals.')) ?></p>
                 <p class="bio-desc"><?= htmlspecialchars(config('store.bio_desc', 'fast response, friendly prices, and service made with love ♡')) ?></p>
+            </div>
+
+            <!-- Jam Operasional Web Kedai Kyuti (Fitur Baru) -->
+            <div class="web-hours-banner <?= $webHoursState['isOpen'] ? 'whb-open' : 'whb-closed' ?>" id="hubWebHoursBanner">
+                <span class="whb-dot"></span>
+                <div class="whb-content">
+                    <strong class="whb-status"><?= htmlspecialchars($webHoursState['statusText']) ?></strong>
+                    <span class="whb-sub"><?= $webHoursState['isOpen'] ? 'Terima pesanan sekarang via WhatsApp ♡' : (!empty($webHoursState['message']) ? htmlspecialchars($webHoursState['message']) : 'Katalog tetap bisa dilihat, pemesanan dibuka pukul ' . htmlspecialchars($webHoursState['open']) . ' - ' . htmlspecialchars($webHoursState['close']) . ' WIB') ?></span>
+                </div>
             </div>
 
             <!-- Deretan Icon Media Sosial (Revisi Poin 4: Komunitas & Kontak di Halaman Landing Pertama) -->
@@ -124,7 +136,20 @@ require_once __DIR__ . '/includes/header.php';
                     </div>
                 </button>
 
-                <!-- 2. WhatsApp Admin -->
+                <!-- 2. Review & Testimoni Customer (Fitur Baru) -->
+                <button class="bio-link-btn" id="openReviewsHubBtn" type="button">
+                    <div class="bl-icon" style="color:#F59E0B">⭐</div>
+                    <div class="bl-info">
+                        <span class="bl-title">Review &amp; Testimoni Customer</span>
+                        <span class="bl-sub">Ulasan sahabat Kyuti &amp; bagikan pengalamanmu</span>
+                    </div>
+                    <div class="bl-arrow">
+                        <span class="bl-tag" style="background:#FEF3C7;color:#D97706">4.9 ★</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                    </div>
+                </button>
+
+                <!-- 3. WhatsApp Admin -->
                 <a class="bio-link-btn" href="<?= htmlspecialchars($socialLinks['wa'] ?? 'https://wa.me/message/7PJFBJ3DLCINJ1') ?>" target="_blank" rel="noopener">
                     <div class="bl-icon" style="color:#22C55E">💬</div>
                     <div class="bl-info">
@@ -200,6 +225,15 @@ require_once __DIR__ . '/includes/header.php';
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
                 <span>Wi-Fi</span>
             </button>
+        </div>
+
+        <!-- Banner Jam Operasional Toko di Store View -->
+        <div class="web-hours-banner <?= $webHoursState['isOpen'] ? 'whb-open' : 'whb-closed' ?>" id="storeWebHoursBanner">
+            <span class="whb-dot"></span>
+            <div class="whb-content">
+                <strong class="whb-status"><?= htmlspecialchars($webHoursState['statusText']) ?></strong>
+                <span class="whb-sub"><?= $webHoursState['isOpen'] ? 'Outlet &amp; keranjang aktif untuk checkout WhatsApp' : (!empty($webHoursState['message']) ? htmlspecialchars($webHoursState['message']) : 'Katalog tetap bisa dicek, pemesanan dibuka pukul ' . htmlspecialchars($webHoursState['open']) . ' - ' . htmlspecialchars($webHoursState['close']) . ' WIB') ?></span>
+            </div>
         </div>
 
         <!-- Tampilan Password Wi-Fi Outlet (Pengganti Tanda Hijau sesuai Revisi Client) -->

@@ -13,6 +13,48 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
     </div>
+
+    <!-- Floating BGM Player Widget (Fitur Lagu Café) -->
+    <div class="floating-bgm-player" id="floatingBgmPlayer">
+        <!-- Floating Disc Button -->
+        <button type="button" class="bgm-disc-btn" id="bgmDiscBtn" title="Putar Musik Café Kyuti" aria-label="Putar Musik Café Kyuti">
+            <div class="bgm-disc" id="bgmDisc">
+                <div class="bgm-disc-core">☕</div>
+            </div>
+            <div class="bgm-wave" id="bgmWave">
+                <span></span><span></span><span></span>
+            </div>
+        </button>
+
+        <!-- Mini Pop-up Controls Drawer -->
+        <div class="bgm-popup" id="bgmPopup" style="display:none">
+            <div class="bgm-popup-head">
+                <div class="bgm-track-info">
+                    <span class="bgm-badge">🌸 BGM CAFÉ</span>
+                    <strong class="bgm-title" id="bgmCurrentTitle">Kedai Kyuti Lo-Fi Vibes</strong>
+                    <small class="bgm-artist" id="bgmCurrentArtist">Chill Lofi Beats ♫</small>
+                </div>
+                <button type="button" class="bgm-close-mini-btn" id="bgmClosePopupBtn" title="Tutup Menu Musik">✕</button>
+            </div>
+            <div class="bgm-popup-ctrls">
+                <button type="button" class="bgm-ctrl-btn" id="bgmPrevBtn" title="Lagu Sebelumnya">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.6"/></svg>
+                </button>
+                <button type="button" class="bgm-ctrl-btn bgm-play-btn" id="bgmPlayToggleBtn" title="Putar / Jeda">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="bgmPlayIcon"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+                <button type="button" class="bgm-ctrl-btn" id="bgmNextBtn" title="Lagu Selanjutnya">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.6"/></svg>
+                </button>
+                <button type="button" class="bgm-ctrl-btn" id="bgmMuteBtn" title="Mute / Unmute">
+                    <span id="bgmMuteIcon" style="font-size:14px">🔊</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Native Audio Tag -->
+    <audio id="bgmAudio" preload="none"></audio>
 </div>
 
 <!-- Toast Container -->
@@ -46,7 +88,10 @@ window.INITIAL_DATA = {
         disabledBundlingOptions: <?= json_encode(config('pricing.disabled_bundling_options', []), JSON_UNESCAPED_UNICODE) ?>,
     },
     addons: <?= json_encode(config('addons', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
-    wifi: <?= json_encode($initialWifi ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+    wifi: <?= json_encode($initialWifi ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+    webHours: <?= json_encode(getWebHoursState(), JSON_UNESCAPED_UNICODE) ?>,
+    bgm: <?= json_encode(config('bgm', []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+    reviewsUrl: 'api/reviews.php'
 };
 </script>
 
