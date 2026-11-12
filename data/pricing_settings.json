@@ -26,6 +26,27 @@
         "closed_message": "♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Jam layanan pemesanan kami adalah pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡",
         "force_status": "auto"
     },
+    "bgm": {
+        "enabled": true,
+        "default_volume": 0.4,
+        "playlist": [
+            {
+                "title": "Kedai Kyuti Lo-Fi Café Vibes",
+                "artist": "Chill Lofi Beats ♫",
+                "src": "https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/empty-mind-118973.mp3"
+            },
+            {
+                "title": "Sweet Morning Coffee",
+                "artist": "Soft Piano & Acoustic ☕",
+                "src": "https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/piano.mp3"
+            },
+            {
+                "title": "Pink Pastel Blossom",
+                "artist": "Cozy Lounge Relaxing 🌸",
+                "src": "https://raw.githubusercontent.com/riccardobertolini/lofi-music/main/public/audio/relaxing.mp3"
+            }
+        ]
+    },
     "admin_passcode": "WHOSUTII26",
     "updated_at": "2026-10-27T16:04:27+07:00"
 }

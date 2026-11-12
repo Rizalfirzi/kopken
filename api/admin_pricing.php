@@ -55,6 +55,11 @@ function getCurrentPricing() {
             'closed_message' => '♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Jam layanan pemesanan kami adalah pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡',
             'force_status' => 'auto',
         ]),
+        'bgm' => config('bgm', [
+            'enabled' => true,
+            'default_volume' => 0.4,
+            'playlist' => [],
+        ]),
         'admin_passcode' => (string) config('admin.passcode', 'WHOSUTII26'),
     ];
 
@@ -240,6 +245,27 @@ try {
                 'close' => !empty($wh['close']) ? trim((string)$wh['close']) : '12:00',
                 'closed_message' => !empty($wh['closed_message']) ? trim((string)$wh['closed_message']) : '♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Jam layanan pemesanan kami adalah pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡',
                 'force_status' => in_array($wh['force_status'] ?? '', ['auto', 'open', 'closed']) ? $wh['force_status'] : 'auto',
+            ];
+        }
+
+        if (isset($input['bgm']) && is_array($input['bgm'])) {
+            $bgmIn = $input['bgm'];
+            $cleanPlaylist = [];
+            if (!empty($bgmIn['playlist']) && is_array($bgmIn['playlist'])) {
+                foreach ($bgmIn['playlist'] as $track) {
+                    if (is_array($track) && !empty($track['src'])) {
+                        $cleanPlaylist[] = [
+                            'title' => trim((string)($track['title'] ?? 'Lagu Café')),
+                            'artist' => trim((string)($track['artist'] ?? 'Kedai Kyuti')),
+                            'src' => trim((string)$track['src']),
+                        ];
+                    }
+                }
+            }
+            $current['bgm'] = [
+                'enabled' => !empty($bgmIn['enabled']),
+                'default_volume' => isset($bgmIn['default_volume']) ? max(0.05, min(1.0, (float)$bgmIn['default_volume'])) : 0.4,
+                'playlist' => $cleanPlaylist,
             ];
         }
 

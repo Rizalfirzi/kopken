@@ -594,6 +594,9 @@ if (is_array($dynamicData)) {
     if (isset($dynamicData['web_hours']) && is_array($dynamicData['web_hours'])) {
         $config['web_hours'] = array_merge($config['web_hours'] ?? [], $dynamicData['web_hours']);
     }
+    if (isset($dynamicData['bgm']) && is_array($dynamicData['bgm'])) {
+        $config['bgm'] = array_merge($config['bgm'] ?? [], $dynamicData['bgm']);
+    }
 }
 
 /**

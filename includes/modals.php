@@ -640,6 +640,112 @@
                     <textarea class="form-input" id="cfgWebHoursMsg" rows="2" style="font-size:11px;line-height:1.4" placeholder="Pesan ramah untuk customer saat web tutup..."></textarea>
                 </div>
             </div>
+
+            <!-- 7. Pengaturan Musik & Lagu Café (BGM) (Fitur Baru) -->
+            <div class="admin-setting-section" style="margin-bottom:18px;background:var(--bg-page);border:1.5px solid var(--border-color);border-radius:var(--radius-md);padding:14px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <label style="font-size:13px;font-weight:800;color:var(--text-main);display:flex;align-items:center;gap:6px">
+                        <span>🎵 7. Pengaturan Musik &amp; Lagu Café (BGM)</span>
+                    </label>
+                    <span id="cfgBgmActiveCountBadge" class="pill pill-premium" style="font-size:11px">3 Lagu Aktif</span>
+                </div>
+                <small style="color:var(--text-muted);font-size:11px;display:block;margin-bottom:12px">
+                    Client dapat mengupload file musik format <b>.mp3</b> atau menginputkan link lagu URL untuk dimainkan di pemutar musik website.
+                </small>
+
+                <!-- Toggle BGM Player -->
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;background:var(--bg-card);padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-color)">
+                    <div>
+                        <b style="font-size:12px;color:var(--text-main);display:block">Tampilkan Pemutar Musik di Website</b>
+                        <small style="font-size:11px;color:var(--text-muted)">Nonaktifkan jika tidak ingin ada musik café</small>
+                    </div>
+                    <label class="switch-toggle" style="cursor:pointer">
+                        <input type="checkbox" id="cfgBgmEnabled" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Volume Slider -->
+                <div style="margin-bottom:14px;background:var(--bg-card);padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-color)">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                        <small style="font-weight:700;color:var(--text-main);font-size:11px">Volume Musik Default</small>
+                        <span id="cfgBgmVolumeVal" style="font-size:11px;font-weight:800;color:var(--brand-primary-dark)">40%</span>
+                    </div>
+                    <input type="range" id="cfgBgmVolume" min="5" max="100" value="40" style="width:100%;accent-color:var(--brand-primary);cursor:pointer">
+                </div>
+
+                <!-- Daftar Playlist Lagu Saat Ini -->
+                <div style="margin-bottom:14px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                        <b style="font-size:12px;color:var(--text-main)">Daftar Lagu Aktif:</b>
+                        <button type="button" id="cfgBgmResetBtn" style="background:none;border:none;color:var(--brand-primary-dark);font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline">
+                            ↺ Reset Lagu Default
+                        </button>
+                    </div>
+                    <div id="cfgBgmPlaylistContainer" style="display:flex;flex-direction:column;gap:8px">
+                        <!-- Rendered dynamically by JS -->
+                    </div>
+                </div>
+
+                <!-- Form Tambah Lagu Baru (Upload / URL) -->
+                <div style="background:var(--bg-card);border:1.5px dashed var(--border-color);border-radius:var(--radius-md);padding:12px">
+                    <b style="font-size:12px;color:var(--text-main);display:block;margin-bottom:8px">Tambah Lagu Baru:</b>
+
+                    <!-- Pilihan Tab: Upload File vs Input Link -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">
+                        <button type="button" class="btn btn-sm" id="cfgBgmTabUploadBtn" style="font-size:11px;font-weight:800;padding:6px;border:1px solid var(--brand-primary);background:var(--brand-primary-light);color:var(--brand-primary-dark);border-radius:var(--radius-sm)">
+                            📤 Upload File MP3
+                        </button>
+                        <button type="button" class="btn btn-sm" id="cfgBgmTabLinkBtn" style="font-size:11px;font-weight:800;padding:6px;border:1px solid var(--border-color);background:var(--bg-page);color:var(--text-muted);border-radius:var(--radius-sm)">
+                            🔗 Input Link URL MP3
+                        </button>
+                    </div>
+
+                    <!-- Panel 1: Upload File MP3 -->
+                    <div id="cfgBgmUploadPanel">
+                        <div style="margin-bottom:8px">
+                            <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Pilih File Lagu (.mp3)</small>
+                            <input type="file" id="cfgBgmFileInput" accept=".mp3,audio/mpeg,audio/mp3" class="form-input" style="font-size:11px;padding:6px">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+                            <div>
+                                <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Judul Lagu</small>
+                                <input type="text" id="cfgBgmUploadTitle" class="form-input" placeholder="Misal: Lofi Kopi Sore" style="font-size:11px">
+                            </div>
+                            <div>
+                                <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Artis / Keterangan</small>
+                                <input type="text" id="cfgBgmUploadArtist" class="form-input" placeholder="Misal: Kedai Kyuti Chill" style="font-size:11px">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-block" id="cfgBgmSubmitUploadBtn" style="font-size:12px;padding:8px;font-weight:800">
+                            <span>📤 Upload File &amp; Tambahkan</span>
+                        </button>
+                        <div id="cfgBgmUploadMsg" style="font-size:11px;margin-top:6px;display:none;text-align:center"></div>
+                    </div>
+
+                    <!-- Panel 2: Input Link URL MP3 -->
+                    <div id="cfgBgmLinkPanel" style="display:none">
+                        <div style="margin-bottom:8px">
+                            <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Link / URL File MP3 Langsung</small>
+                            <input type="url" id="cfgBgmLinkUrl" class="form-input" placeholder="https://example.com/lagu.mp3 atau Google Drive" style="font-size:11px">
+                            <small style="font-size:10px;color:var(--text-light);display:block;margin-top:2px">Bisa link MP3 publik, Google Drive (view link), atau Dropbox</small>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+                            <div>
+                                <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Judul Lagu</small>
+                                <input type="text" id="cfgBgmLinkTitle" class="form-input" placeholder="Misal: Sweet Afternoon Acoustic" style="font-size:11px">
+                            </div>
+                            <div>
+                                <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Artis / Keterangan</small>
+                                <input type="text" id="cfgBgmLinkArtist" class="form-input" placeholder="Misal: Lofi Vibe ☕" style="font-size:11px">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-block" id="cfgBgmSubmitLinkBtn" style="font-size:12px;padding:8px;font-weight:800">
+                            <span>+ Tambahkan Link Lagu</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="sheet-actions" style="border-top:1px solid var(--border-color);padding:14px 18px;background:var(--bg-card)">
