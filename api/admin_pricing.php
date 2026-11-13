@@ -338,6 +338,15 @@ try {
         // 5. Set Cookie for immediate cross-request synchronization on serverless
         $cookiePayload = $current;
         unset($cookiePayload['admin_passcode']);
+        // Strip heavy base64 audio data from cookie to avoid exceeding 4KB cookie header limit
+        if (isset($cookiePayload['bgm']['playlist']) && is_array($cookiePayload['bgm']['playlist'])) {
+            foreach ($cookiePayload['bgm']['playlist'] as &$trk) {
+                if (!empty($trk['src']) && str_starts_with($trk['src'], 'data:')) {
+                    $trk['src'] = '';
+                }
+            }
+            unset($trk);
+        }
         @setcookie('kyuti_custom_pricing', urlencode(json_encode($cookiePayload, JSON_UNESCAPED_UNICODE)), [
             'expires' => time() + 31536000,
             'path' => '/',

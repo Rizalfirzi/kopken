@@ -735,40 +735,51 @@
                     </div>
                 </div>
 
-                <!-- Form Tambah Lagu Baru (Upload / URL) -->
+                <!-- Form Tambah Lagu Baru (YouTube / Direct URL / Upload) -->
                 <div style="background:var(--bg-card);border:1.5px dashed var(--border-color);border-radius:var(--radius-md);padding:12px">
-                    <b style="font-size:12px;color:var(--text-main);display:block;margin-bottom:8px">Tambah Lagu Baru:</b>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <b style="font-size:12px;color:var(--text-main)">+ Tambah Lagu Baru ke Playlist:</b>
+                        <span style="font-size:10.5px;color:var(--brand-primary-dark);font-weight:700">💾 Auto-Save Aktif</span>
+                    </div>
 
-                    <!-- Pilihan Tab: Upload File vs Input Link -->
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">
-                        <button type="button" class="btn btn-sm" id="cfgBgmTabUploadBtn" style="font-size:11px;font-weight:800;padding:6px;border:1px solid var(--brand-primary);background:var(--brand-primary-light);color:var(--brand-primary-dark);border-radius:var(--radius-sm)">
-                            📤 Upload File MP3
+                    <!-- Pilihan Tab: YouTube vs Link Audio vs Upload MP3 -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:12px">
+                        <button type="button" class="btn btn-sm" id="cfgBgmTabYtBtn" style="font-size:11px;font-weight:800;padding:7px 4px;border:1.5px solid var(--brand-primary);background:var(--brand-primary-light);color:var(--brand-primary-dark);border-radius:var(--radius-sm)">
+                            🎬 YouTube
                         </button>
-                        <button type="button" class="btn btn-sm" id="cfgBgmTabLinkBtn" style="font-size:11px;font-weight:800;padding:6px;border:1px solid var(--border-color);background:var(--bg-page);color:var(--text-muted);border-radius:var(--radius-sm)">
-                            🔗 Input Link URL MP3
+                        <button type="button" class="btn btn-sm" id="cfgBgmTabLinkBtn" style="font-size:11px;font-weight:800;padding:7px 4px;border:1.5px solid var(--border-color);background:var(--bg-page);color:var(--text-muted);border-radius:var(--radius-sm)">
+                            🔗 Link MP3
+                        </button>
+                        <button type="button" class="btn btn-sm" id="cfgBgmTabUploadBtn" style="font-size:11px;font-weight:800;padding:7px 4px;border:1.5px solid var(--border-color);background:var(--bg-page);color:var(--text-muted);border-radius:var(--radius-sm)">
+                            📤 Upload File
                         </button>
                     </div>
 
-                    <!-- Panel 1: Upload File MP3 -->
-                    <div id="cfgBgmUploadPanel">
+                    <!-- Panel 1: YouTube / YouTube Music Link (Rekomendasi Utama) -->
+                    <div id="cfgBgmYtPanel">
                         <div style="margin-bottom:8px">
-                            <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Pilih File Lagu (.mp3)</small>
-                            <input type="file" id="cfgBgmFileInput" accept=".mp3,audio/mpeg,audio/mp3" class="form-input" style="font-size:11px;padding:6px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                                <small style="font-weight:700;color:var(--text-main)">Link Video / Musik YouTube</small>
+                                <span style="font-size:10px;color:var(--brand-primary-dark);font-weight:700">Bisa masukkan 1 atau banyak link</span>
+                            </div>
+                            <textarea id="cfgBgmYtUrl" class="form-input" rows="2" placeholder="Contoh: https://youtu.be/6kKuzB_YOmc atau https://youtube.com/watch?v=... (Jika lebih dari 1 lagu, pisahkan dengan baris baru)" style="font-size:11.5px;line-height:1.4;resize:vertical"></textarea>
+                            <small style="font-size:10px;color:var(--text-muted);display:block;margin-top:3px">
+                                ✨ <i>Mendukung YouTube, YouTube Music, Versi Lirik, dan Shorts. Pemutaran full lagu tanpa intro terpotong.</i>
+                            </small>
                         </div>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
                             <div>
-                                <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Judul Lagu</small>
-                                <input type="text" id="cfgBgmUploadTitle" class="form-input" placeholder="Misal: Lofi Kopi Sore" style="font-size:11px">
+                                <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Judul Lagu (Opsional jika 1 link)</small>
+                                <input type="text" id="cfgBgmYtTitle" class="form-input" placeholder="Misal: Negoro Angin" style="font-size:11px">
                             </div>
                             <div>
-                                <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Artis / Keterangan</small>
-                                <input type="text" id="cfgBgmUploadArtist" class="form-input" placeholder="Misal: Kedai Kyuti Chill" style="font-size:11px">
+                                <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Artis / Penyanyi (Opsional)</small>
+                                <input type="text" id="cfgBgmYtArtist" class="form-input" placeholder="Misal: Denny Caknan" style="font-size:11px">
                             </div>
                         </div>
-                        <button type="button" class="btn btn-primary btn-block" id="cfgBgmSubmitUploadBtn" style="font-size:12px;padding:8px;font-weight:800">
-                            <span>📤 Upload File &amp; Tambahkan</span>
+                        <button type="button" class="btn btn-primary btn-block" id="cfgBgmSubmitYtBtn" style="font-size:12px;padding:9px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px">
+                            <span>💾 + Tambahkan &amp; Simpan ke Playlist</span>
                         </button>
-                        <div id="cfgBgmUploadMsg" style="font-size:11px;margin-top:6px;display:none;text-align:center"></div>
                     </div>
 
                     <!-- Panel 2: Input Link URL MP3 -->
@@ -788,9 +799,34 @@
                                 <input type="text" id="cfgBgmLinkArtist" class="form-input" placeholder="Misal: Lofi Vibe ☕" style="font-size:11px">
                             </div>
                         </div>
-                        <button type="button" class="btn btn-secondary btn-block" id="cfgBgmSubmitLinkBtn" style="font-size:12px;padding:8px;font-weight:800">
-                            <span>+ Tambahkan Link Lagu</span>
+                        <button type="button" class="btn btn-secondary btn-block" id="cfgBgmSubmitLinkBtn" style="font-size:12px;padding:9px;font-weight:800">
+                            <span>💾 + Tambahkan &amp; Simpan Link Lagu</span>
                         </button>
+                    </div>
+
+                    <!-- Panel 3: Upload File MP3 -->
+                    <div id="cfgBgmUploadPanel" style="display:none">
+                        <div style="margin-bottom:8px">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                                <small style="font-weight:700;color:var(--text-muted)">Pilih File Lagu (.mp3)</small>
+                                <span style="font-size:10px;color:var(--brand-primary-dark);font-weight:700">Bisa pilih beberapa file sekaligus</span>
+                            </div>
+                            <input type="file" id="cfgBgmFileInput" accept=".mp3,audio/mpeg,audio/mp3" multiple class="form-input" style="font-size:11px;padding:6px">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+                            <div>
+                                <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Judul Lagu (Opsional)</small>
+                                <input type="text" id="cfgBgmUploadTitle" class="form-input" placeholder="Nama lagu..." style="font-size:11px">
+                            </div>
+                            <div>
+                                <small style="font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px">Artis / Keterangan</small>
+                                <input type="text" id="cfgBgmUploadArtist" class="form-input" placeholder="Kedai Kyuti Chill" style="font-size:11px">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-block" id="cfgBgmSubmitUploadBtn" style="font-size:12px;padding:9px;font-weight:800">
+                            <span>📤 Upload File &amp; Simpan ke Playlist</span>
+                        </button>
+                        <div id="cfgBgmUploadMsg" style="font-size:11px;margin-top:6px;display:none;text-align:center"></div>
                     </div>
                 </div>
             </div>

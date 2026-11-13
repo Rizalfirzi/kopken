@@ -3298,131 +3298,107 @@ function initAdminPricingFeature() {
         });
     }
 
-    // Tab switcher between Upload File and Input Link
-    const tabUploadBtn = document.getElementById('cfgBgmTabUploadBtn');
-    const tabLinkBtn = document.getElementById('cfgBgmTabLinkBtn');
-    const uploadPanel = document.getElementById('cfgBgmUploadPanel');
-    const linkPanel = document.getElementById('cfgBgmLinkPanel');
-
-    if (tabUploadBtn && tabLinkBtn && uploadPanel && linkPanel) {
-        tabUploadBtn.addEventListener('click', () => {
-            uploadPanel.style.display = 'block';
-            linkPanel.style.display = 'none';
-            tabUploadBtn.style.background = 'var(--brand-primary-light)';
-            tabUploadBtn.style.color = 'var(--brand-primary-dark)';
-            tabUploadBtn.style.borderColor = 'var(--brand-primary)';
-            tabLinkBtn.style.background = 'var(--bg-page)';
-            tabLinkBtn.style.color = 'var(--text-muted)';
-            tabLinkBtn.style.borderColor = 'var(--border-color)';
-        });
-
-        tabLinkBtn.addEventListener('click', () => {
-            uploadPanel.style.display = 'none';
-            linkPanel.style.display = 'block';
-            tabLinkBtn.style.background = 'var(--brand-primary-light)';
-            tabLinkBtn.style.color = 'var(--brand-primary-dark)';
-            tabLinkBtn.style.borderColor = 'var(--brand-primary)';
-            tabUploadBtn.style.background = 'var(--bg-page)';
-            tabUploadBtn.style.color = 'var(--text-muted)';
-            tabUploadBtn.style.borderColor = 'var(--border-color)';
-        });
+    // Universal YouTube ID Extractor (Supports all desktop, mobile, shorts, music, and share URLs)
+    function extractYouTubeId(urlOrId) {
+        if (!urlOrId) return '';
+        const str = urlOrId.trim();
+        if (/^[a-zA-Z0-9_\-]{11}$/.test(str)) return str;
+        const regExp = /(?:https?:\/\/)?(?:[a-zA-Z0-9_\-]+\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?|shorts)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_\-]{11})/i;
+        const match = str.match(regExp);
+        return (match && match[1]) ? match[1] : '';
     }
 
-    // Upload File Handler (#cfgBgmSubmitUploadBtn)
-    const submitUploadBtn = document.getElementById('cfgBgmSubmitUploadBtn');
-    if (submitUploadBtn) {
-        submitUploadBtn.addEventListener('click', () => {
-            const fileInput = document.getElementById('cfgBgmFileInput');
-            const titleInput = document.getElementById('cfgBgmUploadTitle');
-            const artistInput = document.getElementById('cfgBgmUploadArtist');
-            const msgEl = document.getElementById('cfgBgmUploadMsg');
+    // Tab switcher between YouTube, Direct Audio Link, and Upload File
+    const tabYtBtn = document.getElementById('cfgBgmTabYtBtn');
+    const tabLinkBtn = document.getElementById('cfgBgmTabLinkBtn');
+    const tabUploadBtn = document.getElementById('cfgBgmTabUploadBtn');
+    const ytPanel = document.getElementById('cfgBgmYtPanel');
+    const linkPanel = document.getElementById('cfgBgmLinkPanel');
+    const uploadPanel = document.getElementById('cfgBgmUploadPanel');
 
-            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-                showToast('Silakan pilih file lagu .mp3 terlebih dahulu!');
-                fileInput?.focus();
+    const switchBgmTab = (activeTab) => {
+        if (ytPanel) ytPanel.style.display = activeTab === 'yt' ? 'block' : 'none';
+        if (linkPanel) linkPanel.style.display = activeTab === 'link' ? 'block' : 'none';
+        if (uploadPanel) uploadPanel.style.display = activeTab === 'upload' ? 'block' : 'none';
+
+        [
+            { btn: tabYtBtn, id: 'yt' },
+            { btn: tabLinkBtn, id: 'link' },
+            { btn: tabUploadBtn, id: 'upload' }
+        ].forEach(({ btn, id }) => {
+            if (!btn) return;
+            const isActive = id === activeTab;
+            btn.style.background = isActive ? 'var(--brand-primary-light)' : 'var(--bg-page)';
+            btn.style.color = isActive ? 'var(--brand-primary-dark)' : 'var(--text-muted)';
+            btn.style.borderColor = isActive ? 'var(--brand-primary)' : 'var(--border-color)';
+        });
+    };
+
+    if (tabYtBtn) tabYtBtn.addEventListener('click', () => switchBgmTab('yt'));
+    if (tabLinkBtn) tabLinkBtn.addEventListener('click', () => switchBgmTab('link'));
+    if (tabUploadBtn) tabUploadBtn.addEventListener('click', () => switchBgmTab('upload'));
+
+    // 1. YouTube Link Handler (#cfgBgmSubmitYtBtn - Mendukung 1 atau Banyak Lagu Sekaligus)
+    const submitYtBtn = document.getElementById('cfgBgmSubmitYtBtn');
+    if (submitYtBtn) {
+        submitYtBtn.addEventListener('click', () => {
+            const ytUrlInput = document.getElementById('cfgBgmYtUrl');
+            const ytTitleInput = document.getElementById('cfgBgmYtTitle');
+            const ytArtistInput = document.getElementById('cfgBgmYtArtist');
+
+            const rawText = (ytUrlInput?.value || '').trim();
+            if (!rawText) {
+                showToast('Silakan tempel link video / musik YouTube!');
+                ytUrlInput?.focus();
                 return;
             }
 
-            const file = fileInput.files[0];
-            const filename = file.name || '';
-            const ext = filename.split('.').pop().toLowerCase();
-            if (ext !== 'mp3') {
-                showToast('Format file harus .mp3!');
-                return;
+            // Split by newlines or commas so user can paste multiple YouTube URLs at once!
+            const lines = rawText.split(/[\r\n,]+/).map(l => l.trim()).filter(Boolean);
+            const userTitle = (ytTitleInput?.value || '').trim();
+            const userArtist = (ytArtistInput?.value || '').trim() || 'Kedai Kyuti';
+
+            if (!Array.isArray(adminPricingState.bgmPlaylist)) {
+                adminPricingState.bgmPlaylist = [];
             }
 
-            const title = (titleInput?.value || '').trim() || filename.replace(/\.mp3$/i, '');
-            const artist = (artistInput?.value || '').trim() || 'Kedai Kyuti';
-
-            const code = adminPricingState.activePasscode || sessionStorage.getItem('kyuti_admin_code') || '';
-            if (!code) {
-                showToast('Sesi admin berakhir. Silakan login kembali.');
-                return;
-            }
-
-            submitUploadBtn.disabled = true;
-            submitUploadBtn.innerHTML = '<span>Mengupload MP3...</span>';
-            if (msgEl) {
-                msgEl.textContent = '⏳ Sedang mengupload file audio...';
-                msgEl.style.display = 'block';
-                msgEl.style.color = 'var(--brand-primary-dark)';
-            }
-
-            const formData = new FormData();
-            formData.append('audio_file', file);
-            formData.append('code', code);
-            formData.append('title', title);
-            formData.append('artist', artist);
-
-            fetch('api/upload_audio.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(r => r.json())
-            .then(res => {
-                if (res.success && res.url) {
-                    if (!Array.isArray(adminPricingState.bgmPlaylist)) {
-                        adminPricingState.bgmPlaylist = [];
-                    }
-                    adminPricingState.bgmPlaylist.push({
-                        title: title,
-                        artist: artist,
-                        src: res.url
-                    });
-                    renderAdminBgmPlaylist();
-
-                    fileInput.value = '';
-                    if (titleInput) titleInput.value = '';
-                    if (artistInput) artistInput.value = '';
-
-                    if (msgEl) {
-                        msgEl.textContent = `✓ Berhasil di-upload (${res.size_formatted || ''})! Klik "Simpan Perubahan Fee" untuk menyimpan permanen.`;
-                        msgEl.style.color = '#059669';
-                    }
-                    showToast(`✓ Lagu "${title}" berhasil ditambahkan!`);
-                } else {
-                    if (msgEl) {
-                        msgEl.textContent = `✕ ${res.message || 'Gagal upload'}`;
-                        msgEl.style.color = '#DC2626';
-                    }
-                    showToast(`✕ ${res.message || 'Gagal mengupload MP3'}`);
+            let addedCount = 0;
+            lines.forEach((line, i) => {
+                const yId = extractYouTubeId(line);
+                if (yId) {
+                    const trackTitle = (lines.length === 1 && userTitle)
+                        ? userTitle
+                        : (userTitle ? `${userTitle} #${i + 1}` : `Lagu YouTube (${yId})`);
+                    const track = {
+                        title: trackTitle,
+                        artist: userArtist,
+                        youtube_id: yId,
+                        src: ''
+                    };
+                    adminPricingState.bgmPlaylist.push(track);
+                    addedCount++;
                 }
-            })
-            .catch(() => {
-                if (msgEl) {
-                    msgEl.textContent = '✕ Gagal menghubungi server upload.';
-                    msgEl.style.color = '#DC2626';
-                }
-                showToast('✕ Gagal menghubungi server upload.');
-            })
-            .finally(() => {
-                submitUploadBtn.disabled = false;
-                submitUploadBtn.innerHTML = '<span>📤 Upload File &amp; Tambahkan</span>';
+            });
+
+            if (addedCount === 0) {
+                showToast('✕ Tidak ditemukan link YouTube yang valid. Pastikan link video YouTube benar.');
+                return;
+            }
+
+            renderAdminBgmPlaylist();
+            ytUrlInput.value = '';
+            if (ytTitleInput) ytTitleInput.value = '';
+            if (ytArtistInput) ytArtistInput.value = '';
+
+            // Auto-save langsung ke server
+            persistAdminPricingSettings({
+                triggerBtn: submitYtBtn,
+                onSuccessMessage: `✓ Berhasil menambahkan ${addedCount} lagu YouTube & langsung tersimpan ke server!`
             });
         });
     }
 
-    // Add from Link Handler (#cfgBgmSubmitLinkBtn)
+    // 2. Add from Direct Link Handler (#cfgBgmSubmitLinkBtn)
     const submitLinkBtn = document.getElementById('cfgBgmSubmitLinkBtn');
     if (submitLinkBtn) {
         submitLinkBtn.addEventListener('click', () => {
@@ -3432,17 +3408,13 @@ function initAdminPricingFeature() {
 
             let url = (linkUrlInput?.value || '').trim();
             if (!url) {
-                showToast('Silakan masukkan link/URL file MP3!');
+                showToast('Silakan masukkan link/URL file MP3 atau audio!');
                 linkUrlInput?.focus();
                 return;
             }
 
-            // Auto detect YouTube links for Full Playback:
-            let youtubeId = '';
-            const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_\-]{11})/i);
-            if (ytMatch && ytMatch[1]) {
-                youtubeId = ytMatch[1];
-            }
+            // Auto detect YouTube links even in this tab:
+            let youtubeId = extractYouTubeId(url);
 
             // Auto convert Google Drive links:
             const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -3458,7 +3430,7 @@ function initAdminPricingFeature() {
                 }
             }
 
-            const title = (linkTitleInput?.value || '').trim() || 'Musik Café';
+            const title = (linkTitleInput?.value || '').trim() || (youtubeId ? `Lagu YouTube (${youtubeId})` : 'Musik Café');
             const artist = (linkArtistInput?.value || '').trim() || 'Kedai Kyuti';
 
             if (!Array.isArray(adminPricingState.bgmPlaylist)) {
@@ -3467,7 +3439,7 @@ function initAdminPricingFeature() {
             const newTrack = {
                 title: title,
                 artist: artist,
-                src: url
+                src: youtubeId ? '' : url
             };
             if (youtubeId) newTrack.youtube_id = youtubeId;
 
@@ -3478,7 +3450,115 @@ function initAdminPricingFeature() {
             if (linkTitleInput) linkTitleInput.value = '';
             if (linkArtistInput) linkArtistInput.value = '';
 
-            showToast(`✓ Lagu "${title}" ditambahkan ke playlist! Jangan lupa klik Simpan.`);
+            // Auto-save langsung ke server
+            persistAdminPricingSettings({
+                triggerBtn: submitLinkBtn,
+                onSuccessMessage: `✓ Lagu "${title}" berhasil ditambahkan & tersimpan ke server!`
+            });
+        });
+    }
+
+    // 3. Upload File MP3 Handler (#cfgBgmSubmitUploadBtn - Mendukung Multi-File)
+    const submitUploadBtn = document.getElementById('cfgBgmSubmitUploadBtn');
+    if (submitUploadBtn) {
+        submitUploadBtn.addEventListener('click', () => {
+            const fileInput = document.getElementById('cfgBgmFileInput');
+            const titleInput = document.getElementById('cfgBgmUploadTitle');
+            const artistInput = document.getElementById('cfgBgmUploadArtist');
+            const msgEl = document.getElementById('cfgBgmUploadMsg');
+
+            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                showToast('Silakan pilih file lagu .mp3 terlebih dahulu!');
+                fileInput?.focus();
+                return;
+            }
+
+            const code = adminPricingState.activePasscode || sessionStorage.getItem('kyuti_admin_code') || '';
+            if (!code) {
+                showToast('Sesi admin berakhir. Silakan login kembali.');
+                return;
+            }
+
+            const files = Array.from(fileInput.files);
+            const userTitle = (titleInput?.value || '').trim();
+            const userArtist = (artistInput?.value || '').trim() || 'Kedai Kyuti';
+
+            submitUploadBtn.disabled = true;
+            submitUploadBtn.innerHTML = '<span>Mengupload MP3...</span>';
+            if (msgEl) {
+                msgEl.textContent = `⏳ Sedang mengupload ${files.length} file audio...`;
+                msgEl.style.display = 'block';
+                msgEl.style.color = 'var(--brand-primary-dark)';
+            }
+
+            if (!Array.isArray(adminPricingState.bgmPlaylist)) {
+                adminPricingState.bgmPlaylist = [];
+            }
+
+            let uploadedCount = 0;
+            const uploadNext = (idx) => {
+                if (idx >= files.length) {
+                    submitUploadBtn.disabled = false;
+                    submitUploadBtn.innerHTML = '<span>📤 Upload File &amp; Simpan ke Playlist</span>';
+                    fileInput.value = '';
+                    if (titleInput) titleInput.value = '';
+                    if (artistInput) artistInput.value = '';
+
+                    if (uploadedCount > 0) {
+                        if (msgEl) {
+                            msgEl.textContent = `✓ Berhasil mengupload ${uploadedCount} lagu!`;
+                            msgEl.style.color = '#059669';
+                        }
+                        renderAdminBgmPlaylist();
+                        persistAdminPricingSettings({
+                            onSuccessMessage: `✓ Berhasil menambahkan ${uploadedCount} lagu & tersimpan ke server!`
+                        });
+                    }
+                    return;
+                }
+
+                const file = files[idx];
+                const filename = file.name || '';
+                const ext = filename.split('.').pop().toLowerCase();
+                if (ext !== 'mp3') {
+                    showToast(`File "${filename}" dilewati karena bukan .mp3`);
+                    uploadNext(idx + 1);
+                    return;
+                }
+
+                const trackTitle = (files.length === 1 && userTitle) ? userTitle : filename.replace(/\.mp3$/i, '');
+                const formData = new FormData();
+                formData.append('audio_file', file);
+                formData.append('code', code);
+                formData.append('title', trackTitle);
+                formData.append('artist', userArtist);
+
+                fetch('api/upload_audio.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success && res.url) {
+                        adminPricingState.bgmPlaylist.push({
+                            title: trackTitle,
+                            artist: userArtist,
+                            src: res.url
+                        });
+                        uploadedCount++;
+                    } else {
+                        showToast(`✕ Gagal upload "${filename}": ${res.message || 'Error'}`);
+                    }
+                })
+                .catch(() => {
+                    showToast(`✕ Gagal menghubungi server saat upload "${filename}".`);
+                })
+                .finally(() => {
+                    uploadNext(idx + 1);
+                });
+            };
+
+            uploadNext(0);
         });
     }
 
@@ -3496,7 +3576,10 @@ function initAdminPricingFeature() {
                 }
             ];
             renderAdminBgmPlaylist();
-            showToast('↺ Playlist dikembalikan ke default. Klik Simpan untuk menerapkan.');
+            persistAdminPricingSettings({
+                triggerBtn: resetBgmBtn,
+                onSuccessMessage: '↺ Playlist dikembalikan ke default & tersimpan ke server!'
+            });
         });
     }
 
@@ -3889,7 +3972,9 @@ function renderAdminBgmPlaylist() {
 
     container.innerHTML = list.map((track, idx) => {
         const isBlobOrData = track.src?.startsWith('data:');
-        const srcDisplay = isBlobOrData ? '📁 File MP3 Upload Langsung' : (track.src || '');
+        const srcDisplay = track.youtube_id
+            ? `🎬 YouTube (${track.youtube_id})`
+            : (isBlobOrData ? '📁 File MP3 Upload Langsung' : (track.src || 'Audio'));
         return `
             <div class="admin-bgm-row">
                 <div class="admin-bgm-info">
@@ -3913,26 +3998,39 @@ function renderAdminBgmPlaylist() {
         btn.addEventListener('click', () => {
             const idx = parseInt(btn.dataset.idx, 10);
             const track = list[idx];
-            if (!track || !track.src) return;
-            const audio = document.getElementById('bgmAudio');
-            if (audio) {
-                audio.src = track.src;
-                audio.play().then(() => {
-                    showToast(`▶ Memutar preview: ${track.title}`);
-                }).catch(() => {
-                    showToast(`✕ Tidak dapat memutar audio link ini.`);
-                });
+            if (!track) return;
+            if (track.youtube_id) {
+                if (typeof window.playBgmTrackByIdx === 'function') {
+                    window.playBgmTrackByIdx(idx);
+                    showToast(`▶ Memutar lagu YouTube: ${track.title}`);
+                } else {
+                    window.open(`https://www.youtube.com/watch?v=${track.youtube_id}`, '_blank');
+                }
+            } else if (track.src) {
+                const audio = document.getElementById('bgmAudio');
+                if (audio) {
+                    audio.src = track.src;
+                    audio.play().then(() => {
+                        showToast(`▶ Memutar preview: ${track.title}`);
+                    }).catch(() => {
+                        showToast(`✕ Tidak dapat memutar audio link ini.`);
+                    });
+                }
             }
         });
     });
 
-    // Delete button
+    // Delete button with Auto-Save
     container.querySelectorAll('.cfg-bgm-del-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const idx = parseInt(btn.dataset.idx, 10);
             const deleted = list.splice(idx, 1);
             renderAdminBgmPlaylist();
-            showToast(`✓ Lagu "${deleted[0]?.title || ''}" dihapus dari playlist.`);
+            // Auto-save deletion directly to server
+            persistAdminPricingSettings({
+                triggerBtn: btn,
+                onSuccessMessage: `✓ Lagu "${deleted[0]?.title || ''}" telah dihapus & tersimpan ke server.`
+            });
         });
     });
 }
@@ -5190,6 +5288,13 @@ function initBgmPlayer() {
             playlist = [...newBgm.playlist];
             currentIdx = 0;
             loadTrack(0, isPlaying);
+        }
+    };
+
+    // Expose direct track play by index for Admin Preview
+    window.playBgmTrackByIdx = (idx) => {
+        if (playlist[idx]) {
+            loadTrack(idx, true);
         }
     };
 
