@@ -1380,6 +1380,99 @@ class KopiKenanganApi
     }
 
     /**
+     * Update order status by code (Admin).
+     */
+    public function updateOrderStatus(string $orderCode, string $status, string $statusText = '', string $statusDesc = ''): ?array
+    {
+        $code = strtoupper(trim($orderCode));
+        $orders = $this->loadOrders();
+        $updatedOrder = null;
+
+        $statusMap = [
+            'menunggu_pembayaran' => [
+                'text' => 'Menunggu Pembayaran',
+                'desc' => 'Pesanan telah diterima. Silakan selesaikan pembayaran agar barista segera meracik pesananmu ♡',
+            ],
+            'diproses' => [
+                'text' => 'Pesanan Sedang Disiapkan',
+                'desc' => 'Pesananmu sedang disiapkan dengan penuh cinta oleh barista Kedai Kyuti ♡',
+            ],
+            'siap_pickup' => [
+                'text' => 'Siap Diambil / Diantar',
+                'desc' => 'Yey! Pesananmu sudah selesai disiapkan dan siap diambil di outlet / siap diantar ♡',
+            ],
+            'selesai' => [
+                'text' => 'Pesanan Selesai',
+                'desc' => 'Terima kasih banyak telah memesan di Kedai Kyuti! Semoga harimu manis dan menyenangkan ୨୧ ♡',
+            ],
+            'batal' => [
+                'text' => 'Pesanan Dibatalkan',
+                'desc' => 'Pesanan ini telah dibatalkan. Silakan hubungi admin di WhatsApp jika ada pertanyaan ♡',
+            ],
+        ];
+
+        if (empty($statusText) && isset($statusMap[$status])) {
+            $statusText = $statusMap[$status]['text'];
+        }
+        if (empty($statusDesc) && isset($statusMap[$status])) {
+            $statusDesc = $statusMap[$status]['desc'];
+        }
+
+        $found = false;
+        foreach ($orders as &$ord) {
+            $oCode = strtoupper(trim($ord['orderCode'] ?? ($ord['code'] ?? '')));
+            if ($oCode === $code) {
+                $ord['status'] = $status;
+                $ord['statusText'] = $statusText ?: 'Pesanan Sedang Disiapkan';
+                $ord['statusDesc'] = $statusDesc ?: 'Status pesanan diperbarui oleh Admin Kedai Kyuti.';
+                $ord['updatedAt'] = date('c');
+                $updatedOrder = $ord;
+                $found = true;
+                break;
+            }
+        }
+        unset($ord);
+
+        if (!$found) {
+            $updatedOrder = [
+                'orderCode' => $code,
+                'code' => $code,
+                'customerName' => 'Sahabat Kyuti',
+                'status' => $status,
+                'statusText' => $statusText ?: 'Pesanan Sedang Disiapkan',
+                'statusDesc' => $statusDesc ?: 'Status pesanan diperbarui oleh Admin Kedai Kyuti.',
+                'outletName' => 'Kopi Kenangan',
+                'pickupTime' => 'Sekarang',
+                'pickup' => 'Sekarang',
+                'total' => 0,
+                'items' => [],
+                'createdAt' => date('c'),
+                'updatedAt' => date('c'),
+            ];
+            array_unshift($orders, $updatedOrder);
+        }
+
+        $json = json_encode($orders, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $dataPath = __DIR__ . '/../data/orders.json';
+        $tempPath = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'orders.json';
+
+        @file_put_contents($dataPath, $json);
+        @file_put_contents($tempPath, $json);
+
+        if (class_exists('SimpleRedis')) {
+            try {
+                $redis = new SimpleRedis();
+                if ($redis->isConnected()) {
+                    $redis->set('kyuti_orders_list', $json);
+                    $redis->set('kyuti_order_' . $code, json_encode($updatedOrder, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                }
+            } catch (Throwable $e) {}
+        }
+
+        return $updatedOrder;
+    }
+
+    /**
      * Helper to perform HTTP GET request with cURL and fallback.
      */
     protected function httpRequest(string $url, array $params = []): ?array

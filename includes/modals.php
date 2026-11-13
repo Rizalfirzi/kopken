@@ -428,6 +428,34 @@
                 <span id="adminDbStatusBadge" style="font-weight:700;padding:3px 10px;border-radius:12px;font-size:11px;background:#FEF3C7;color:#92400E">Memeriksa...</span>
             </div>
 
+            <!-- 0. KELOLA STATUS PESANAN & TRACKING (Fitur Permintaan Client) -->
+            <div class="admin-setting-section" style="margin-bottom:20px;background:var(--bg-page);border:2px solid var(--brand-primary);border-radius:var(--radius-md);padding:14px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <label style="font-size:13.5px;font-weight:900;color:var(--brand-primary-dark);display:flex;align-items:center;gap:6px">
+                        <span>📦 Kelola Status Pesanan &amp; Tracking</span>
+                    </label>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshAdminOrders" style="font-size:11px;padding:4px 10px;font-weight:800;border-radius:var(--radius-full);cursor:pointer">
+                        🔄 Segarkan
+                    </button>
+                </div>
+                <p style="font-size:11.5px;color:var(--text-muted);margin-bottom:12px;line-height:1.4">
+                    Ubah status pesanan customer secara langsung. Saat status diubah, customer yang membuka link tracking akan langsung melihat status terbarunya.
+                </p>
+
+                <!-- Search / Filter Orders -->
+                <div style="display:flex;gap:6px;margin-bottom:12px">
+                    <input type="search" id="adminOrderSearchInput" class="form-input" placeholder="Cari Kode (misal: KYUTI-ABC) atau Nama..." style="font-size:12px;padding:7px 12px">
+                </div>
+
+                <!-- Orders Container -->
+                <div id="adminOrdersContainer" style="display:flex;flex-direction:column;gap:10px;max-height:360px;overflow-y:auto;padding-right:4px">
+                    <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11.5px">
+                        <span class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid var(--brand-primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:4px"></span>
+                        Memuat daftar pesanan...
+                    </div>
+                </div>
+            </div>
+
             <!-- 1. Fee Global / Default -->
             <div class="admin-setting-section" style="margin-bottom:18px">
                 <label style="font-size:13px;font-weight:800;color:var(--text-main);display:block;margin-bottom:6px">

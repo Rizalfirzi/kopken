@@ -2611,6 +2611,42 @@ function renderTrackingDetails(ord, code) {
     const items = Array.isArray(ord.items) ? ord.items : [];
     const plasticBagQty = ord.plasticBagQty || (ord.hasPlasticBag ? 1 : 0);
 
+    // Admin Controls for Order Status (Cara 1: Langsung di Sheet Tracking)
+    const isAdminAuth = sessionStorage.getItem('kyuti_admin_auth') === '1';
+    let adminControlsHtml = '';
+    if (isAdminAuth) {
+        adminControlsHtml = `
+            <div style="margin-top:12px;padding:12px;background:rgba(244, 114, 182, 0.1);border:1.5px dashed var(--brand-primary-dark);border-radius:var(--radius-md)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <span style="font-size:11.5px;font-weight:900;color:var(--brand-primary-dark);display:flex;align-items:center;gap:4px">
+                        👑 Panel Admin: Ubah Status Tracking
+                    </span>
+                    <span style="font-size:10px;color:var(--text-muted);font-weight:700">Simpan Otomatis</span>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <select id="quickTrackStatusSelect" class="form-input" style="font-size:12px;font-weight:700;padding:6px 10px;background:var(--bg-card);color:var(--text-main);flex:1">
+                        <option value="menunggu_pembayaran" ${ord.status === 'menunggu_pembayaran' ? 'selected' : ''}>🟡 Menunggu Pembayaran</option>
+                        <option value="diproses" ${(!ord.status || ord.status === 'diproses') ? 'selected' : ''}>🔵 Sedang Disiapkan</option>
+                        <option value="siap_pickup" ${ord.status === 'siap_pickup' ? 'selected' : ''}>🛵 Siap Diambil / Diantar</option>
+                        <option value="selesai" ${ord.status === 'selesai' ? 'selected' : ''}>🟢 Selesai</option>
+                        <option value="batal" ${ord.status === 'batal' ? 'selected' : ''}>🔴 Dibatalkan</option>
+                    </select>
+                    <button type="button" class="btn btn-primary" id="btnQuickSaveStatus" style="font-size:12px;padding:7px 14px;white-space:nowrap;font-weight:800">
+                        Update
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        adminControlsHtml = `
+            <div style="margin-top:12px;text-align:center">
+                <button type="button" id="btnAdminUnlockTrack" style="background:none;border:none;font-size:11px;font-weight:700;color:var(--brand-primary-dark);cursor:pointer;opacity:0.85;text-decoration:underline">
+                    👑 Admin Kedai Kyuti? Klik di sini untuk ubah status pesanan
+                </button>
+            </div>
+        `;
+    }
+
     let itemsHtml = '';
     if (items.length > 0) {
         itemsHtml = `
@@ -2691,6 +2727,8 @@ function renderTrackingDetails(ord, code) {
                 ✨ <i>Setelah format dikirim, segera payment ya kak. Barista akan langsung menyiapkan pesananmu begitu konfirmasi payment diterima.</i>
             </div>
 
+            ${adminControlsHtml}
+
             <div style="margin-top:12px;display:flex;gap:8px">
                 <a href="${waChatUrl}" target="_blank" class="btn btn-wa" style="flex:1;text-decoration:none;font-size:12px;padding:9px;border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;gap:6px">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-.9-2.3c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .8 2.5.7 3 .6a2.9 2.9 0 0 0 1.9-1.3 2.4 2.4 0 0 0 .2-1.3c-.1-.2-.3-.3-.6-.4zM12 21.8a9.8 9.8 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A9.8 9.8 0 1 1 12 21.8zm8.4-18.2A11.8 11.8 0 0 0 1.7 17.8L0 24l6.4-1.7a11.8 11.8 0 0 0 5.6 1.4A11.8 11.8 0 0 0 20.4 3.6z"/></svg>
@@ -2702,6 +2740,27 @@ function renderTrackingDetails(ord, code) {
             </div>
         </div>
     `;
+
+    // Bind Admin Quick Status Listeners
+    const btnQuickSaveStatus = document.getElementById('btnQuickSaveStatus');
+    const quickTrackStatusSelect = document.getElementById('quickTrackStatusSelect');
+    if (btnQuickSaveStatus && quickTrackStatusSelect) {
+        btnQuickSaveStatus.addEventListener('click', () => {
+            const newStatus = quickTrackStatusSelect.value;
+            updateOrderStatusDirectly(orderCode, newStatus);
+        });
+        quickTrackStatusSelect.addEventListener('change', () => {
+            const newStatus = quickTrackStatusSelect.value;
+            updateOrderStatusDirectly(orderCode, newStatus);
+        });
+    }
+
+    const btnAdminUnlockTrack = document.getElementById('btnAdminUnlockTrack');
+    if (btnAdminUnlockTrack) {
+        btnAdminUnlockTrack.addEventListener('click', () => {
+            openSheet('adminPasscodeModal');
+        });
+    }
 }
 
 function executeTrackOrder(code) {
@@ -2807,6 +2866,183 @@ function handleUrlTracking() {
     }
 }
 
+// Function to update order status directly via api/order_status.php
+function updateOrderStatusDirectly(orderCode, newStatus, callback) {
+    const passcode = sessionStorage.getItem('kyuti_admin_code') || '';
+    if (!passcode) {
+        openSheet('adminPasscodeModal');
+        return;
+    }
+
+    showToast('Sedang memperbarui status...');
+    fetch('api/order_status.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            passcode: passcode,
+            orderCode: orderCode,
+            status: newStatus
+        })
+    })
+    .then(res => res.json())
+    .then(res => {
+        if (res.success && res.order) {
+            showToast(`✓ ${res.message || 'Status pesanan berhasil diubah!'}`);
+            // Update local order history if present
+            try {
+                const history = JSON.parse(localStorage.getItem('kyuti_orders') || '[]');
+                const idx = history.findIndex(o => (o.orderCode || o.code || '').toUpperCase() === orderCode.toUpperCase());
+                if (idx !== -1) {
+                    history[idx] = res.order;
+                    localStorage.setItem('kyuti_orders', JSON.stringify(history));
+                }
+            } catch (e) {}
+
+            // Re-render tracking if active
+            const currentTrackCode = document.getElementById('trackCodeInput')?.value.trim().toUpperCase();
+            if (currentTrackCode === orderCode.toUpperCase()) {
+                renderTrackingDetails(res.order, orderCode);
+            }
+            if (typeof callback === 'function') callback(res.order);
+        } else {
+            showToast(`✕ ${res.message || 'Gagal mengubah status.'}`);
+        }
+    })
+    .catch(() => {
+        showToast('✕ Gagal menghubungi server.');
+    });
+}
+
+function loadAdminOrders() {
+    const container = document.getElementById('adminOrdersContainer');
+    if (!container) return;
+
+    const passcode = sessionStorage.getItem('kyuti_admin_code') || '';
+    if (!passcode) return;
+
+    container.innerHTML = `
+        <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11.5px">
+            <span class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid var(--brand-primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:4px"></span>
+            Memuat daftar pesanan...
+        </div>
+    `;
+
+    fetch(`api/order_status.php?action=list&passcode=${encodeURIComponent(passcode)}`)
+        .then(res => res.json())
+        .then(res => {
+            if (res.success && Array.isArray(res.orders)) {
+                window.ADMIN_ORDERS_CACHE = res.orders;
+                renderAdminOrdersList(res.orders);
+            } else {
+                container.innerHTML = `
+                    <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">
+                        ${escapeHtml(res.message || 'Belum ada pesanan masuk.')}
+                    </div>
+                `;
+            }
+        })
+        .catch(() => {
+            container.innerHTML = `
+                <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">
+                    Gagal memuat pesanan dari server.
+                </div>
+            `;
+        });
+}
+
+function renderAdminOrdersList(orders) {
+    const container = document.getElementById('adminOrdersContainer');
+    if (!container) return;
+
+    if (!orders || !orders.length) {
+        container.innerHTML = `
+            <div style="text-align:center;padding:18px;color:var(--text-muted);font-size:12px">
+                Belum ada pesanan yang tersimpan di sistem.
+            </div>
+        `;
+        return;
+    }
+
+    const statusPillClass = {
+        'menunggu_pembayaran': 'background:#FEF3C7;color:#92400E',
+        'diproses': 'background:#DBEAFE;color:#1E40AF',
+        'siap_pickup': 'background:#EDE9FE;color:#6D28D9',
+        'selesai': 'background:#DCFCE7;color:#15803D',
+        'batal': 'background:#FEE2E2;color:#991B1B'
+    };
+
+    container.innerHTML = orders.map(ord => {
+        const code = ord.orderCode || ord.code || 'KYUTI-XXXX';
+        const name = ord.customerName || 'Customer';
+        const outlet = ord.outletName || 'Kopi Kenangan';
+        const total = ord.total || 0;
+        const curStatus = ord.status || 'diproses';
+        const curStatusText = ord.statusText || 'Sedang Disiapkan';
+        const pillStyle = statusPillClass[curStatus] || 'background:#DCFCE7;color:#15803D';
+        const timeStr = ord.createdAt ? new Date(ord.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
+        const items = Array.isArray(ord.items) ? ord.items : [];
+        const itemSummary = items.map(it => `${it.qty || 1}x ${it.name || 'Item'}`).join(', ');
+
+        return `
+            <div class="admin-order-card" data-code="${escapeHtml(code)}" data-name="${escapeHtml(name)}" style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                        <b style="font-size:13px;color:var(--brand-primary-dark);font-family:monospace">${escapeHtml(code)}</b>
+                        <span style="font-size:11px;color:var(--text-muted);margin-left:4px">${timeStr ? '(' + timeStr + ')' : ''}</span>
+                    </div>
+                    <span style="font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:var(--radius-full);${pillStyle}">
+                        ${escapeHtml(curStatusText)}
+                    </span>
+                </div>
+                <div style="font-size:11.5px;color:var(--text-main);line-height:1.4">
+                    <b>${escapeHtml(name)}</b> • <span style="color:var(--text-muted)">${escapeHtml(outlet)}</span> • <b>${formatRp(total)}</b>
+                </div>
+                ${itemSummary ? `<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📦 ${escapeHtml(itemSummary)}</div>` : ''}
+                <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+                    <select class="admin-card-status-select form-input" data-code="${escapeHtml(code)}" style="font-size:11.5px;font-weight:700;padding:5px 8px;background:var(--bg-page);color:var(--text-main);flex:1">
+                        <option value="menunggu_pembayaran" ${curStatus === 'menunggu_pembayaran' ? 'selected' : ''}>🟡 Menunggu Bayar</option>
+                        <option value="diproses" ${(!curStatus || curStatus === 'diproses') ? 'selected' : ''}>🔵 Sedang Disiapkan</option>
+                        <option value="siap_pickup" ${curStatus === 'siap_pickup' ? 'selected' : ''}>🛵 Siap Pickup</option>
+                        <option value="selesai" ${curStatus === 'selesai' ? 'selected' : ''}>🟢 Selesai</option>
+                        <option value="batal" ${curStatus === 'batal' ? 'selected' : ''}>🔴 Dibatalkan</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary btn-sm btn-preview-track" data-code="${escapeHtml(code)}" style="font-size:11px;padding:5px 8px;white-space:nowrap">
+                        🔍 Lacak
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Attach listeners on select change
+    container.querySelectorAll('.admin-card-status-select').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+            const oCode = e.target.dataset.code;
+            const newSt = e.target.value;
+            updateOrderStatusDirectly(oCode, newSt, (updated) => {
+                if (window.ADMIN_ORDERS_CACHE) {
+                    const foundOrd = window.ADMIN_ORDERS_CACHE.find(o => (o.orderCode || o.code || '').toUpperCase() === oCode.toUpperCase());
+                    if (foundOrd) {
+                        foundOrd.status = updated.status;
+                        foundOrd.statusText = updated.statusText;
+                    }
+                }
+                loadAdminOrders();
+            });
+        });
+    });
+
+    // Attach listeners on preview tracking
+    container.querySelectorAll('.btn-preview-track').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const oCode = btn.dataset.code;
+            closeSheet('adminPricingSheet');
+            openSheet('trackSheet');
+            executeTrackOrder(oCode);
+        });
+    });
+}
+
 // =========================================================================
 // 8. ADMIN PRICING & FEE MANAGEMENT CONTROLLER
 // =========================================================================
@@ -2853,6 +3089,12 @@ function initAdminPricingFeature() {
 
     adminTriggers.forEach(btn => {
         btn.addEventListener('click', () => {
+            const cachedCode = sessionStorage.getItem('kyuti_admin_code');
+            if (sessionStorage.getItem('kyuti_admin_auth') === '1' && cachedCode) {
+                adminPricingState.activePasscode = cachedCode;
+                loadAndOpenAdminPanel(cachedCode);
+                return;
+            }
             adminPricingState.activePasscode = '';
             sessionStorage.removeItem('kyuti_admin_auth');
             sessionStorage.removeItem('kyuti_admin_code');
@@ -2893,8 +3135,16 @@ function initAdminPricingFeature() {
                     sessionStorage.setItem('kyuti_admin_code', code);
                     closeSheet('adminPasscodeModal');
                     populateAdminPricingForm(res.data, res.database);
+                    loadAdminOrders();
                     openSheet('adminPricingSheet');
                     showToast('✓ Akses admin berhasil terverifikasi!');
+
+                    // If track sheet is open, re-render it with admin controls
+                    const trackSheet = document.getElementById('trackSheet');
+                    if (trackSheet && trackSheet.classList.contains('active')) {
+                        const trackCode = document.getElementById('trackCodeInput')?.value?.trim();
+                        if (trackCode) executeTrackOrder(trackCode);
+                    }
                 } else {
                     if (passErr) {
                         passErr.textContent = res.message || '✕ Kode redeem / passcode salah!';
@@ -3460,6 +3710,31 @@ function initAdminPricingFeature() {
                 });
         });
     }
+
+    // Admin Orders Management (Search & Refresh)
+    const btnRefreshOrders = document.getElementById('btnRefreshAdminOrders');
+    if (btnRefreshOrders) {
+        btnRefreshOrders.addEventListener('click', () => {
+            loadAdminOrders();
+        });
+    }
+
+    const orderSearchInput = document.getElementById('adminOrderSearchInput');
+    if (orderSearchInput) {
+        orderSearchInput.addEventListener('input', (e) => {
+            const query = (e.target.value || '').trim().toLowerCase();
+            const cards = document.querySelectorAll('.admin-order-card');
+            cards.forEach(card => {
+                const code = (card.getAttribute('data-code') || '').toLowerCase();
+                const name = (card.getAttribute('data-name') || '').toLowerCase();
+                if (!query || code.includes(query) || name.includes(query)) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    }
 }
 
 function loadAndOpenAdminPanel(code) {
@@ -3468,6 +3743,7 @@ function loadAndOpenAdminPanel(code) {
         .then(res => {
             if (res.success && res.data) {
                 populateAdminPricingForm(res.data, res.database);
+                loadAdminOrders();
                 openSheet('adminPricingSheet');
             } else {
                 sessionStorage.removeItem('kyuti_admin_auth');
