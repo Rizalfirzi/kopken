@@ -188,6 +188,11 @@ initTheme();
 
 // Check whether to show Welcome Popup on first load
 function checkWelcomePopup() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasTrackParam = urlParams.has('track') || urlParams.has('kode') || urlParams.has('code') || urlParams.has('order');
+    if (hasTrackParam) {
+        return; // Don't show welcome popup if customer is opening a tracking link!
+    }
     const hasSeen = sessionStorage.getItem('kyuti_seen_welcome');
     if (!hasSeen) {
         openSheet('welcomeModal');
@@ -2309,10 +2314,19 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
     const outletName = AppState.outlet?.name || 'Kopi Kenangan';
     const outletCode = AppState.outlet?.code || 'LA.CODEFIN';
 
+    // Construct direct tracking link for customer
+    const domain = window.INITIAL_DATA?.storeDomain || 'kedaikyuti.my.id';
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const trackBase = isLocal 
+        ? `${window.location.origin}${window.location.pathname.replace(/\/+$/, '')}` 
+        : `https://${domain}`;
+    const trackUrl = `${trackBase}/?track=${encodeURIComponent(orderCode)}`;
+
     // Format WhatsApp message
     let msg = `୨୧ *FORMAT ORDER KEDAI KYUTI* ୨୧\n`;
     msg += `--------------------------------------\n`;
-    msg += `Kode Pesanan: *${orderCode}*\n`;
+    msg += `🧾 Kode Order: *${orderCode}*\n`;
+    msg += `🔍 Link Tracking:\n${trackUrl}\n`;
     msg += `Outlet: *${outletName}*\n`;
     msg += `Nama: *${custName}*\n`;
     if (custPhone) {
@@ -2371,6 +2385,7 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
     }
     msg += `--------------------------------------\n`;
     msg += `*TOTAL BAYAR: Rp ${Number(grandTotal).toLocaleString('id-ID')}*\n\n`;
+    msg += `Setelah format dikirim, segera payment ya kak.\n`;
     msg += `𝒯𝒽𝒶𝓃𝓀 𝓎𝑜𝓊 𝒻𝑜𝓇 𝒸𝒽𝑜𝑜𝓈𝒾𝓃𝑔 𝓀𝑒𝒹𝒶𝒾 𝓀𝓎𝓊𝓉𝒾! ୨୧ ♡\n`;
     msg += `Mohon diproses ya min, terima kasih! 🌷✨`;
 
@@ -2384,6 +2399,7 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
 
     const orderObj = {
         orderCode,
+        code: orderCode,
         customerName: custName,
         customerPhone: custPhone,
         outletCode,
@@ -2401,6 +2417,7 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
         items: JSON.parse(JSON.stringify(AppState.cart)),
         subtotal,
         total: grandTotal,
+        trackUrl,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
     };
@@ -2410,6 +2427,7 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
         order: orderObj,
         waMessage: msg,
         waUrl,
+        trackUrl,
         subtotal,
         hasSingleFee,
         singleFee,
@@ -2497,6 +2515,8 @@ if (checkoutWaBtn) {
         }
         if (successModalTotal) successModalTotal.textContent = formatRp(generated.grandTotal);
         if (successOpenWaBtn) successOpenWaBtn.href = generated.waUrl;
+        const successModalTrackLink = document.getElementById('successModalTrackLink');
+        if (successModalTrackLink) successModalTrackLink.href = generated.trackUrl;
 
         if (successCopyMsgBtn) {
             successCopyMsgBtn.onclick = () => {
@@ -2567,7 +2587,7 @@ if (checkoutWaBtn) {
 }
 
 // =========================================================================
-// 8. ORDER TRACKING CONTROLLER
+// 8. ORDER TRACKING CONTROLLER (Direct Link & Live Detail Tracker)
 // =========================================================================
 
 const trackOrderBtn = document.getElementById('trackOrderBtn');
@@ -2575,6 +2595,182 @@ if (trackOrderBtn) {
     trackOrderBtn.addEventListener('click', () => {
         openSheet('trackSheet');
     });
+}
+
+function renderTrackingDetails(ord, code) {
+    const trackResultBox = document.getElementById('trackResultBox');
+    if (!trackResultBox) return;
+
+    const orderCode = ord.orderCode || ord.code || code || 'KYUTI-XXXX';
+    const statusText = ord.statusText || 'Pesanan Sedang Disiapkan';
+    const statusDesc = ord.statusDesc || 'Pesananmu sedang disiapkan dengan penuh cinta oleh Kedai Kyuti ♡';
+    const custName = ord.customerName || 'Sahabat Kyuti';
+    const outlet = ord.outletName || 'Kopi Kenangan';
+    const pickup = ord.pickupTime || ord.pickup || 'Sekarang';
+    const total = ord.total || 0;
+    const items = Array.isArray(ord.items) ? ord.items : [];
+    const plasticBagQty = ord.plasticBagQty || (ord.hasPlasticBag ? 1 : 0);
+
+    let itemsHtml = '';
+    if (items.length > 0) {
+        itemsHtml = `
+            <div style="margin:12px 0 10px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm)">
+                <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Detail Menu Pesanan (${items.length} item)</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    ${items.map((it, i) => {
+                        const itQty = it.qty || 1;
+                        const itPrice = it.subtotal || ((it.price || 0) * itQty);
+                        let optNote = '';
+                        if (it.bundleChoices) optNote += `<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">Paket: ${escapeHtml(it.bundleChoices)}</div>`;
+                        if (it.addons && it.addons.length) {
+                            const topStr = it.addons.map(a => a.name || a.text || 'Topping').join(', ');
+                            optNote += `<div style="font-size:10.5px;color:var(--brand-primary-dark);margin-top:2px">+ Topping: ${escapeHtml(topStr)}</div>`;
+                        }
+                        if (it.note) optNote += `<div style="font-size:10.5px;color:var(--text-muted);font-style:italic;margin-top:2px">Catatan: ${escapeHtml(it.note)}</div>`;
+                        return `
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:12px;border-bottom:1px dashed var(--border-color);padding-bottom:6px">
+                                <div style="flex:1;padding-right:8px">
+                                    <b style="color:var(--text-main)">${i + 1}. ${escapeHtml(it.name || 'Menu')}</b> <span style="font-size:11px;color:var(--text-muted)">x${itQty}</span>
+                                    ${optNote}
+                                </div>
+                                <div style="font-weight:800;color:var(--text-main);white-space:nowrap">${formatRp(itPrice)}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    const adminPhone = normalizeWaPhone(window.INITIAL_DATA?.adminPhone || '628972276154');
+    const waChatUrl = `https://wa.me/${adminPhone}?text=${encodeURIComponent(`Halo Admin Kedai Kyuti, saya ingin cek/konfirmasi pesanan dengan Kode: ${orderCode}`)}`;
+
+    trackResultBox.innerHTML = `
+        <div style="background:var(--bg-page);border-radius:var(--radius-lg);padding:16px;border:1.5px solid var(--border-color);animation:fadeIn 0.3s ease">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <div>
+                    <span style="font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block">Kode Order</span>
+                    <b style="font-size:15px;color:var(--brand-primary-dark);font-family:monospace;letter-spacing:0.5px">${escapeHtml(orderCode)}</b>
+                </div>
+                <span class="pill pill-open" style="background:#DCFCE7;color:#15803D;font-weight:800;font-size:11px;padding:4px 10px;border-radius:var(--radius-full);display:inline-flex;align-items:center;gap:4px">
+                    <span style="width:6px;height:6px;border-radius:50%;background:#16A34A;display:inline-block"></span>
+                    ${escapeHtml(statusText)}
+                </span>
+            </div>
+
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.4">${escapeHtml(statusDesc)}</div>
+
+            <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;justify-content:space-between">
+                    <span style="color:var(--text-muted)">Pemesan:</span>
+                    <b style="color:var(--text-main)">${escapeHtml(custName)}</b>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                    <span style="color:var(--text-muted)">Outlet:</span>
+                    <b style="color:var(--text-main)">${escapeHtml(outlet)}</b>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                    <span style="color:var(--text-muted)">Waktu Pickup:</span>
+                    <b style="color:var(--text-main)">${escapeHtml(pickup)}</b>
+                </div>
+                ${plasticBagQty > 0 ? `
+                <div style="display:flex;justify-content:space-between">
+                    <span style="color:var(--text-muted)">Kantung Belanja:</span>
+                    <b style="color:var(--text-main)">${plasticBagQty} pcs</b>
+                </div>` : ''}
+                ${total > 0 ? `
+                <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--border-color);padding-top:6px;margin-top:2px">
+                    <span style="font-weight:700;color:var(--text-main)">Total Pembayaran:</span>
+                    <b style="color:var(--brand-primary-dark);font-size:13px">${formatRp(total)}</b>
+                </div>` : ''}
+            </div>
+
+            ${itemsHtml}
+
+            <div style="margin-top:10px;padding:8px 10px;background:rgba(244, 114, 182, 0.1);border:1px dashed var(--brand-primary);border-radius:var(--radius-sm);font-size:11px;color:var(--text-main);text-align:center">
+                ✨ <i>Setelah format dikirim, segera payment ya kak. Barista akan langsung menyiapkan pesananmu begitu konfirmasi payment diterima.</i>
+            </div>
+
+            <div style="margin-top:12px;display:flex;gap:8px">
+                <a href="${waChatUrl}" target="_blank" class="btn btn-wa" style="flex:1;text-decoration:none;font-size:12px;padding:9px;border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;gap:6px">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1s-.5-.1-.7.1-.8 1-1 1.2-.4.2-.7.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6.3-.5a.6.6 0 0 0 0-.5l-.9-2.3c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .8 2.5.7 3 .6a2.9 2.9 0 0 0 1.9-1.3 2.4 2.4 0 0 0 .2-1.3c-.1-.2-.3-.3-.6-.4zM12 21.8a9.8 9.8 0 0 1-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4A9.8 9.8 0 1 1 12 21.8zm8.4-18.2A11.8 11.8 0 0 0 1.7 17.8L0 24l6.4-1.7a11.8 11.8 0 0 0 5.6 1.4A11.8 11.8 0 0 0 20.4 3.6z"/></svg>
+                    <span>Hubungi Admin WA</span>
+                </a>
+                <button type="button" class="btn btn-secondary" onclick="navigator.clipboard?.writeText('${escapeHtml(orderCode)}');showToast('✓ Kode pesanan disalin!');" style="font-size:12px;padding:9px 12px;border-radius:var(--radius-sm)">
+                    Salin Kode
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function executeTrackOrder(code) {
+    if (!code) return;
+    const cleanCode = code.trim().toUpperCase();
+    const trackResultBox = document.getElementById('trackResultBox');
+    const trackSubmitBtn = document.getElementById('trackSubmitBtn');
+    const trackCodeInput = document.getElementById('trackCodeInput');
+    if (trackCodeInput) trackCodeInput.value = cleanCode;
+
+    if (!trackResultBox) return;
+
+    if (trackSubmitBtn) {
+        trackSubmitBtn.disabled = true;
+        trackSubmitBtn.textContent = 'Mencari...';
+    }
+
+    trackResultBox.innerHTML = `
+        <div style="text-align:center;padding:24px 0;color:var(--text-muted);font-size:13px">
+            <div class="spinner" style="margin:0 auto 10px"></div>
+            <div>Sedang memuat data pesanan <b>${escapeHtml(cleanCode)}</b>...</div>
+        </div>
+    `;
+
+    // 1. Check local order history first for zero-latency instant rendering
+    let localOrder = null;
+    try {
+        const history = JSON.parse(localStorage.getItem('kyuti_orders') || '[]');
+        localOrder = history.find(o => (o.orderCode || o.code || '').toUpperCase() === cleanCode) || null;
+    } catch (e) {}
+
+    // If already in local history, render instantly without waiting for network!
+    if (localOrder) {
+        renderTrackingDetails(localOrder, cleanCode);
+    }
+
+    // 2. Fetch fresh status from server
+    fetch(`api/track.php?code=${encodeURIComponent(cleanCode)}`)
+        .then(res => res.json())
+        .then(res => {
+            const ord = (res && res.success && res.order) ? res.order : localOrder;
+            if (ord) {
+                renderTrackingDetails(ord, cleanCode);
+            } else {
+                trackResultBox.innerHTML = `
+                    <div class="empty-box">
+                        <div class="empty-icon">✕</div>
+                        <p style="font-weight:700;color:var(--text-main);margin-bottom:4px">Pesanan Tidak Ditemukan</p>
+                        <p style="font-size:11px;color:var(--text-muted)">Kode <b>${escapeHtml(cleanCode)}</b> belum terdaftar. Pastikan kode pesanan sudah sesuai.</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(err => {
+            if (!localOrder) {
+                trackResultBox.innerHTML = `
+                    <div class="empty-box">
+                        <div class="empty-icon">⚠️</div>
+                        <p>Gagal menghubungi server pelacakan.</p>
+                    </div>
+                `;
+            }
+        })
+        .finally(() => {
+            if (trackSubmitBtn) {
+                trackSubmitBtn.disabled = false;
+                trackSubmitBtn.textContent = 'Lacak';
+            }
+        });
 }
 
 const trackSubmitBtn = document.getElementById('trackSubmitBtn');
@@ -2588,56 +2784,27 @@ if (trackSubmitBtn && trackCodeInput && trackResultBox) {
             showToast('Silakan ketik kode pesanan.');
             return;
         }
-
-        trackSubmitBtn.disabled = true;
-        trackSubmitBtn.textContent = 'Mencari...';
-
-        fetch(`api/track.php?code=${encodeURIComponent(code)}`)
-            .then(res => res.json())
-            .then(res => {
-                if (res.success && res.order) {
-                    const ord = res.order;
-                    trackResultBox.innerHTML = `
-                        <div style="background:var(--bg-page);border-radius:var(--radius-lg);padding:16px;border:1px solid var(--border-color);animation:fadeIn 0.3s ease">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                                <b style="font-size:14px;color:var(--brand-primary-dark)">${ord.code}</b>
-                                <span class="pill pill-open">Sedang Disiapkan</span>
-                            </div>
-                            <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">${ord.statusDesc || 'Barista sedang meracik pesananmu.'}</div>
-                            <div style="border-top:1px dashed var(--border-color);padding-top:10px;font-size:12px">
-                                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                                    <span>Outlet:</span>
-                                    <b>${ord.outletName || 'Kopi Kenangan'}</b>
-                                </div>
-                                <div style="display:flex;justify-content:space-between">
-                                    <span>Waktu Pickup:</span>
-                                    <b>${ord.pickup || 'Sekarang'}</b>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    trackResultBox.innerHTML = `
-                        <div class="empty-box">
-                            <div class="empty-icon">✕</div>
-                            <p>${res.message || 'Pesanan tidak ditemukan.'}</p>
-                        </div>
-                    `;
-                }
-            })
-            .catch(() => {
-                trackResultBox.innerHTML = `
-                    <div class="empty-box">
-                        <div class="empty-icon">⚠️</div>
-                        <p>Gagal menghubungi server pelacakan.</p>
-                    </div>
-                `;
-            })
-            .finally(() => {
-                trackSubmitBtn.disabled = false;
-                trackSubmitBtn.textContent = 'Lacak';
-            });
+        executeTrackOrder(code);
     });
+
+    trackCodeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const code = trackCodeInput.value.trim().toUpperCase();
+            if (code) executeTrackOrder(code);
+        }
+    });
+}
+
+// Auto-track URL parameter (?track=CODE / ?kode=CODE / ?code=CODE)
+function handleUrlTracking() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const trackCode = urlParams.get('track') || urlParams.get('kode') || urlParams.get('code') || urlParams.get('order');
+    if (trackCode) {
+        const cleanCode = trackCode.trim().toUpperCase();
+        openSheet('trackSheet');
+        executeTrackOrder(cleanCode);
+    }
 }
 
 // =========================================================================
@@ -4801,6 +4968,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMenu();
     updateCartUI();
     checkWelcomePopup();
+    handleUrlTracking();
     initAdminPricingFeature();
     initWifiFeature();
     initWebHoursFeature();

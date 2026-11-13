@@ -73,6 +73,7 @@
 <!-- Pass Server-side Initial Data to Native JavaScript Engine -->
 <script>
 window.INITIAL_DATA = {
+    storeDomain: <?= json_encode(config('store.domain', 'kedaikyuti.my.id')) ?>,
     outlet: <?= json_encode($initialOutlet ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
     outlets: <?= json_encode($initialOutlets ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
     menu: <?= json_encode($initialMenu ?? ['items' => [], 'stats' => []], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,

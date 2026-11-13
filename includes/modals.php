@@ -866,6 +866,10 @@
                 <span style="color:var(--text-main);font-weight:700">Total Pembayaran:</span>
                 <strong id="successModalTotal" style="color:var(--brand-primary-dark);font-size:14px">Rp 0</strong>
             </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border-color)">
+                <span style="color:var(--text-muted)">Link Tracking:</span>
+                <a href="#" id="successModalTrackLink" style="color:var(--brand-primary-dark);font-weight:700;text-decoration:none;font-size:11px" target="_blank">Lihat Status Pesanan ↗</a>
+            </div>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:8px">

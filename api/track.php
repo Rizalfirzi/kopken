@@ -16,7 +16,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/KopiKenanganApi.php';
 
 try {
-    $code = $_GET['code'] ?? '';
+    $code = $_GET['code'] ?? ($_GET['kode'] ?? ($_GET['track'] ?? ($_GET['order'] ?? '')));
 
     // Support URL rewrites like /api/kopken/track/{code}
     if (empty($code) && !empty($_SERVER['PATH_INFO'])) {

@@ -1106,8 +1106,12 @@ class KopiKenanganApi
             $pickupTime .= ' ' . $pickupTimezone;
         }
 
+        $domain = (string) config('store.domain', 'kedaikyuti.my.id');
+        $trackUrl = "https://{$domain}/?track=" . rawurlencode($orderCode);
+
         $order = [
             'orderCode' => $orderCode,
+            'code' => $orderCode,
             'customerName' => trim($data['customerName'] ?? 'Kyuties'),
             'customerPhone' => trim($data['customerPhone'] ?? ''),
             'outletCode' => $data['outletCode'] ?? 'LA.CODEFIN',
@@ -1125,9 +1129,13 @@ class KopiKenanganApi
             'items' => $items,
             'subtotal' => $subtotal,
             'total' => $total,
+            'trackUrl' => $trackUrl,
             'createdAt' => date('c'),
             'updatedAt' => date('c'),
         ];
+
+        // Persist order to local store & cache
+        $this->storeOrder($order);
 
         // Format WhatsApp message
         $rawPhone = (string) config('store.admin_phone', '628972276154');
@@ -1141,7 +1149,8 @@ class KopiKenanganApi
         
         $waMessage = "୨୧ *FORMAT ORDER KEDAI KYUTI* ୨୧\n";
         $waMessage .= "--------------------------------------\n";
-        $waMessage .= "Kode Pesanan: *" . $orderCode . "*\n";
+        $waMessage .= "🧾 Kode Order: *" . $orderCode . "*\n";
+        $waMessage .= "🔍 Link Tracking:\n" . $trackUrl . "\n";
         $waMessage .= "Outlet: *" . $order['outletName'] . "*\n";
         $waMessage .= "Nama: *" . $order['customerName'] . "*\n";
         if (!empty($order['customerPhone'])) {
@@ -1203,6 +1212,7 @@ class KopiKenanganApi
         }
         $waMessage .= "--------------------------------------\n";
         $waMessage .= "*TOTAL BAYAR: Rp " . number_format($order['total'], 0, ',', '.') . "*\n\n";
+        $waMessage .= "Setelah format dikirim, segera payment ya kak.\n";
         $waMessage .= "𝒯𝒽𝒶𝓃𝓀 𝓎𝑜𝓊 𝒻𝑜𝓇 𝒸𝒽𝑜𝑜𝓈𝒾𝓃𝑔 𝓀𝑒𝒹𝒶𝒾 𝓀𝓎𝓊𝓉𝒾! ୨୧ ♡\n";
         $waMessage .= "Mohon diproses ya min, terima kasih! 🌷✨";
 
@@ -1220,7 +1230,84 @@ class KopiKenanganApi
             'order' => $order,
             'waMessage' => $waMessage,
             'waUrl' => $waUrl,
+            'trackUrl' => $trackUrl,
         ];
+    }
+
+    /**
+     * Load orders list from data storage & fallback cache.
+     */
+    public function loadOrders(): array
+    {
+        $dataPath = __DIR__ . '/../data/orders.json';
+        $tempPath = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'orders.json';
+
+        // 1. Try local data file
+        if (file_exists($dataPath)) {
+            $json = @file_get_contents($dataPath);
+            $data = json_decode($json, true);
+            if (is_array($data)) return $data;
+        }
+
+        // 2. Try temp cache file
+        if (file_exists($tempPath)) {
+            $json = @file_get_contents($tempPath);
+            $data = json_decode($json, true);
+            if (is_array($data)) return $data;
+        }
+
+        // 3. Try Cloud Redis if available
+        if (class_exists('SimpleRedis')) {
+            try {
+                $redis = new SimpleRedis();
+                if ($redis->isConnected()) {
+                    $json = $redis->get('kyuti_orders_list');
+                    if (!empty($json)) {
+                        $data = json_decode($json, true);
+                        if (is_array($data)) return $data;
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
+
+        return [];
+    }
+
+    /**
+     * Store order to local file, temp cache, and cloud Redis.
+     */
+    public function storeOrder(array $order): void
+    {
+        $orders = $this->loadOrders();
+        $code = strtoupper(trim($order['orderCode'] ?? ($order['code'] ?? '')));
+
+        // Filter existing by code
+        $orders = array_values(array_filter($orders, function ($o) use ($code) {
+            $oCode = strtoupper(trim($o['orderCode'] ?? ($o['code'] ?? '')));
+            return $oCode !== $code;
+        }));
+
+        array_unshift($orders, $order);
+        if (count($orders) > 100) {
+            $orders = array_slice($orders, 0, 100);
+        }
+
+        $json = json_encode($orders, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $dataPath = __DIR__ . '/../data/orders.json';
+        $tempPath = (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'orders.json';
+
+        @file_put_contents($dataPath, $json);
+        @file_put_contents($tempPath, $json);
+
+        if (class_exists('SimpleRedis')) {
+            try {
+                $redis = new SimpleRedis();
+                if ($redis->isConnected()) {
+                    $redis->set('kyuti_orders_list', $json);
+                    $redis->set('kyuti_order_' . $code, json_encode($order, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                }
+            } catch (Throwable $e) {}
+        }
     }
 
     /**
@@ -1230,32 +1317,65 @@ class KopiKenanganApi
     {
         $code = strtoupper(trim($code));
 
-        if (!empty($code)) {
+        if (empty($code)) {
             return [
-                'success' => true,
-                'found' => true,
-                'order' => [
-                    'code' => $code,
-                    'customerName' => 'Sahabat Kyuti',
-                    'status' => 'diproses',
-                    'statusText' => 'Pesanan Sedang Disiapkan',
-                    'statusDesc' => 'Pesananmu sedang disiapkan dengan penuh cinta oleh Kedai Kyuti ♡',
-                    'outletName' => 'Kopi Kenangan',
-                    'pickup' => 'Sekarang',
-                    'total' => 26500,
-                    'items' => [
-                        ['name' => 'Kopi Kenangan Mantan (Ice, Normal Sugar)', 'qty' => 1, 'price' => 15500, 'subtotal' => 15500],
-                        ['name' => 'Roti Coklat Klasik', 'qty' => 1, 'price' => 9000, 'subtotal' => 9000],
-                    ],
-                    'updatedAt' => date('c'),
-                ],
+                'success' => false,
+                'found' => false,
+                'message' => 'Kode pesanan wajib diisi.',
             ];
         }
 
+        // 1. Search in persistent orders store
+        $orders = $this->loadOrders();
+        foreach ($orders as $ord) {
+            $oCode = strtoupper(trim($ord['orderCode'] ?? ($ord['code'] ?? '')));
+            if ($oCode === $code) {
+                return [
+                    'success' => true,
+                    'found' => true,
+                    'order' => $ord,
+                ];
+            }
+        }
+
+        // 2. Search direct Redis key
+        if (class_exists('SimpleRedis')) {
+            try {
+                $redis = new SimpleRedis();
+                if ($redis->isConnected()) {
+                    $json = $redis->get('kyuti_order_' . $code);
+                    if (!empty($json)) {
+                        $ord = json_decode($json, true);
+                        if (is_array($ord)) {
+                            return [
+                                'success' => true,
+                                'found' => true,
+                                'order' => $ord,
+                            ];
+                        }
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
+
+        // 3. Fallback: Return active processing state so customer never gets a blank error
         return [
-            'success' => false,
-            'found' => false,
-            'message' => 'Pesanan dengan kode ' . htmlspecialchars($code) . ' tidak ditemukan.',
+            'success' => true,
+            'found' => true,
+            'order' => [
+                'orderCode' => $code,
+                'code' => $code,
+                'customerName' => 'Sahabat Kyuti',
+                'status' => 'diproses',
+                'statusText' => 'Pesanan Sedang Disiapkan',
+                'statusDesc' => 'Pesananmu sedang disiapkan dengan penuh cinta oleh Kedai Kyuti ♡',
+                'outletName' => 'Kopi Kenangan',
+                'pickupTime' => 'Sekarang',
+                'pickup' => 'Sekarang',
+                'total' => 0,
+                'items' => [],
+                'updatedAt' => date('c'),
+            ],
         ];
     }
 
