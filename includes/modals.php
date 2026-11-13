@@ -513,7 +513,7 @@
                 <div style="background:var(--bg-page);border:1.5px dashed var(--brand-primary);border-radius:var(--radius-md);padding:14px;margin-top:6px">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                         <b style="font-size:12px;font-weight:800;color:var(--text-main)">+ Tambah Fee Khusus Menu & Ukuran:</b>
-                        <span style="font-size:10px;color:var(--brand-primary-dark);font-weight:700;background:var(--bg-card-subtle);padding:2px 8px;border-radius:10px;border:1px solid var(--border-color)">⚡ Live dari API</span>
+                        <span style="font-size:10px;color:var(--brand-primary-dark);font-weight:700;background:var(--bg-card-subtle);padding:2px 8px;border-radius:10px;border:1px solid var(--border-color)">💾 Auto-Save Otomatis</span>
                     </div>
 
                     <!-- Row 1: Pilih Menu -->
@@ -548,9 +548,9 @@
                         </div>
                     </div>
 
-                    <!-- Row 3: Add Button Full Width -->
+                    <!-- Row 3: Add Button Full Width with Auto-Save -->
                     <button type="button" class="btn btn-primary btn-block" id="cfgAddNewItemBtn" style="font-size:13px;padding:10px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px">
-                        <span>+ Pasang Fee Khusus Menu</span>
+                        <span>💾 Pasang & Simpan Fee Khusus</span>
                     </button>
                 </div>
             </div>

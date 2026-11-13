@@ -84,11 +84,20 @@ function getCurrentPricing() {
         }
     }
 
-    if (!is_array($loaded) && file_exists($tempPath)) {
-        $loaded = json_decode(@file_get_contents($tempPath), true);
-    }
-    if (!is_array($loaded) && file_exists($dataPath)) {
-        $loaded = json_decode(@file_get_contents($dataPath), true);
+    if (!is_array($loaded)) {
+        $candidateFiles = array_filter([$dataPath, $tempPath], 'file_exists');
+        if (!empty($candidateFiles)) {
+            usort($candidateFiles, function ($a, $b) {
+                return filemtime($b) <=> filemtime($a);
+            });
+            foreach ($candidateFiles as $f) {
+                $parsed = json_decode(@file_get_contents($f), true);
+                if (is_array($parsed)) {
+                    $loaded = $parsed;
+                    break;
+                }
+            }
+        }
     }
     if (!is_array($loaded) && !empty($_COOKIE['kyuti_custom_pricing'])) {
         $raw = $_COOKIE['kyuti_custom_pricing'];
@@ -109,8 +118,10 @@ function getCurrentPricing() {
             $default['category_markups'] = $loaded['category_markups'];
         }
         // Direct assignment, do NOT merge deleted items!
-        if (isset($loaded['item_markup_overrides']) && is_array($loaded['item_markup_overrides'])) {
-            $default['item_markup_overrides'] = $loaded['item_markup_overrides'];
+        if (isset($loaded['item_markup_overrides'])) {
+            $default['item_markup_overrides'] = (is_array($loaded['item_markup_overrides']) || is_object($loaded['item_markup_overrides']))
+                ? (array)$loaded['item_markup_overrides']
+                : [];
         }
         if (isset($loaded['single_item_fee'])) {
             $default['single_item_fee'] = max(0, (float)$loaded['single_item_fee']);
@@ -206,15 +217,15 @@ try {
         }
 
         // Sanitize & Update Item Markup Overrides (Direct assignment to allow deleting)
-        if (isset($input['item_markup_overrides']) && is_array($input['item_markup_overrides'])) {
+        if (isset($input['item_markup_overrides']) && (is_array($input['item_markup_overrides']) || is_object($input['item_markup_overrides']))) {
             $cleanItems = [];
-            foreach ($input['item_markup_overrides'] as $name => $val) {
+            foreach ((array)$input['item_markup_overrides'] as $name => $val) {
                 $iName = trim((string)$name);
                 if ($iName !== '') {
                     $cleanItems[$iName] = max(0, (float)$val);
                 }
             }
-            $current['item_markup_overrides'] = $cleanItems;
+            $current['item_markup_overrides'] = empty($cleanItems) ? (object)[] : $cleanItems;
         }
 
         // Sanitize & Update Single Item Fee & Plastic Bag Fee

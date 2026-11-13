@@ -608,13 +608,16 @@ if ($simpleRedis->isConnected()) {
 
 // 2. Fallback to Local Files (/tmp cache on Vercel or data/pricing_settings.json)
 if ($dynamicData === null) {
-    $dynamicPricingCandidates = [
-        (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'pricing_settings.json',
+    $dynamicPricingCandidates = array_filter([
         __DIR__ . '/data/pricing_settings.json',
-    ];
+        (defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache') . DIRECTORY_SEPARATOR . 'pricing_settings.json',
+    ], 'file_exists');
 
-    foreach ($dynamicPricingCandidates as $dynFile) {
-        if (file_exists($dynFile)) {
+    if (!empty($dynamicPricingCandidates)) {
+        usort($dynamicPricingCandidates, function ($a, $b) {
+            return filemtime($b) <=> filemtime($a);
+        });
+        foreach ($dynamicPricingCandidates as $dynFile) {
             $parsed = json_decode(@file_get_contents($dynFile), true);
             if (is_array($parsed)) {
                 $dynamicData = $parsed;
@@ -646,8 +649,10 @@ if (is_array($dynamicData)) {
     // CRITICAL BUGFIX: Direct assignment, NOT array_merge!
     // When an admin deletes an item override, $dynamicData['item_markup_overrides'] is [] (empty).
     // array_merge with the default array would wrongly restore the deleted item override.
-    if (isset($dynamicData['item_markup_overrides']) && is_array($dynamicData['item_markup_overrides'])) {
-        $config['pricing']['item_markup_overrides'] = $dynamicData['item_markup_overrides'];
+    if (isset($dynamicData['item_markup_overrides'])) {
+        $config['pricing']['item_markup_overrides'] = (is_array($dynamicData['item_markup_overrides']) || is_object($dynamicData['item_markup_overrides']))
+            ? (array)$dynamicData['item_markup_overrides']
+            : [];
     }
     if (isset($dynamicData['single_item_fee'])) {
         $config['fees']['single_item_fee'] = max(0, (float)$dynamicData['single_item_fee']);

@@ -9,7 +9,9 @@
         "Makanan": 4500,
         "Bundling": 0
     },
-    "item_markup_overrides": [],
+    "item_markup_overrides": {
+        "Kopi Kenangan Mantan": 6000
+    },
     "single_item_fee": 0,
     "plastic_bag_fee": 1000,
     "bundling_status": {

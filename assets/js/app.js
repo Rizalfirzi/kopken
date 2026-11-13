@@ -3258,7 +3258,11 @@ function initAdminPricingFeature() {
             if (sizeSelect) sizeSelect.value = '';
             if (customWrap) customWrap.style.display = 'none';
 
-            showToast(`✓ Fee khusus untuk "${targetKey}" diset +${formatRp(fee).replace('Rp ', '')}`);
+            // Auto-save ke server secara langsung agar tidak hilang/terreset
+            persistAdminPricingSettings({
+                triggerBtn: addItemBtn,
+                onSuccessMessage: `✓ Fee khusus "${targetKey}" (+${formatRp(fee).replace('Rp ', '')}) berhasil disimpan ke database!`
+            });
         });
     }
 
@@ -3567,147 +3571,15 @@ function initAdminPricingFeature() {
         });
     }
 
-    // Save Admin Pricing Changes
+    // Save Admin Pricing Changes Button (Bottom of Sheet)
     const saveBtn = document.getElementById('saveAdminPricingBtn');
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
-            const code = adminPricingState.activePasscode || sessionStorage.getItem('kyuti_admin_code') || '';
-            if (!code) {
-                showToast('✕ Sesi admin telah berakhir. Silakan masukkan kode kembali.');
-                closeSheet('adminPricingSheet');
-                return;
-            }
-            const defMarkup = parseFloat(document.getElementById('cfgDefaultMarkup')?.value || '5000');
-            const drinkMarkup = parseFloat(document.getElementById('cfgCategoryDrinks')?.value || '5000');
-            const foodMarkup = parseFloat(document.getElementById('cfgCategoryFood')?.value || '4500');
-            const singleFee = parseFloat(document.getElementById('cfgSingleItemFee')?.value || '2000');
-            const plasticFee = parseFloat(document.getElementById('cfgPlasticBagFee')?.value || '1000');
-
-            // Web Operating Hours Settings
-            const webHoursEnabled = document.getElementById('cfgWebHoursEnabled')?.checked ?? true;
-            const webHoursOpen = document.getElementById('cfgWebHoursOpen')?.value || '09:00';
-            const webHoursClose = document.getElementById('cfgWebHoursClose')?.value || '12:00';
-            const webHoursForce = document.getElementById('cfgWebHoursForce')?.value || 'auto';
-            const webHoursMsg = document.getElementById('cfgWebHoursMsg')?.value || '';
-
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<span>Menyimpan pengaturan...</span>';
-
-            const payload = {
-                code: code,
-                default_markup: defMarkup,
-                category_markups: {
-                    Coffee: drinkMarkup,
-                    'Non Coffee': drinkMarkup,
-                    Frappe: drinkMarkup,
-                    Food: foodMarkup,
-                    Minuman: drinkMarkup,
-                    Makanan: foodMarkup,
-                    Bundling: 0,
-                },
-                item_markup_overrides: adminPricingState.itemMarkupOverrides,
-                single_item_fee: singleFee,
-                plastic_bag_fee: plasticFee,
-                bundling_status: adminPricingState.bundlingStatus,
-                disabled_bundling_options: adminPricingState.disabledBundlingOptions,
-                web_hours: {
-                    enabled: webHoursEnabled,
-                    open: webHoursOpen,
-                    close: webHoursClose,
-                    force_status: webHoursForce,
-                    custom_closed_message: webHoursMsg
-                },
-                bgm: {
-                    enabled: document.getElementById('cfgBgmEnabled')?.checked ?? true,
-                    default_volume: (parseFloat(document.getElementById('cfgBgmVolume')?.value || '40')) / 100,
-                    playlist: Array.isArray(adminPricingState.bgmPlaylist) ? adminPricingState.bgmPlaylist : []
-                }
-            };
-
-            fetch('api/admin_pricing.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.success) {
-                        AppState.singleItemFeeAmount = singleFee;
-                        AppState.plasticBagFeeAmount = plasticFee;
-
-                        // Synchronize in-memory admin pricing state & initial data
-                        if (res.data) {
-                            adminPricingState.itemMarkupOverrides = Object.assign({}, res.data.item_markup_overrides || {});
-                            if (res.data.bundling_status) {
-                                adminPricingState.bundlingStatus = Object.assign({}, res.data.bundling_status);
-                            }
-                            if (Array.isArray(res.data.disabled_bundling_options)) {
-                                adminPricingState.disabledBundlingOptions = [...res.data.disabled_bundling_options];
-                            }
-                            if (window.INITIAL_DATA?.pricing) {
-                                window.INITIAL_DATA.pricing.itemMarkupOverrides = Object.assign({}, res.data.item_markup_overrides || {});
-                                window.INITIAL_DATA.pricing.defaultMarkup = res.data.default_markup ?? defMarkup;
-                                window.INITIAL_DATA.pricing.categoryMarkups = Object.assign({}, res.data.category_markups || {});
-                                window.INITIAL_DATA.pricing.bundlingStatus = Object.assign({}, res.data.bundling_status || adminPricingState.bundlingStatus);
-                                window.INITIAL_DATA.pricing.disabledBundlingOptions = Array.isArray(res.data.disabled_bundling_options) ? [...res.data.disabled_bundling_options] : adminPricingState.disabledBundlingOptions;
-                            }
-                        } else {
-                            adminPricingState.itemMarkupOverrides = Object.assign({}, payload.item_markup_overrides || {});
-                        }
-
-                        // Save to localStorage for instant client-side persistence across reloads
-                        try {
-                            localStorage.setItem('kyuti_custom_pricing', JSON.stringify(res.data || payload));
-                        } catch (e) {}
-
-                        // Also set a 1-year Cookie so EVERY request (including menu & checkout) sends this pricing to Vercel PHP backend
-                        try {
-                            const cookieData = encodeURIComponent(JSON.stringify(res.data || payload));
-                            document.cookie = `kyuti_custom_pricing=${cookieData}; path=/; max-age=31536000; SameSite=Lax`;
-                        } catch (e) {}
-
-                        // Update Web Operating Hours in AppState
-                        if (res.data?.web_hours) {
-                            AppState.webHours = Object.assign({}, AppState.webHours, res.data.web_hours);
-                        } else {
-                            AppState.webHours = Object.assign({}, AppState.webHours, payload.web_hours);
-                        }
-                        updateWebHoursBanners();
-
-                        // Update BGM Playlist in AppState
-                        if (res.data?.bgm) {
-                            AppState.bgm = Object.assign({}, AppState.bgm, res.data.bgm);
-                        } else {
-                            AppState.bgm = Object.assign({}, AppState.bgm, payload.bgm);
-                        }
-                        if (window.reloadBgmPlayer) {
-                            window.reloadBgmPlayer(AppState.bgm);
-                        }
-
-                        updateCartUI();
-                        renderMenu();
-
-                        closeSheet('adminPricingSheet');
-                        adminPricingState.activePasscode = '';
-                        sessionStorage.removeItem('kyuti_admin_auth');
-                        sessionStorage.removeItem('kyuti_admin_code');
-                        showToast('✓ Pengaturan fee & bundling berhasil disimpan!');
-
-                        // Refresh menu to immediately apply new fee formula
-                        if (AppState.outlet?.code) {
-                            fetchMenu(AppState.outlet.code, true);
-                        }
-                    } else {
-                        showToast(`✕ ${res.message || 'Gagal menyimpan fee'}`);
-                    }
-                })
-                .catch(() => {
-                    showToast('✕ Gagal menghubungi server.');
-                })
-                .finally(() => {
-                    saveBtn.disabled = false;
-                    saveBtn.innerHTML = '<span>💾 Simpan Perubahan Fee</span>';
-                });
+            persistAdminPricingSettings({
+                triggerBtn: saveBtn,
+                closeOnSuccess: true,
+                onSuccessMessage: '✓ Pengaturan fee & bundling berhasil disimpan!'
+            });
         });
     }
 
@@ -3737,7 +3609,170 @@ function initAdminPricingFeature() {
     }
 }
 
+// Core Function: Persist All Admin Pricing & Settings to Server & Local Caches
+function persistAdminPricingSettings(options = {}) {
+    const {
+        closeOnSuccess = false,
+        onSuccessMessage = '',
+        callback = null,
+        triggerBtn = null
+    } = options;
+
+    const code = adminPricingState.activePasscode || sessionStorage.getItem('kyuti_admin_code') || '';
+    if (!code) {
+        showToast('✕ Sesi admin telah berakhir. Silakan masukkan passcode kembali.');
+        openSheet('adminPasscodeModal');
+        return;
+    }
+
+    const defMarkup = parseFloat(document.getElementById('cfgDefaultMarkup')?.value || adminPricingState.defaultMarkup || '5000');
+    const drinkMarkup = parseFloat(document.getElementById('cfgCategoryDrinks')?.value || adminPricingState.categoryMarkups?.Coffee || '5000');
+    const foodMarkup = parseFloat(document.getElementById('cfgCategoryFood')?.value || adminPricingState.categoryMarkups?.Food || '4500');
+    const singleFee = parseFloat(document.getElementById('cfgSingleItemFee')?.value || adminPricingState.singleItemFee || '0');
+    const plasticFee = parseFloat(document.getElementById('cfgPlasticBagFee')?.value || adminPricingState.plasticBagFee || '1000');
+
+    // Web Operating Hours Settings
+    const webHoursEnabled = document.getElementById('cfgWebHoursEnabled')?.checked ?? true;
+    const webHoursOpen = document.getElementById('cfgWebHoursOpen')?.value || '09:00';
+    const webHoursClose = document.getElementById('cfgWebHoursClose')?.value || '12:00';
+    const webHoursForce = document.getElementById('cfgWebHoursForce')?.value || 'auto';
+    const webHoursMsg = document.getElementById('cfgWebHoursMsg')?.value || '';
+
+    const originalBtnHtml = triggerBtn ? triggerBtn.innerHTML : '';
+    if (triggerBtn) {
+        triggerBtn.disabled = true;
+        triggerBtn.innerHTML = '<span>Menyimpan ke server...</span>';
+    }
+
+    const payload = {
+        code: code,
+        default_markup: defMarkup,
+        category_markups: {
+            Coffee: drinkMarkup,
+            'Non Coffee': drinkMarkup,
+            Frappe: drinkMarkup,
+            Food: foodMarkup,
+            Minuman: drinkMarkup,
+            Makanan: foodMarkup,
+            Bundling: 0,
+        },
+        item_markup_overrides: adminPricingState.itemMarkupOverrides,
+        single_item_fee: singleFee,
+        plastic_bag_fee: plasticFee,
+        bundling_status: adminPricingState.bundlingStatus,
+        disabled_bundling_options: adminPricingState.disabledBundlingOptions,
+        web_hours: {
+            enabled: webHoursEnabled,
+            open: webHoursOpen,
+            close: webHoursClose,
+            force_status: webHoursForce,
+            custom_closed_message: webHoursMsg
+        },
+        bgm: {
+            enabled: document.getElementById('cfgBgmEnabled')?.checked ?? true,
+            default_volume: (parseFloat(document.getElementById('cfgBgmVolume')?.value || '40')) / 100,
+            playlist: Array.isArray(adminPricingState.bgmPlaylist) ? adminPricingState.bgmPlaylist : []
+        }
+    };
+
+    return fetch('api/admin_pricing.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                AppState.singleItemFeeAmount = singleFee;
+                AppState.plasticBagFeeAmount = plasticFee;
+
+                // Synchronize in-memory admin pricing state & initial data
+                if (res.data) {
+                    adminPricingState.itemMarkupOverrides = Object.assign({}, res.data.item_markup_overrides || {});
+                    if (res.data.bundling_status) {
+                        adminPricingState.bundlingStatus = Object.assign({}, res.data.bundling_status);
+                    }
+                    if (Array.isArray(res.data.disabled_bundling_options)) {
+                        adminPricingState.disabledBundlingOptions = [...res.data.disabled_bundling_options];
+                    }
+                    if (window.INITIAL_DATA?.pricing) {
+                        window.INITIAL_DATA.pricing.itemMarkupOverrides = Object.assign({}, res.data.item_markup_overrides || {});
+                        window.INITIAL_DATA.pricing.defaultMarkup = res.data.default_markup ?? defMarkup;
+                        window.INITIAL_DATA.pricing.categoryMarkups = Object.assign({}, res.data.category_markups || {});
+                        window.INITIAL_DATA.pricing.bundlingStatus = Object.assign({}, res.data.bundling_status || adminPricingState.bundlingStatus);
+                        window.INITIAL_DATA.pricing.disabledBundlingOptions = Array.isArray(res.data.disabled_bundling_options) ? [...res.data.disabled_bundling_options] : adminPricingState.disabledBundlingOptions;
+                    }
+                } else {
+                    adminPricingState.itemMarkupOverrides = Object.assign({}, payload.item_markup_overrides || {});
+                }
+
+                // Save to localStorage for instant client-side persistence across reloads
+                try {
+                    localStorage.setItem('kyuti_custom_pricing', JSON.stringify(res.data || payload));
+                } catch (e) {}
+
+                // Also set a 1-year Cookie so EVERY request (including menu & checkout) sends this pricing to Vercel PHP backend
+                try {
+                    const cookieData = encodeURIComponent(JSON.stringify(res.data || payload));
+                    document.cookie = `kyuti_custom_pricing=${cookieData}; path=/; max-age=31536000; SameSite=Lax`;
+                } catch (e) {}
+
+                // Update Web Operating Hours in AppState
+                if (res.data?.web_hours) {
+                    AppState.webHours = Object.assign({}, AppState.webHours, res.data.web_hours);
+                } else {
+                    AppState.webHours = Object.assign({}, AppState.webHours, payload.web_hours);
+                }
+                updateWebHoursBanners();
+
+                // Update BGM Playlist in AppState
+                if (res.data?.bgm) {
+                    AppState.bgm = Object.assign({}, AppState.bgm, res.data.bgm);
+                } else {
+                    AppState.bgm = Object.assign({}, AppState.bgm, payload.bgm);
+                }
+                if (window.reloadBgmPlayer) {
+                    window.reloadBgmPlayer(AppState.bgm);
+                }
+
+                updateCartUI();
+                renderMenu();
+
+                // Refresh menu to immediately apply new fee formula
+                if (AppState.outlet?.code) {
+                    fetchMenu(AppState.outlet.code, true);
+                }
+
+                if (onSuccessMessage) {
+                    showToast(onSuccessMessage);
+                }
+
+                if (closeOnSuccess) {
+                    closeSheet('adminPricingSheet');
+                }
+
+                if (callback) callback(true, res);
+            } else {
+                showToast(`✕ ${res.message || 'Gagal menyimpan fee'}`);
+                if (callback) callback(false, res);
+            }
+        })
+        .catch(() => {
+            showToast('✕ Gagal menghubungi server saat menyimpan pengaturan.');
+            if (callback) callback(false, null);
+        })
+        .finally(() => {
+            if (triggerBtn && originalBtnHtml) {
+                triggerBtn.disabled = false;
+                triggerBtn.innerHTML = originalBtnHtml;
+            }
+        });
+}
+
 function loadAndOpenAdminPanel(code) {
+    adminPricingState.activePasscode = code;
+    sessionStorage.setItem('kyuti_admin_auth', '1');
+    sessionStorage.setItem('kyuti_admin_code', code);
     fetch(`api/admin_pricing.php?code=${encodeURIComponent(code)}&_t=${Date.now()}`)
         .then(res => res.json())
         .then(res => {
@@ -4044,7 +4079,11 @@ function renderItemOverridesList() {
                 delete adminPricingState.itemMarkupOverrides[itemName];
                 renderItemOverridesList();
                 populateMenuDropdown();
-                showToast(`Fee khusus "${itemName}" dihapus.`);
+                // Auto-save ke server secara langsung agar perubahan tersimpan permanen
+                persistAdminPricingSettings({
+                    triggerBtn: btn,
+                    onSuccessMessage: `✓ Fee khusus "${itemName}" telah dihapus & tersimpan ke server!`
+                });
             }
         });
     });
