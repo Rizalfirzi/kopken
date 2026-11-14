@@ -655,34 +655,40 @@ class KopiKenanganApi
                 }
 
                 $effectiveLargeFee = ($largeFee !== null) ? $largeFee : $fee;
-                $feeDiff = ($largeFee !== null) ? ($largeFee - $fee) : 0;
 
-                $rawApiLarge = !empty($item['largePrice']) ? (float)$item['largePrice'] : 0;
-                if ($rawApiLarge > 0 && $rawApiPrice > 0) {
-                    // Upstream API provides the exact Large difference from raw price (e.g. +3.000)
-                    $largeDelta = max(0, $rawApiLarge - $rawApiPrice);
-                    $calcLarge = $calculatedPrice + $largeDelta + $feeDiff;
-                } elseif (!empty($item['largeNormal']) && (float)$item['largeNormal'] > 0) {
+                // Determine Original Large Price (Normal / Outlet Price)
+                // Kopi Kenangan official rules:
+                // Kopi Kenangan Mantan: Regular = 19.000, Large = 25.000 (Selisih +6.000)
+                // Other drinks: Regular = $origPrice, Large = $origPrice + 6.000
+                $isKKM = str_contains($normName, 'kenanganmantan') || str_contains($normKey, 'kenanganmantan') || str_contains($normName, 'kkm') || str_contains($normKey, 'kkm');
+                if ($isKKM) {
+                    $origLarge = ($origPrice >= 22000) ? 28000.0 : 25000.0;
+                } elseif (!empty($item['largeNormal']) && (float)$item['largeNormal'] > $origPrice) {
                     $origLarge = (float)$item['largeNormal'];
-                    $calcLarge = round(($origLarge * (1 - ($discountPercent / 100))) + $effectiveLargeFee);
                 } else {
-                    $calcLarge = $calculatedPrice + 3500 + $feeDiff;
+                    $origLarge = $origPrice + 6000.0;
+                }
+                $item['largeNormal'] = $origLarge;
+
+                // Calculate Large Selling Price using Kedai Kyuti Formula: (Harga Asli - 50%) + Fee
+                if ($origLarge > 0) {
+                    $discountedLarge = $origLarge * (1 - ($discountPercent / 100));
+                    $calcLarge = round($discountedLarge + $effectiveLargeFee);
+                } else {
+                    $calcLarge = $calculatedPrice + 3000;
                 }
 
-                // Ensure large price is strictly higher than regular price
+                // Check manual price override for large
+                if (isset($priceOverrides[$largeKey])) {
+                    $calcLarge = (float) $priceOverrides[$largeKey];
+                }
+
+                // Ensure large price is strictly higher than regular price (by at least 3.000)
                 if ($calcLarge <= $calculatedPrice) {
-                    $calcLarge = $calculatedPrice + 3500;
+                    $calcLarge = $calculatedPrice + 3000;
                 }
 
                 $item['largePrice'] = $calcLarge;
-
-                // Calculate largeNormal for crossed-out price display
-                if (!empty($item['largeNormal'])) {
-                    $item['largeNormal'] = (float) $item['largeNormal'];
-                } else {
-                    $largeDelta = $calcLarge - $calculatedPrice;
-                    $item['largeNormal'] = round($origPrice + ($largeDelta * 2));
-                }
             }
 
             // Guarantee image fallback
@@ -937,71 +943,40 @@ class KopiKenanganApi
                     }
                 }
 
-                // Determine base upstream raw price (min price among all combos)
-                $rawBase = 0;
-                if (isset($response['price']) && (float)$response['price'] > 0) {
-                    $rawBase = (float)$response['price'];
-                } else {
-                    $rawBase = (float)min(array_values($response['prices']));
-                }
-
-                // Calculated price in our store for regular base item
-                $calculatedBase = (float)($matchedItem['price'] ?? round($rawBase + 5000));
-                // Fee delta between our price and upstream raw price
-                $deltaMarkup = $calculatedBase - $rawBase;
-
-                // Check for Large fee override specifically for this menu item
-                $itemMarkupOverrides = config('pricing.item_markup_overrides', []);
-                $defaultMarkup = (float)config('pricing.default_markup', 5000);
-                $mName = $matchedItem['name'] ?? '';
-                $normMName = strtolower(str_replace([' ', '_', '-'], '', $mName));
-                $largeFee = null;
-                foreach ($itemMarkupOverrides as $oKey => $oFee) {
-                    $oKeyStr = trim((string)$oKey);
-                    if (preg_match('/\(large\)$/i', $oKeyStr)) {
-                        $basePart = trim(preg_replace('/\(large\)$/i', '', $oKeyStr));
-                        $normBasePart = strtolower(str_replace([' ', '_', '-'], '', $basePart));
-                        if ($normBasePart === $normMName || str_contains($normMName, $normBasePart) || str_contains($normBasePart, $normMName)) {
-                            $largeFee = (float)$oFee;
-                            break;
-                        }
-                    }
-                }
-                // Determine item base fee to calculate fee difference for Large
-                $baseFee = null;
-                foreach ($itemMarkupOverrides as $oKey => $oFee) {
-                    if (preg_match('/\(large\)$/i', trim((string)$oKey))) continue;
-                    $normOK = strtolower(str_replace([' ', '_', '-'], '', (string)$oKey));
-                    if ($normOK === $normMName || str_contains($normMName, $normOK) || str_contains($normOK, $normMName)) {
-                        $baseFee = (float)$oFee;
-                        break;
-                    }
-                }
-                if ($baseFee === null) {
-                    $cat = $matchedItem['category'] ?? '';
-                    $categoryMarkups = config('pricing.category_markups', []);
-                    foreach ($categoryMarkups as $cKey => $cFee) {
-                        if (strcasecmp($cKey, $cat) === 0) {
-                            $baseFee = (float)$cFee;
-                            break;
-                        }
-                    }
-                }
-                if ($baseFee === null) {
-                    $baseFee = $defaultMarkup;
-                }
-                $feeDiff = ($largeFee !== null) ? ($largeFee - $baseFee) : 0;
-                $deltaLargeMarkup = $deltaMarkup + $feeDiff;
-
-                // Base normal (unpromoted) price from item
+                // Base selling & normal prices from $matchedItem
+                $calculatedBase = (float)($matchedItem['price'] ?? 15500);
                 $origBaseNormal = (float)($matchedItem['normalPrice'] ?? $matchedItem['outletPrice'] ?? 19000);
                 if ($origBaseNormal <= 0) $origBaseNormal = 19000;
+
+                $largePriceBase = (float)($matchedItem['largePrice'] ?? ($calculatedBase + 3000));
+                $origLargeNormal = (float)($matchedItem['largeNormal'] ?? ($origBaseNormal + 6000));
+                if ($origLargeNormal <= 0) $origLargeNormal = 25000;
+
+                // Segregate combos into Regular vs Large to find their respective base raw prices
+                $rawRegPrices = [];
+                $rawLargePrices = [];
+                foreach ($response['prices'] as $combo => $rawP) {
+                    $parts = explode('|', (string)$combo);
+                    $isLarge = false;
+                    foreach ($parts as $partId) {
+                        if (in_array((string)$partId, $largeIds, true)) {
+                            $isLarge = true;
+                            break;
+                        }
+                    }
+                    if ($isLarge) {
+                        $rawLargePrices[] = (float)$rawP;
+                    } else {
+                        $rawRegPrices[] = (float)$rawP;
+                    }
+                }
+
+                $rawRegBase = !empty($rawRegPrices) ? min($rawRegPrices) : (float)($response['price'] ?? 14500);
+                $rawLargeBase = !empty($rawLargePrices) ? min($rawLargePrices) : ($rawRegBase + 6000);
 
                 $normals = [];
                 foreach ($response['prices'] as $combo => &$p) {
                     $rawP = (float)$p;
-                    // Combo difference from raw base (e.g. +3.000 for Large, +3.000 for Juwara, +3.000 for Oatside)
-                    $comboDiff = max(0, $rawP - $rawBase);
 
                     // Check if this combo is Large
                     $isLargeCombo = false;
@@ -1013,12 +988,19 @@ class KopiKenanganApi
                         }
                     }
 
-                    // Final selling price = raw price + markup delta (use Large markup if Large variant has override)
-                    $appliedDelta = ($isLargeCombo && $largeFee !== null) ? $deltaLargeMarkup : $deltaMarkup;
-                    $p = round($rawP + $appliedDelta);
-
-                    // Normal (crossed-out) price: In Kopi Kenangan 50% discount system, a +3.000 jasdor diff = +6.000 normal diff
-                    $normals[$combo] = round($origBaseNormal + ($comboDiff * 2));
+                    if ($isLargeCombo) {
+                        // Extra modifier difference (e.g. Oatside milk +3.000)
+                        $extraDiff = max(0, $rawP - $rawLargeBase);
+                        $p = round($largePriceBase + $extraDiff);
+                        // Normal price strictly starts from $origLargeNormal (e.g. 25.000) + any modifier
+                        $normals[$combo] = round($origLargeNormal + ($extraDiff * 2));
+                    } else {
+                        // Extra modifier difference (e.g. Oatside milk +3.000)
+                        $extraDiff = max(0, $rawP - $rawRegBase);
+                        $p = round($calculatedBase + $extraDiff);
+                        // Normal price strictly starts from $origBaseNormal (e.g. 19.000) + any modifier
+                        $normals[$combo] = round($origBaseNormal + ($extraDiff * 2));
+                    }
                 }
                 unset($p);
 
@@ -1818,7 +1800,8 @@ class KopiKenanganApi
                     'desc' => 'Espresso berpadu dengan susu segar dan gula aren murni khas Kopi Kenangan yang creamy dan legit.',
                     'price' => 15500,
                     'normalPrice' => 19000,
-                    'largePrice' => 20500,
+                    'largePrice' => 18500,
+                    'largeNormal' => 25000,
                     'isSoldOut' => false,
                     'tag' => 'BEST SELLER',
                     'options' => [
@@ -1837,7 +1820,8 @@ class KopiKenanganApi
                     'desc' => 'Sensasi kopi latte dengan tekstur extra creamy dan sentuhan manis gula aren alami.',
                     'price' => 16000,
                     'normalPrice' => 22000,
-                    'largePrice' => 21000,
+                    'largePrice' => 19000,
+                    'largeNormal' => 28000,
                     'isSoldOut' => false,
                     'tag' => 'FAVORIT',
                     'options' => [

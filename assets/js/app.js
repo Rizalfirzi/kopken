@@ -1488,8 +1488,9 @@ function unitPrice(sel = AppState.sheet?.sel) {
         const largeOverride = overrides[`${item.name} (Large)`];
         if (largeOverride !== undefined) {
             const defFee = adminPricingState?.defaultMarkup || 5000;
-            return (item.price || 0) + 3500 + (largeOverride - defFee);
+            return (item.price || 0) + 3000 + (largeOverride - defFee);
         }
+        return (item.price || 0) + 3000;
     }
     return item.price;
 }
@@ -1508,7 +1509,12 @@ function normalPrice(sel = AppState.sheet?.sel) {
         (item.key && item.key.toLowerCase().includes('butterscotchseasaltcrumble'));
 
     const isLarge = !isNoLarge && (sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large'));
-    if (isLarge) return item.largeNormal || (item.normalPrice ? item.normalPrice + 6000 : null);
+    if (isLarge) {
+        if (item.largeNormal) return item.largeNormal;
+        const isKKM = (item.name && item.name.toLowerCase().includes('kenangan mantan')) || (item.key && item.key.toLowerCase().includes('kenanganmantan'));
+        if (isKKM) return (item.normalPrice && item.normalPrice >= 22000) ? 28000 : 25000;
+        return item.normalPrice ? item.normalPrice + 6000 : null;
+    }
     return item.normalPrice || null;
 }
 
