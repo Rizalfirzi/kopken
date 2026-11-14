@@ -439,7 +439,8 @@ $config = [
     ],
 
     // External Live API Endpoint
-    'api_base_url' => 'https://tixandcoffee.developerngantuk.my.id/api',
+    'api_base_url' => 'https://twinsjasdor.my.id/api',
+    'api_origin' => 'https://twinsjasdor.my.id',
     'api_timeout' => 15,
     'cache_ttl' => [
         'outlets' => 1800,

@@ -388,7 +388,12 @@ function renderOutletList(items) {
     if (!container) return;
 
     if (!items || !items.length) {
-        container.innerHTML = '<div class="empty-box"><p>Outlet tidak ditemukan.</p></div>';
+        container.innerHTML = `
+            <div class="empty-box" style="padding: 28px 16px; text-align: center;">
+                <p style="font-weight: 600; font-size: 14px; margin-bottom: 6px; color: var(--text-heading);">Outlet tidak ditemukan.</p>
+                <small style="color: var(--text-muted); font-size: 12px; line-height: 1.5; display: block;">Coba gunakan kata kunci lain atau gunakan tombol <b>Pakai Lokasi Saya</b> di atas.</small>
+            </div>
+        `;
         return;
     }
 
@@ -504,31 +509,57 @@ window.selectOutlet = function(code) {
 const outletCardBtn = document.getElementById('outletCardBtn');
 if (outletCardBtn) {
     outletCardBtn.addEventListener('click', () => {
+        if (outletSearchInput) outletSearchInput.value = '';
         renderOutletList(AppState.outlets);
         openSheet('outletSheet');
     });
 }
 
-// Live Search Outlets via API
+// Live Search Outlets via API (Real-Time Sync with twinsjasdor)
 let outletSearchTimer;
+let outletSearchAbortCtrl = null;
 const outletSearchInput = document.getElementById('outletSearchInput');
 if (outletSearchInput) {
-    outletSearchInput.addEventListener('input', (e) => {
+    const handleSearch = () => {
         clearTimeout(outletSearchTimer);
-        const query = e.target.value.trim();
+        const query = outletSearchInput.value.trim();
+
+        if (!query) {
+            if (outletSearchAbortCtrl) outletSearchAbortCtrl.abort();
+            renderOutletList(AppState.outlets);
+            return;
+        }
+
+        const container = document.getElementById('outletListContainer');
+        if (container) {
+            container.innerHTML = `
+                <div style="padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 13px;">
+                    <div class="spinner" style="display:inline-block; width: 22px; height: 22px; border: 2.5px solid var(--border-color); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 8px;"></div>
+                    <div>Mencari outlet Kopi Kenangan...</div>
+                </div>
+            `;
+        }
+
         outletSearchTimer = setTimeout(() => {
-            fetch(`api/outlets.php?q=${encodeURIComponent(query)}`)
+            if (outletSearchAbortCtrl) outletSearchAbortCtrl.abort();
+            outletSearchAbortCtrl = new AbortController();
+
+            fetch(`api/outlets.php?q=${encodeURIComponent(query)}`, { signal: outletSearchAbortCtrl.signal })
                 .then(res => res.json())
                 .then(data => {
                     const list = data.outlets || [];
                     list.forEach(o => outletStore.set(o.code, o));
                     renderOutletList(list);
                 })
-                .catch(() => {
+                .catch(err => {
+                    if (err.name === 'AbortError') return;
                     showToast('Gagal mencari outlet.');
                 });
-        }, 250);
-    });
+        }, 220);
+    };
+
+    outletSearchInput.addEventListener('input', handleSearch);
+    outletSearchInput.addEventListener('search', handleSearch);
 }
 
 // Geo Location Trigger

@@ -17,13 +17,15 @@
 class KopiKenanganApi
 {
     protected string $baseUrl;
+    protected string $origin;
     protected int $outletsTtl;
     protected int $stockTtl;
     protected string $cacheDir;
 
     public function __construct()
     {
-        $this->baseUrl = rtrim((string) config('api_base_url', 'https://tixandcoffee.developerngantuk.my.id/api'), '/');
+        $this->baseUrl = rtrim((string) config('api_base_url', 'https://twinsjasdor.my.id/api'), '/');
+        $this->origin = rtrim((string) config('api_origin', 'https://twinsjasdor.my.id'), '/');
         $this->outletsTtl = (int) config('cache_ttl.outlets', 1800);
         $this->stockTtl = (int) config('stock.ttl_seconds', config('cache_ttl.menu', 60));
         $this->cacheDir = defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache';
@@ -34,15 +36,52 @@ class KopiKenanganApi
     }
 
     /**
+     * Cookie file path for session persistence with twinsjasdor.my.id
+     */
+    protected function getCookieFile(): string
+    {
+        return $this->cacheDir . DIRECTORY_SEPARATOR . 'twins_cookie.txt';
+    }
+
+    /**
+     * Handshake with twinsjasdor.my.id to obtain a valid Cloudflare session cookie (jd_v).
+     */
+    protected function refreshSessionCookie(): bool
+    {
+        if (!function_exists('curl_init')) {
+            return false;
+        }
+
+        $cookieFile = $this->getCookieFile();
+        $targetOrigin = $this->origin ?: 'https://twinsjasdor.my.id';
+
+        $ch = curl_init($targetOrigin . '/');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return ($code >= 200 && $code < 400 && file_exists($cookieFile));
+    }
+
+    /**
      * Fetch list of outlets with real-time hours evaluation, search, and distance sorting.
      */
     public function getOutlets(?string $query = null, ?float $lat = null, ?float $lng = null): array
     {
         $query = trim((string) $query);
+        $isSearch = ($query !== '');
+        $ttl = $isSearch ? 180 : $this->outletsTtl;
         $cacheKey = 'outlets_' . md5($query . '|' . ($lat ? round($lat, 3) : '') . '|' . ($lng ? round($lng, 3) : ''));
         
-        $cached = $this->getCache($cacheKey, $this->outletsTtl);
-        if ($cached !== null) {
+        $cached = $this->getCache($cacheKey, $ttl);
+        if ($cached !== null && !empty($cached['outlets'])) {
             foreach ($cached['outlets'] as &$o) {
                 $o = $this->evaluateOutletHours($o);
                 $o['isPremium'] = $this->checkIsPremiumOutlet($o);
@@ -415,23 +454,17 @@ class KopiKenanganApi
             return $this->applyMenuCustomizations($result, $outletCode);
         }
 
-        // Fallback menu
+        // Fallback menu when upstream is unreachable or returns 502
         $fallback = $this->getFallbackMenu($outletCode);
-        $outletInfo = null;
-        $outletsData = $this->getOutlets();
-        if (!empty($outletsData['outlets'])) {
-            foreach ($outletsData['outlets'] as $o) {
-                if (($o['code'] ?? '') === $outletCode) {
-                    $outletInfo = $o;
-                    break;
-                }
-            }
-        }
+        $outletInfo = $this->getOutletByCode($outletCode);
         if (!$outletInfo) {
             $outletInfo = $this->evaluateOutletHours(['code' => $outletCode]);
         }
         if ($outletInfo && isset($outletInfo['canOrder']) && !$outletInfo['canOrder']) {
             $fallback['isClosed'] = true;
+        }
+        if ($outletInfo && !empty($outletInfo['name'])) {
+            $fallback['outletName'] = $outletInfo['name'];
         }
         return $this->applyMenuCustomizations($fallback, $outletCode);
     }
@@ -1473,15 +1506,23 @@ class KopiKenanganApi
     }
 
     /**
-     * Helper to perform HTTP GET request with cURL and fallback.
+     * Helper to perform HTTP GET request with cURL, automatic cookie session handling, and fallback.
      */
-    protected function httpRequest(string $url, array $params = []): ?array
+    protected function httpRequest(string $url, array $params = [], int $retry = 1): ?array
     {
         if (!empty($params)) {
-            $url .= '?' . http_build_query($params);
+            $separator = (strpos($url, '?') !== false) ? '&' : '?';
+            $url .= $separator . http_build_query($params);
         }
 
-        $timeout = (int) config('api_timeout', 8);
+        $timeout = (int) config('api_timeout', 12);
+        $cookieFile = $this->getCookieFile();
+        $isTwins = str_contains($url, 'twinsjasdor.my.id');
+
+        // Automatically fetch cookie if missing or older than 6 hours
+        if ($isTwins && (!file_exists($cookieFile) || (time() - (int)@filemtime($cookieFile) > 21600))) {
+            $this->refreshSessionCookie();
+        }
 
         if (function_exists('curl_init')) {
             $ch = curl_init();
@@ -1491,14 +1532,25 @@ class KopiKenanganApi
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'KedaiKyutiNative/1.0');
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Accept: application/json',
-            ]);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+            $headers = ['Accept: application/json'];
+            if ($isTwins) {
+                curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
+                curl_setopt($ch, CURLOPT_REFERER, 'https://twinsjasdor.my.id/');
+            }
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
+
+            // If session expired or unauthorized on twinsjasdor, refresh session and retry once
+            if ($isTwins && $retry > 0 && ($httpCode === 401 || $httpCode === 403 || ($response !== false && (str_contains($response, 'Sesi halaman habis') || str_contains($response, 'Akses ditolak'))))) {
+                @unlink($cookieFile);
+                $this->refreshSessionCookie();
+                return $this->httpRequest($url, [], $retry - 1);
+            }
 
             if ($response !== false && $httpCode >= 200 && $httpCode < 300) {
                 $decoded = json_decode($response, true);
@@ -1509,11 +1561,22 @@ class KopiKenanganApi
         }
 
         if (ini_get('allow_url_fopen')) {
+            $headerStr = "Accept: application/json\r\n";
+            if ($isTwins) {
+                $headerStr .= "Referer: https://twinsjasdor.my.id/\r\n";
+                if (file_exists($cookieFile)) {
+                    $cookieContent = @file_get_contents($cookieFile);
+                    if ($cookieContent && preg_match('/jd_v\s+([^\s]+)/', $cookieContent, $m)) {
+                        $headerStr .= "Cookie: jd_v=" . $m[1] . "\r\n";
+                    }
+                }
+            }
+
             $context = stream_context_create([
                 'http' => [
                     'timeout' => $timeout,
-                    'user_agent' => 'KedaiKyutiNative/1.0',
-                    'header' => "Accept: application/json\r\n",
+                    'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'header' => $headerStr,
                 ],
                 'ssl' => [
                     'verify_peer' => false,
@@ -1585,6 +1648,57 @@ class KopiKenanganApi
     {
         $outlets = [
             [
+                'code' => 'JKT.SPBUDODOTB',
+                'id' => 660,
+                'name' => 'Shell (Tanjung Barat)',
+                'address' => 'Shell Tanjung Barat (Container), 34.125.05, Jl. Tj. Barat Raya No. 120, Jagakarsa, Jakarta Selatan 12530',
+                'city' => 'Jakarta Selatan',
+                'lat' => -6.30376,
+                'lng' => 106.840222,
+                'isOpen' => true,
+                'canOrder' => true,
+                'statusText' => 'Buka',
+                'hours' => '07:00 - 21:30',
+                'img' => 'https://cdn.kopikenangan.com/public/7ca8d809-5389-2fb1-00a8-dcaf87da87d9',
+                'category' => 'Gas Station',
+                'phone' => '08170739217',
+                'distanceKm' => null,
+            ],
+            [
+                'code' => 'JKT.SHELLANTSR',
+                'id' => 353,
+                'name' => 'Shell Antasari',
+                'address' => 'Shell Antasari, Jl. Pangeran Antasari No.68, RT.4/RW.11, Cipete Utara, Kec. Kby. Baru, Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta 12150',
+                'city' => 'Jakarta Selatan',
+                'lat' => -6.262529,
+                'lng' => 106.804107,
+                'isOpen' => true,
+                'canOrder' => true,
+                'statusText' => 'Buka',
+                'hours' => '07:00 - 21:00',
+                'img' => 'https://cdn.kopikenangan.com/public/b7512ea2-9eb5-8e7c-eb8d-4767220ae868',
+                'category' => 'Gas Station',
+                'phone' => '08170739097',
+                'distanceKm' => null,
+            ],
+            [
+                'code' => 'JKT.SHELLCPNG',
+                'id' => 350,
+                'name' => 'Shell Cipinang',
+                'address' => 'Shell Cipinang, Jl. Bekasi Tim. Raya No.154, RT.8/RW.13, Cipinang Besar Utara, Kecamatan Jatinegara, Kota Jakarta Timur, Daerah Khusus Ibukota Jakarta 13410',
+                'city' => 'Jakarta Timur',
+                'lat' => -6.223847,
+                'lng' => 106.883713,
+                'isOpen' => true,
+                'canOrder' => true,
+                'statusText' => 'Buka',
+                'hours' => '09:00 - 20:30',
+                'img' => 'https://cdn.kopikenangan.com/public/f2015fa4-96fe-c3c2-d1dc-02ebfc2fa209',
+                'category' => 'Gas Station',
+                'phone' => '08170739095',
+                'distanceKm' => null,
+            ],
+            [
                 'code' => 'LA.CODEFIN',
                 'id' => 101,
                 'name' => 'Codefin Kemang Jakarta',
@@ -1599,6 +1713,23 @@ class KopiKenanganApi
                 'img' => 'https://cdn.kopikenangan.com/public/da484154-47b1-a756-54a4-8b3490fb0eae',
                 'category' => 'Shop House',
                 'phone' => '081234567890',
+                'distanceKm' => null,
+            ],
+            [
+                'code' => 'JKT.THAMCIT',
+                'id' => 411,
+                'name' => 'Thamrin City',
+                'address' => 'Thamrin City, Lantai Dasar, Jl. K.H. Mas Mansyur, Kb. Melati, Kecamatan Tanah Abang, Kota Jakarta Pusat, Daerah Khusus Ibukota Jakarta 10230',
+                'city' => 'Jakarta Pusat',
+                'lat' => -6.1949231,
+                'lng' => 106.8170567,
+                'isOpen' => true,
+                'canOrder' => true,
+                'statusText' => 'Buka',
+                'hours' => '08:00 - 20:00',
+                'img' => 'https://cdn.kopikenangan.com/public/8f19b461-7e86-b8dc-6f0f-d225299d387a',
+                'category' => 'Mall',
+                'phone' => '08170110244',
                 'distanceKm' => null,
             ],
             [
