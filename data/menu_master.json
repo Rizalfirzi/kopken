@@ -3945,36 +3945,6 @@
         ]
       },
       "tag": ""
-    },
-    {
-      "key": "saltbreadabon",
-      "id": "saltbreadabon",
-      "code": "5577304",
-      "name": "Salt Bread Abon",
-      "category": "Food",
-      "sourceCategory": "Food",
-      "img": "https://cdn.kopikenangan.com/ID/release/pub/kk-api-management/product/f19ebfd0-7c6f-437a-bcc0-7f74f6925058?",
-      "desc": "",
-      "price": 13000,
-      "largePrice": null,
-      "normalPrice": 14000,
-      "outletPrice": 14000,
-      "customPrice": false,
-      "discount": null,
-      "discountLabel": "",
-      "largeNormal": null,
-      "isSoldOut": true,
-      "notCarried": true,
-      "isFood": true,
-      "isSpecial": true,
-      "noLarge": false,
-      "options": {
-        "sizes": [],
-        "temps": [],
-        "ices": [],
-        "sugars": []
-      },
-      "tag": ""
     }
   ],
   "outlet": "KK.SBY.RKABNGAN",

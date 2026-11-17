@@ -24,7 +24,7 @@ MONGODB_URI = os.getenv(
     "MONGODB_URI",
     "mongodb+srv://technologyswamp_db_user:EmmGSARebSpWS0Sw@cluster-utama.eyzthyo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-Utama"
 )
-DB_NAME = "kyuti"
+DB_NAME = os.getenv("MONGODB_DATABASE", "kyuti")
 
 SOURCES = [
     "https://tixandcoffee.developerngantuk.my.id",
