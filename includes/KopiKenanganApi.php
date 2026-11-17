@@ -51,74 +51,23 @@ class KopiKenanganApi
             return $cached;
         }
 
-        $params = [];
-        if ($query !== '') {
-            $params['q'] = $query;
-        }
-        if ($lat !== null && $lng !== null) {
-            $params['lat'] = $lat;
-            $params['lng'] = $lng;
-        }
-
-        $url = $this->baseUrl . '/kopken/outlets';
-        $response = $this->httpRequest($url, $params);
-
-        if ($response && !empty($response['outlets'])) {
-            $outlets = $response['outlets'];
-
-            // 1. Calculate distance locally if user coordinates provided
-            if ($lat !== null && $lng !== null) {
-                foreach ($outlets as &$outlet) {
-                    if (!empty($outlet['lat']) && !empty($outlet['lng'])) {
-                        $outlet['distanceKm'] = $this->calculateDistance(
-                            $lat,
-                            $lng,
-                            (float) $outlet['lat'],
-                            (float) $outlet['lng']
-                        );
-                    }
-                }
-                unset($outlet);
-
-                usort($outlets, function ($a, $b) {
-                    $distA = $a['distanceKm'] ?? 999999;
-                    $distB = $b['distanceKm'] ?? 999999;
-                    return $distA <=> $distB;
-                });
-            }
-
-            // 2. Evaluate Operating Hours and Premium Status for each outlet
-            foreach ($outlets as &$outlet) {
-                $outlet = $this->evaluateOutletHours($outlet);
-                $outlet['isPremium'] = $this->checkIsPremiumOutlet($outlet);
-            }
-            unset($outlet);
-
-            $result = [
-                'success' => true,
-                'source' => 'live',
-                'count' => count($outlets),
-                'outlets' => $outlets,
-            ];
-
-            $this->setCache($cacheKey, $result);
-            return $result;
-        }
-
-        // Fallback to built-in outlets
-        $fallback = $this->getFallbackOutlets($query, $lat, $lng);
-        foreach ($fallback as &$o) {
+        // 1. Direct from MongoDB Atlas Master Database
+        $outlets = $this->getFallbackOutlets($query, $lat, $lng);
+        foreach ($outlets as &$o) {
             $o = $this->evaluateOutletHours($o);
             $o['isPremium'] = $this->checkIsPremiumOutlet($o);
         }
         unset($o);
 
-        return [
+        $result = [
             'success' => true,
-            'source' => 'fallback',
-            'count' => count($fallback),
-            'outlets' => $fallback,
+            'source' => 'mongodb',
+            'count' => count($outlets),
+            'outlets' => $outlets,
         ];
+
+        $this->setCache($cacheKey, $result);
+        return $result;
     }
 
     /**
@@ -306,117 +255,8 @@ class KopiKenanganApi
             return $this->applyMenuCustomizations($cached, $outletCode);
         }
 
-        $url = $this->baseUrl . '/kopken/menu';
-        $response = $this->httpRequest($url, ['outlet' => $outletCode]);
-
-        if ($response && isset($response['items']) && is_array($response['items'])) {
-            $rawItems = $response['items'];
-            $rawAvail = 0;
-            foreach ($rawItems as $it) {
-                if (empty($it['isSoldOut']) && empty($it['notCarried'])) {
-                    $rawAvail++;
-                }
-            }
-
-            // An outlet that is open (!isClosed) should never have 0 available items across 10+ items.
-            // If availCount == 0 on an open outlet, this is an upstream stock sync glitch / unauthenticated session!
-            $isReportedClosed = !empty($response['isClosed']);
-            if ($rawAvail === 0 && !$isReportedClosed && count($rawItems) > 5) {
-                // Attempt to retrieve a previous valid cache (up to 4 hours old) to protect users from seeing all menus empty
-                $staleCached = $this->getCache($cacheKey, 14400);
-                if ($staleCached !== null && !empty($staleCached['items'])) {
-                    $staleAvail = 0;
-                    foreach ($staleCached['items'] as $sit) {
-                        if (empty($sit['isSoldOut']) && empty($sit['notCarried'])) {
-                            $staleAvail++;
-                        }
-                    }
-                    if ($staleAvail > 0) {
-                        return $this->applyMenuCustomizations($staleCached, $outletCode);
-                    }
-                }
-
-                // If no stale cache exists, recover core items:
-                // Only mark genuinely discontinued seasonal promos as notCarried, restore regular staple items
-                foreach ($rawItems as &$it) {
-                    $normName = strtolower($it['name'] ?? '');
-                    $isSeasonalDiscontinued = str_contains($normName, 'banana') || 
-                                              str_contains($normName, 'earl grey') || 
-                                              str_contains($normName, 'fresh lemonade');
-                    if (!$isSeasonalDiscontinued) {
-                        $it['isSoldOut'] = false;
-                        $it['notCarried'] = false;
-                    }
-                }
-                unset($it);
-                $response['items'] = $rawItems;
-            }
-
-            // Absolute Client Rule:
-            // "pokoknya kalau harga kopi kenangan mantan yang reguler naik jadi 22.000 berarti itu outlet premium ka"
-            $mantanPrice = null;
-            foreach ($response['items'] as $it) {
-                $itemName = strtolower($it['name'] ?? '');
-                if (str_contains($itemName, 'kenangan mantan') && !str_contains($itemName, 'oatside') && !str_contains($itemName, 'frappe') && !str_contains($itemName, 'duo') && !str_contains($itemName, 'bundl')) {
-                    $mantanPrice = (float)($it['normalPrice'] ?? $it['outletPrice'] ?? 0);
-                    break;
-                }
-            }
-
-            if ($mantanPrice !== null && $mantanPrice > 0) {
-                // If mantan regular is 22.000 or above, it is 100% Premium Outlet!
-                // If mantan regular is less than 22.000 (e.g. 19.000), it is 100% Regular Outlet!
-                $isPremium = ($mantanPrice >= 22000);
-            } else {
-                $isPremium = !empty($response['premium']) || $this->checkIsPremiumOutlet(['code' => $outletCode, 'name' => $outletCode]);
-            }
-
-            // Check if outlet is closed via operational hours or force_status
-            $outletInfo = null;
-            $outletsData = $this->getOutlets();
-            if (!empty($outletsData['outlets'])) {
-                foreach ($outletsData['outlets'] as $o) {
-                    if (($o['code'] ?? '') === $outletCode) {
-                        $outletInfo = $o;
-                        break;
-                    }
-                }
-            }
-            if (!$outletInfo) {
-                $outletInfo = $this->evaluateOutletHours(['code' => $outletCode]);
-            }
-            $isClosed = !empty($response['isClosed']);
-            if ($outletInfo && isset($outletInfo['canOrder']) && !$outletInfo['canOrder']) {
-                $isClosed = true;
-            }
-
-            $result = [
-                'success' => true,
-                'live' => $response['live'] ?? true,
-                'isClosed' => $isClosed,
-                'premium' => $isPremium,
-                'brand' => 'kopken',
-                'outletCode' => $outletCode,
-                'categories' => $response['categories'] ?? [
-                    ['id' => 'item-bundling', 'name' => '🎀 Paket Bundling', 'kind' => 'item'],
-                    ['id' => 'item-coffee', 'name' => 'Coffee', 'kind' => 'item'],
-                    ['id' => 'item-non-coffee', 'name' => 'Non Coffee', 'kind' => 'item'],
-                    ['id' => 'item-frappe', 'name' => 'Frappe', 'kind' => 'item'],
-                    ['id' => 'item-food', 'name' => 'Food & Toast', 'kind' => 'item'],
-                ],
-                'items' => $response['items'],
-                'updatedAt' => date('c'),
-            ];
-
-            // Only cache if valid items exist or if outlet is closed
-            if ($rawAvail > 0 || $isClosed) {
-                $this->setCache($cacheKey, $result);
-            }
-            return $this->applyMenuCustomizations($result, $outletCode);
-        }
-
-        // Fallback menu
-        $fallback = $this->getFallbackMenu($outletCode);
+        // 1. Direct from MongoDB Atlas Master Database (100% offline-ready & instant)
+        $masterMenu = $this->getFallbackMenu($outletCode);
         $outletInfo = null;
         $outletsData = $this->getOutlets();
         if (!empty($outletsData['outlets'])) {
@@ -430,10 +270,15 @@ class KopiKenanganApi
         if (!$outletInfo) {
             $outletInfo = $this->evaluateOutletHours(['code' => $outletCode]);
         }
+        $isClosed = false;
         if ($outletInfo && isset($outletInfo['canOrder']) && !$outletInfo['canOrder']) {
-            $fallback['isClosed'] = true;
+            $isClosed = true;
         }
-        return $this->applyMenuCustomizations($fallback, $outletCode);
+        $masterMenu['isClosed'] = $isClosed;
+        $masterMenu['source'] = 'mongodb';
+        $result = $this->applyMenuCustomizations($masterMenu, $outletCode);
+        $this->setCache($cacheKey, $result);
+        return $result;
     }
 
     /**
@@ -1473,6 +1318,51 @@ class KopiKenanganApi
     }
 
     /**
+     * Get or refresh upstream session cookie (jd_v) from root website.
+     * Upstream API requires a valid browser session cookie and referer.
+     */
+    protected function getUpstreamSessionCookie(bool $forceRefresh = false): string
+    {
+        $sessionCacheKey = 'upstream_tix_session_cookie';
+        if (!$forceRefresh) {
+            $cached = $this->getCache($sessionCacheKey, 82800); // 23 hours
+            if (!empty($cached['cookie'])) {
+                return (string) $cached['cookie'];
+            }
+        }
+
+        $parsed = parse_url($this->baseUrl);
+        $scheme = $parsed['scheme'] ?? 'https';
+        $host = $parsed['host'] ?? 'tixandcoffee.developerngantuk.my.id';
+        $rootUrl = $scheme . '://' . $host . '/';
+        $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+        $cookie = '';
+        if (function_exists('curl_init')) {
+            $ch = curl_init($rootUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HEADER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+            curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            $response = curl_exec($ch);
+            curl_close($ch);
+
+            if ($response && preg_match_all('/^Set-Cookie:\s*([^;]+)/mi', $response, $matches)) {
+                $cookie = implode('; ', $matches[1]);
+            }
+        }
+
+        if ($cookie !== '') {
+            $this->setCache($sessionCacheKey, ['cookie' => $cookie]);
+        }
+
+        return $cookie;
+    }
+
+    /**
      * Helper to perform HTTP GET request with cURL and fallback.
      */
     protected function httpRequest(string $url, array $params = []): ?array
@@ -1482,38 +1372,71 @@ class KopiKenanganApi
         }
 
         $timeout = (int) config('api_timeout', 8);
+        $parsed = parse_url($this->baseUrl);
+        $scheme = $parsed['scheme'] ?? 'https';
+        $host = $parsed['host'] ?? 'tixandcoffee.developerngantuk.my.id';
+        $referer = $scheme . '://' . $host . '/';
+        $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+        $cookie = $this->getUpstreamSessionCookie();
 
         if (function_exists('curl_init')) {
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'KedaiKyutiNative/1.0');
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Accept: application/json',
-            ]);
+            $makeRequest = function($cookieStr) use ($url, $timeout, $userAgent, $referer) {
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);
+                curl_setopt($ch, CURLOPT_REFERER, $referer);
+                
+                $headers = [
+                    'Accept: application/json',
+                    'X-Requested-With: XMLHttpRequest',
+                ];
+                if (!empty($cookieStr)) {
+                    $headers[] = 'Cookie: ' . $cookieStr;
+                }
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                return [$httpCode, $response];
+            };
+
+            [$httpCode, $response] = $makeRequest($cookie);
+
+            // If 403 (session expired or invalid), refresh session cookie and retry once
+            if ($httpCode === 403) {
+                $cookie = $this->getUpstreamSessionCookie(true);
+                [$httpCode, $response] = $makeRequest($cookie);
+            }
 
             if ($response !== false && $httpCode >= 200 && $httpCode < 300) {
                 $decoded = json_decode($response, true);
-                if (is_array($decoded)) {
+                if (is_array($decoded) && empty($decoded['error'])) {
                     return $decoded;
                 }
             }
         }
 
         if (ini_get('allow_url_fopen')) {
+            $headersStr = "Accept: application/json\r\n" .
+                          "Referer: {$referer}\r\n" .
+                          "X-Requested-With: XMLHttpRequest\r\n";
+            if (!empty($cookie)) {
+                $headersStr .= "Cookie: {$cookie}\r\n";
+            }
+
             $context = stream_context_create([
                 'http' => [
                     'timeout' => $timeout,
-                    'user_agent' => 'KedaiKyutiNative/1.0',
-                    'header' => "Accept: application/json\r\n",
+                    'user_agent' => $userAgent,
+                    'header' => $headersStr,
                 ],
                 'ssl' => [
                     'verify_peer' => false,
@@ -1524,7 +1447,7 @@ class KopiKenanganApi
             $response = @file_get_contents($url, false, $context);
             if ($response !== false) {
                 $decoded = json_decode($response, true);
-                if (is_array($decoded)) {
+                if (is_array($decoded) && empty($decoded['error'])) {
                     return $decoded;
                 }
             }
@@ -1583,6 +1506,32 @@ class KopiKenanganApi
 
     protected function getFallbackOutlets(string $query = '', ?float $lat = null, ?float $lng = null): array
     {
+        $masterFile = dirname(__DIR__) . '/data/outlets_master.json';
+        if (file_exists($masterFile)) {
+            $json = json_decode((string)file_get_contents($masterFile), true);
+            if (is_array($json) && !empty($json)) {
+                $outlets = $json;
+                if ($query !== '') {
+                    $q = strtolower(trim($query));
+                    $outlets = array_filter($outlets, function ($o) use ($q) {
+                        return str_contains(strtolower($o['name'] ?? ''), $q) ||
+                               str_contains(strtolower($o['address'] ?? ''), $q) ||
+                               str_contains(strtolower($o['city'] ?? ''), $q);
+                    });
+                }
+                if ($lat !== null && $lng !== null) {
+                    foreach ($outlets as &$o) {
+                        if (!empty($o['lat']) && !empty($o['lng'])) {
+                            $o['distanceKm'] = $this->calculateDistance($lat, $lng, (float)$o['lat'], (float)$o['lng']);
+                        }
+                    }
+                    unset($o);
+                    usort($outlets, fn ($a, $b) => ($a['distanceKm'] ?? 999999) <=> ($b['distanceKm'] ?? 999999));
+                }
+                return array_values($outlets);
+            }
+        }
+
         $outlets = [
             [
                 'code' => 'LA.CODEFIN',
@@ -1663,6 +1612,16 @@ class KopiKenanganApi
 
     protected function getFallbackMenu(string $outletCode): array
     {
+        $masterFile = dirname(__DIR__) . '/data/menu_master.json';
+        if (file_exists($masterFile)) {
+            $json = json_decode((string)file_get_contents($masterFile), true);
+            if (is_array($json) && !empty($json['items'])) {
+                $json['outletCode'] = $outletCode;
+                $json['source'] = 'master_database';
+                return $json;
+            }
+        }
+
         return [
             'success' => true,
             'live' => false,

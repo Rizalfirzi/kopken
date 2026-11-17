@@ -447,6 +447,14 @@ $config = [
     ],
 
     // =========================================================================
+    // 7B. MONGODB ATLAS CONFIGURATION
+    // =========================================================================
+    'mongodb' => [
+        'uri' => getenv('MONGODB_URI') ?: 'mongodb+srv://technologyswamp_db_user:EmmGSARebSpWS0Sw@cluster-utama.eyzthyo.mongodb.net/kyuti?retryWrites=true&w=majority',
+        'database' => 'kyuti',
+    ],
+
+    // =========================================================================
     // 8. AKSES ADMIN / REDEEM CODE
     // =========================================================================
     'admin' => [
@@ -476,107 +484,6 @@ $config = [
         'closed_message' => '♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Jam layanan pemesanan kami adalah pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡',
         'allow_browsing' => true,
         'force_status' => 'auto', // 'auto', 'open', 'closed'
-    ],
-
-    // =========================================================================
-    // 11. BACKGROUND MUSIC (BGM) PLAYLIST (Trending TikTok & Pop Viral Indonesia)
-    // =========================================================================
-    'bgm' => [
-        'enabled' => true,
-        'autoplay_hint' => true,
-        'default_volume' => 0.4,
-        'playlist' => [
-            [
-                'title' => 'Negoro Angin (Trending TikTok ♫)',
-                'artist' => 'Denny Caknan',
-                'youtube_id' => '6kKuzB_YOmc',
-                'src' => '',
-            ],
-            [
-                'title' => 'Sesi Potret',
-                'artist' => 'eńau ft. Ari Lesmana',
-                'youtube_id' => 'CSKr9seKdgI',
-                'src' => '',
-            ],
-            [
-                'title' => 'Dunia Yang Nanti',
-                'artist' => 'Raim Laode',
-                'youtube_id' => 'awWKxGftWh4',
-                'src' => '',
-            ],
-            [
-                'title' => 'bergema sampai selamanya',
-                'artist' => 'Nadhif Basalamah',
-                'youtube_id' => 'gvunApwKIiY',
-                'src' => '',
-            ],
-            [
-                'title' => 'Teh Hijau',
-                'artist' => 'Tulus',
-                'youtube_id' => 'RO75uUZiAw0',
-                'src' => '',
-            ],
-            [
-                'title' => 'Jatuh Suka',
-                'artist' => 'Tulus',
-                'youtube_id' => '2uJut6USftQ',
-                'src' => '',
-            ],
-            [
-                'title' => 'Amnesia',
-                'artist' => 'Al-Ghazali',
-                'youtube_id' => '6iolyINA45I',
-                'src' => '',
-            ],
-            [
-                'title' => 'Iqro\'',
-                'artist' => 'Raim Laode',
-                'youtube_id' => '46pNDkp4KQU',
-                'src' => '',
-            ],
-            [
-                'title' => 'Terbelah Jadi Dua',
-                'artist' => 'Gloria Jessica',
-                'youtube_id' => 'RS4fnhf_LHc',
-                'src' => '',
-            ],
-            [
-                'title' => 'Separuh Aku',
-                'artist' => 'Noah',
-                'youtube_id' => 'iAP_EyZMvw0',
-                'src' => '',
-            ],
-            [
-                'title' => 'Titik Nadir',
-                'artist' => 'Kahitna',
-                'youtube_id' => 'QGZ1tR-xMLo',
-                'src' => '',
-            ],
-            [
-                'title' => 'Bersenja Gurau',
-                'artist' => 'Raim Laode',
-                'youtube_id' => 'jmvX6XyvCy0',
-                'src' => '',
-            ],
-            [
-                'title' => 'Monolog',
-                'artist' => 'Pamungkas',
-                'youtube_id' => 'IrjzeNspw78',
-                'src' => '',
-            ],
-            [
-                'title' => 'Ini Abadi',
-                'artist' => 'Perunggu',
-                'youtube_id' => 'oofq7T8cb1E',
-                'src' => '',
-            ],
-            [
-                'title' => 'Bahagia Lagi',
-                'artist' => 'Piche Kota',
-                'youtube_id' => 'S_bSlK_yZoo',
-                'src' => '',
-            ],
-        ],
     ],
 ];
 
@@ -671,9 +578,6 @@ if (is_array($dynamicData)) {
     }
     if (isset($dynamicData['web_hours']) && is_array($dynamicData['web_hours'])) {
         $config['web_hours'] = array_merge($config['web_hours'] ?? [], $dynamicData['web_hours']);
-    }
-    if (isset($dynamicData['bgm']) && is_array($dynamicData['bgm'])) {
-        $config['bgm'] = array_merge($config['bgm'] ?? [], $dynamicData['bgm']);
     }
     if (isset($dynamicData['addons']) && is_array($dynamicData['addons'])) {
         $config['addons'] = $dynamicData['addons'];

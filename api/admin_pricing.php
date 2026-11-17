@@ -55,11 +55,6 @@ function getCurrentPricing() {
             'closed_message' => '♡ Maaf, jam operasional pemesanan Kedai Kyuti saat ini sedang tutup. Jam layanan pemesanan kami adalah pukul 09.00 - 12.00 WIB. Kamu tetap bisa melihat-lihat menu terlebih dahulu ya! ♡',
             'force_status' => 'auto',
         ]),
-        'bgm' => config('bgm', [
-            'enabled' => true,
-            'default_volume' => 0.4,
-            'playlist' => [],
-        ]),
         'addons' => config('addons', []),
         'admin_passcode' => (string) config('admin.passcode', 'WHOSUTII26'),
     ];
@@ -263,31 +258,6 @@ try {
             ];
         }
 
-        if (isset($input['bgm']) && is_array($input['bgm'])) {
-            $bgmIn = $input['bgm'];
-            $cleanPlaylist = [];
-            if (!empty($bgmIn['playlist']) && is_array($bgmIn['playlist'])) {
-                foreach ($bgmIn['playlist'] as $track) {
-                    if (is_array($track) && (!empty($track['src']) || !empty($track['youtube_id']))) {
-                        $cleanTrack = [
-                            'title' => trim((string)($track['title'] ?? 'Lagu Café')),
-                            'artist' => trim((string)($track['artist'] ?? 'Kedai Kyuti')),
-                            'src' => trim((string)($track['src'] ?? '')),
-                        ];
-                        if (!empty($track['youtube_id'])) {
-                            $cleanTrack['youtube_id'] = trim((string)$track['youtube_id']);
-                        }
-                        $cleanPlaylist[] = $cleanTrack;
-                    }
-                }
-            }
-            $current['bgm'] = [
-                'enabled' => !empty($bgmIn['enabled']),
-                'default_volume' => isset($bgmIn['default_volume']) ? max(0.05, min(1.0, (float)$bgmIn['default_volume'])) : 0.4,
-                'playlist' => $cleanPlaylist,
-            ];
-        }
-
         // Sanitize & Update Addons / Toppings
         if (isset($input['addons']) && is_array($input['addons'])) {
             $current['addons'] = $input['addons'];
@@ -338,15 +308,6 @@ try {
         // 5. Set Cookie for immediate cross-request synchronization on serverless
         $cookiePayload = $current;
         unset($cookiePayload['admin_passcode']);
-        // Strip heavy base64 audio data from cookie to avoid exceeding 4KB cookie header limit
-        if (isset($cookiePayload['bgm']['playlist']) && is_array($cookiePayload['bgm']['playlist'])) {
-            foreach ($cookiePayload['bgm']['playlist'] as &$trk) {
-                if (!empty($trk['src']) && str_starts_with($trk['src'], 'data:')) {
-                    $trk['src'] = '';
-                }
-            }
-            unset($trk);
-        }
         @setcookie('kyuti_custom_pricing', urlencode(json_encode($cookiePayload, JSON_UNESCAPED_UNICODE)), [
             'expires' => time() + 31536000,
             'path' => '/',

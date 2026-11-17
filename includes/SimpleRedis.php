@@ -1,20 +1,27 @@
 <?php
 /**
- * Lightweight Pure PHP Redis Client
- * Supports both Redis TCP/TLS Socket Protocol (REDIS_URL) & REST API (Upstash/Vercel KV).
+ * Lightweight Cloud Storage Adapter for Kedai Kyuti
+ * Prioritizes MongoDB Atlas ('kyuti' database) as primary cloud database.
+ * Supports legacy Redis / KV as secondary fallback.
  * Zero external composer dependencies.
  */
+require_once __DIR__ . '/SimpleMongo.php';
+
 class SimpleRedis {
+    protected ?SimpleMongo $mongo = null;
     protected ?string $redisUrl = null;
     protected ?string $restUrl = null;
     protected ?string $restToken = null;
 
     public function __construct() {
-        // 1. Check REST environment variables
+        // 1. Primary: MongoDB Atlas
+        $this->mongo = new SimpleMongo();
+
+        // 2. Secondary: Check REST environment variables (Legacy Redis / KV)
         $this->restUrl = getenv('KV_REST_API_URL') ?: getenv('UPSTASH_REDIS_REST_URL') ?: (function_exists('config') ? config('database.kv_url') : null);
         $this->restToken = getenv('KV_REST_API_TOKEN') ?: getenv('UPSTASH_REDIS_REST_TOKEN') ?: (function_exists('config') ? config('database.kv_token') : null);
 
-        // 2. Check TCP REDIS_URL environment variables
+        // 3. Check TCP REDIS_URL environment variables
         $this->redisUrl = getenv('REDIS_URL') ?: getenv('KV_URL') ?: null;
 
         // Auto-derive REST URL from REDIS_URL if not directly set
@@ -28,10 +35,16 @@ class SimpleRedis {
     }
 
     public function isConnected(): bool {
+        if ($this->mongo !== null && $this->mongo->isConnected()) {
+            return true;
+        }
         return !empty($this->redisUrl) || (!empty($this->restUrl) && !empty($this->restToken));
     }
 
     public function getProviderName(): string {
+        if ($this->mongo !== null && $this->mongo->isConnected()) {
+            return $this->mongo->getProviderName();
+        }
         return $this->isConnected() ? 'Vercel KV / Upstash Redis' : 'Lokal / Serverless Temp';
     }
 
@@ -39,7 +52,15 @@ class SimpleRedis {
      * Set a string or JSON key
      */
     public function set(string $key, string $value): bool {
-        // 1. Try TCP/TLS Socket first if REDIS_URL is present
+        // 1. Save to MongoDB Atlas first
+        if ($this->mongo !== null && $this->mongo->isConnected()) {
+            $ok = $this->mongo->set($key, $value);
+            if ($ok) {
+                return true;
+            }
+        }
+
+        // 2. Legacy fallback: Try TCP/TLS Socket if REDIS_URL is present
         if (!empty($this->redisUrl)) {
             $ok = $this->socketCommand('SET', $key, $value);
             if ($ok !== null && ($ok === 'OK' || $ok === '+OK' || $ok === true)) {
@@ -47,7 +68,7 @@ class SimpleRedis {
             }
         }
 
-        // 2. Fallback to REST API
+        // 3. Legacy fallback: REST API
         if (!empty($this->restUrl) && !empty($this->restToken)) {
             return $this->restSet($key, $value);
         }
@@ -59,7 +80,15 @@ class SimpleRedis {
      * Get a string or JSON key
      */
     public function get(string $key): ?string {
-        // 1. Try TCP/TLS Socket first if REDIS_URL is present
+        // 1. Read from MongoDB Atlas first
+        if ($this->mongo !== null && $this->mongo->isConnected()) {
+            $val = $this->mongo->get($key);
+            if ($val !== null && $val !== '') {
+                return $val;
+            }
+        }
+
+        // 2. Legacy fallback: Try TCP/TLS Socket if REDIS_URL is present
         if (!empty($this->redisUrl)) {
             $val = $this->socketCommand('GET', $key);
             if ($val !== null) {
@@ -67,12 +96,28 @@ class SimpleRedis {
             }
         }
 
-        // 2. Fallback to REST API
+        // 3. Legacy fallback: REST API
         if (!empty($this->restUrl) && !empty($this->restToken)) {
             return $this->restGet($key);
         }
 
         return null;
+    }
+
+    /**
+     * Delete a key
+     */
+    public function del(string $key): bool {
+        if ($this->mongo !== null && $this->mongo->isConnected()) {
+            return $this->mongo->del($key);
+        }
+
+        if (!empty($this->redisUrl)) {
+            $this->socketCommand('DEL', $key);
+            return true;
+        }
+
+        return false;
     }
 
     /**
