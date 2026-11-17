@@ -2,7 +2,7 @@
 
 ## Project Overview
 This is a lightweight PHP Native web application without framework dependencies.
-It integrates with the live Kopi Kenangan REST API (`https://tixandcoffee.developerngantuk.my.id/api`) and generates WhatsApp ordering receipts.
+It integrates with the live Kopi Kenangan REST API (`https://twinsjasdor.my.id/api`) and generates WhatsApp ordering receipts.
 
 ## Architecture
 - `index.php`: Main entry point (HTML, PHP, JS).
