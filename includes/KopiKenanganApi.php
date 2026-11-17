@@ -1706,6 +1706,7 @@ class KopiKenanganApi
         if (file_exists($masterFile)) {
             $json = json_decode((string)file_get_contents($masterFile), true);
             if (is_array($json) && !empty($json['items'])) {
+                unset($json['bundles'], $json['satuan'], $json['seliter'], $json['raw_dump']);
                 $json['outletCode'] = $outletCode;
                 $json['source'] = 'master_database';
                 return $json;

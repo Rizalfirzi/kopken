@@ -159,6 +159,11 @@ class KopkenMongoSync:
 
         if sample_menu_full:
             sample_menu_full["items"] = menu_list
+            # Strip heavy redundant upstream bloat (bundles alone was 355 KB, saving 85% bandwidth)
+            sample_menu_full.pop("bundles", None)
+            sample_menu_full.pop("satuan", None)
+            sample_menu_full.pop("seliter", None)
+            sample_menu_full.pop("raw_dump", None)
             with open(os.path.join(data_dir, "menu_master.json"), "w", encoding="utf-8") as f:
                 json.dump(sample_menu_full, f, indent=2, ensure_ascii=False)
 

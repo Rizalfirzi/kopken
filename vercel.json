@@ -11,14 +11,14 @@
       "src": "/assets/img/(.*)",
       "dest": "/assets/img/$1",
       "headers": {
-        "cache-control": "public, max-age=86400"
+        "cache-control": "public, max-age=31536000, immutable"
       }
     },
     {
       "src": "/assets/(css|js)/(.*)",
       "dest": "/assets/$1/$2",
       "headers": {
-        "cache-control": "public, max-age=0, must-revalidate"
+        "cache-control": "public, max-age=31536000, immutable"
       }
     },
     {
