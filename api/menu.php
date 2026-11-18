@@ -14,7 +14,7 @@ if (!headers_sent()) {
         header('Cache-Control: private, no-cache, no-store, must-revalidate');
         header('Pragma: no-cache');
     } else {
-        header('Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+        header('Cache-Control: public, max-age=15, s-maxage=60, stale-while-revalidate=120');
     }
 }
 

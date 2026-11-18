@@ -294,8 +294,88 @@ class KopiKenanganApi
             return $this->applyMenuCustomizations($cached, $outletCode);
         }
 
-        // 1. Direct from MongoDB Atlas Master Database (100% offline-ready & instant)
+        // 1. Fetch LIVE Real-time Menu & Outlet Stock from multi-source upstream
+        $sources = [
+            'https://tixandcoffee.developerngantuk.my.id',
+            'https://ridstore.developerngantuk.my.id',
+            'https://tyaastore.my.id',
+            $this->origin ?: 'https://twinsjasdor.my.id'
+        ];
+
+        $liveMenu = null;
+        foreach ($sources as $src) {
+            $src = rtrim($src, '/');
+            $url = $src . '/api/kopken/menu';
+            $response = $this->httpRequest($url, ['outlet' => $outletCode]);
+            if ($response && !empty($response['items']) && is_array($response['items']) && count($response['items']) > 5) {
+                $liveMenu = $response;
+                $liveMenu['source'] = $src;
+                $liveMenu['live'] = true;
+                break;
+            }
+        }
+
         $masterMenu = $this->getFallbackMenu($outletCode);
+
+        if ($liveMenu !== null) {
+            // Live menu from upstream contains the outlet's real-time stock
+            $menuData = $liveMenu;
+
+            // Map master items for fast metadata lookup (img, desc, largeBase, options)
+            $masterItemMap = [];
+            foreach ($masterMenu['items'] ?? [] as $mi) {
+                $mKey = $mi['key'] ?? $mi['id'] ?? '';
+                $mCode = (string)($mi['code'] ?? '');
+                if ($mKey !== '') $masterItemMap[$mKey] = $mi;
+                if ($mCode !== '') $masterItemMap[$mCode] = $mi;
+            }
+
+            // Enrich live items with master metadata if missing
+            $liveKeys = [];
+            foreach ($menuData['items'] as &$it) {
+                $iKey = $it['key'] ?? $it['id'] ?? '';
+                $iCode = (string)($it['code'] ?? '');
+                if ($iKey !== '') $liveKeys[$iKey] = true;
+                if ($iCode !== '') $liveKeys[$iCode] = true;
+
+                $ref = $masterItemMap[$iKey] ?? $masterItemMap[$iCode] ?? null;
+                if ($ref) {
+                    if (empty($it['img']) && !empty($ref['img'])) {
+                        $it['img'] = $ref['img'];
+                    }
+                    if (empty($it['desc']) && !empty($ref['desc'])) {
+                        $it['desc'] = $ref['desc'];
+                    }
+                    if (empty($it['largeBase']) && !empty($ref['largeBase'])) {
+                        $it['largeBase'] = $ref['largeBase'];
+                    }
+                    if (empty($it['options']) && !empty($ref['options'])) {
+                        $it['options'] = $ref['options'];
+                    }
+                }
+            }
+            unset($it);
+
+            // Append master items that this outlet does NOT carry, marked as notCarried / isSoldOut
+            foreach ($masterMenu['items'] ?? [] as $mi) {
+                $mKey = $mi['key'] ?? $mi['id'] ?? '';
+                $mCode = (string)($mi['code'] ?? '');
+                if (($mKey !== '' && !empty($liveKeys[$mKey])) || ($mCode !== '' && !empty($liveKeys[$mCode]))) {
+                    continue; // Already in live menu
+                }
+                // Item is not carried by this outlet
+                $notCarriedItem = $mi;
+                $notCarriedItem['isSoldOut'] = true;
+                $notCarriedItem['notCarried'] = true;
+                $menuData['items'][] = $notCarriedItem;
+            }
+        } else {
+            // Fallback to master database if all upstreams are down
+            $menuData = $masterMenu;
+            $menuData['source'] = 'master_database';
+            $menuData['live'] = false;
+        }
+
         $outletInfo = null;
         $outletsData = $this->getOutlets();
         if (!empty($outletsData['outlets'])) {
@@ -313,11 +393,17 @@ class KopiKenanganApi
         if ($outletInfo && isset($outletInfo['canOrder']) && !$outletInfo['canOrder']) {
             $isClosed = true;
         }
-        $masterMenu['isClosed'] = $isClosed;
-        $masterMenu['source'] = 'mongodb';
-        $result = $this->applyMenuCustomizations($masterMenu, $outletCode);
-        $this->setCache($cacheKey, $result);
-        return $result;
+        if (!empty($menuData['isClosed'])) {
+            $isClosed = true;
+        }
+        $menuData['isClosed'] = $isClosed;
+        $menuData['outletCode'] = $outletCode;
+
+        // Strip heavy redundant upstream bloat before caching
+        unset($menuData['bundles'], $menuData['satuan'], $menuData['seliter'], $menuData['raw_dump'], $menuData['bundleAll']);
+
+        $this->setCache($cacheKey, $menuData);
+        return $this->applyMenuCustomizations($menuData, $outletCode);
     }
 
     /**
@@ -353,13 +439,12 @@ class KopiKenanganApi
             $key = $item['key'] ?? $item['id'] ?? '';
             $category = $item['category'] ?? 'Coffee';
 
-            // Filter out items that are NOT CARRIED by this outlet (discontinued seasonal promos like Korean Banana / not sold here)
-            // unless explicitly overridden in admin stock settings
-            if (!empty($item['notCarried']) && !isset($stockOverrides[$key])) {
-                continue;
+            // Synchronize stock: if item is sold out or not carried at this outlet, mark as isSoldOut
+            if (!empty($item['notCarried'])) {
+                $item['isSoldOut'] = true;
             }
 
-            // Override Stock
+            // Override Stock from Admin settings if set
             if (isset($stockOverrides[$key])) {
                 $item['isSoldOut'] = (bool) $stockOverrides[$key];
             }
@@ -679,7 +764,12 @@ class KopiKenanganApi
         $rawResponse = $this->getCache($upstreamCacheKey, 120);
 
         if ($rawResponse === null) {
-            $url = $this->baseUrl . '/kopken/item';
+            $sources = [
+                'https://tixandcoffee.developerngantuk.my.id',
+                'https://ridstore.developerngantuk.my.id',
+                'https://tyaastore.my.id',
+                $this->origin ?: 'https://twinsjasdor.my.id'
+            ];
             $params = [
                 'outlet' => $outletCode,
             ];
@@ -690,9 +780,15 @@ class KopiKenanganApi
                 $params['key'] = $itemKey;
             }
 
-            $rawResponse = $this->httpRequest($url, $params);
-            if ($rawResponse && is_array($rawResponse)) {
-                $this->setCache($upstreamCacheKey, $rawResponse);
+            foreach ($sources as $src) {
+                $src = rtrim($src, '/');
+                $url = $src . '/api/kopken/item';
+                $resp = $this->httpRequest($url, $params);
+                if ($resp && is_array($resp) && (!empty($resp['groups']) || !empty($resp['prices']) || isset($resp['isSoldOut']))) {
+                    $rawResponse = $resp;
+                    $this->setCache($upstreamCacheKey, $rawResponse);
+                    break;
+                }
             }
         }
 
