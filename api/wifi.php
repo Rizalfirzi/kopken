@@ -10,7 +10,7 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 if (!headers_sent()) {
-    header('Cache-Control: public, max-age=300, s-maxage=1800, stale-while-revalidate=3600');
+    header('Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=600');
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {

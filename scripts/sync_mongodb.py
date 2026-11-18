@@ -106,6 +106,54 @@ class KopkenMongoSync:
 
         return outlets, menu_full
 
+    def fetch_wifi(self):
+        """Fetch real-time Wi-Fi info from upstream sources with cookie handshake"""
+        print("[*] Fetching live Wi-Fi credentials from upstream sources...")
+        for base_url in SOURCES:
+            cj = http.cookiejar.CookieJar()
+            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+            try:
+                req_home = urllib.request.Request(f"{base_url}/", headers={"User-Agent": USER_AGENT})
+                opener.open(req_home, timeout=8)
+            except Exception:
+                continue
+
+            headers = {
+                "User-Agent": USER_AGENT,
+                "Accept": "application/json",
+                "Referer": f"{base_url}/",
+                "X-Requested-With": "XMLHttpRequest"
+            }
+
+            try:
+                req_wifi = urllib.request.Request(f"{base_url}/api/kopken/wifi?outlet=LA.CODEFIN", headers=headers)
+                with opener.open(req_wifi, timeout=8) as resp:
+                    raw = resp.read().decode("utf-8")
+                    data = json.loads(raw)
+                    wifi_obj = data.get("wifi") if (isinstance(data, dict) and "wifi" in data) else data
+                    if isinstance(wifi_obj, dict) and wifi_obj.get("password"):
+                        wifi_data = {
+                            "ssid": wifi_obj.get("ssid", "Teman Kenangan"),
+                            "password": wifi_obj.get("password"),
+                            "source": base_url,
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                            "date": datetime.now().strftime("%A, %d %B %Y")
+                        }
+                        print(f"[✓] Retrieved live Wi-Fi from {base_url}: SSID='{wifi_data['ssid']}', Password='{wifi_data['password']}'")
+                        return wifi_data
+            except Exception:
+                continue
+
+        # Dynamic fallback if upstreams are unreachable: SecangkirRindu + date('j')
+        day_num = datetime.now().strftime("%d").lstrip("0") or "1"
+        return {
+            "ssid": "Teman Kenangan",
+            "password": f"SecangkirRindu{day_num}",
+            "source": "verified_daily_formula",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "date": datetime.now().strftime("%A, %d %B %Y")
+        }
+
     def sync_all(self):
         start_time = time.time()
         print(f"\n[*] Starting multi-source sync to MongoDB Atlas ('{DB_NAME}')...")
@@ -188,6 +236,27 @@ class KopkenMongoSync:
             with open(os.path.join(data_dir, "menu_master.json"), "w", encoding="utf-8") as f:
                 json.dump(sample_menu_full, f, indent=2, ensure_ascii=False)
 
+        # Upsert Wi-Fi info into MongoDB Atlas settings collection
+        wifi_data = self.fetch_wifi()
+        if wifi_data:
+            self.db["settings"].update_one(
+                {"_id": "wifi_info"},
+                {"$set": {
+                    "_id": "wifi_info",
+                    "data": wifi_data,
+                    "raw_json": json.dumps(wifi_data),
+                    "ssid": wifi_data["ssid"],
+                    "password": wifi_data["password"],
+                    "date": wifi_data["date"],
+                    "updated_at": now
+                }},
+                upsert=True
+            )
+            # Write snapshot to data/wifi_master.json
+            with open(os.path.join(data_dir, "wifi_master.json"), "w", encoding="utf-8") as f:
+                json.dump(wifi_data, f, indent=2, ensure_ascii=False)
+            print(f"[✓] Wi-Fi in MongoDB & snapshot: SSID='{wifi_data['ssid']}', Password='{wifi_data['password']}'")
+
         duration = round(time.time() - start_time, 2)
         print(f"[+] Master JSON snapshots updated in {data_dir}")
 
@@ -196,6 +265,7 @@ class KopkenMongoSync:
             "timestamp": now,
             "outlets_count": len(outlets_list),
             "menu_count": len(menu_list),
+            "wifi_password": wifi_data.get("password") if wifi_data else None,
             "sources": SOURCES,
             "duration_seconds": duration,
             "status": "success"

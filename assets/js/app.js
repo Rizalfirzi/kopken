@@ -3822,9 +3822,9 @@ async function fetchWifi(outletCode) {
     } catch (err) {
         console.warn('fetchWifi error:', err);
     }
-    const fallback = window.INITIAL_DATA?.wifi || {
+    const fallback = window.INITIAL_DATA?.wifi?.wifi || window.INITIAL_DATA?.wifi || {
         ssid: 'Teman Kenangan',
-        password: 'KopiBikinSemangat@' + new Date().getDate()
+        password: 'SecangkirRindu' + new Date().getDate()
     };
     updateWifiUI({ outlet: code, wifi: fallback, date: new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) });
     return fallback;
@@ -3833,7 +3833,7 @@ async function fetchWifi(outletCode) {
 function updateWifiUI(data) {
     if (!data || !data.wifi) return;
     const ssid = data.wifi.ssid || 'Teman Kenangan';
-    const pass = data.wifi.password || ('KopiBikinSemangat@' + new Date().getDate());
+    const pass = data.wifi.password || ('SecangkirRindu' + new Date().getDate());
     const dateText = data.date || new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     // 1. Update Banner Card in Store View

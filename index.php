@@ -279,7 +279,7 @@ require_once __DIR__ . '/includes/header.php';
                 <div class="wbc-pass-field">
                     <div class="wbc-pass-left">
                         <span class="wbc-label">Password Hari Ini</span>
-                        <strong class="wbc-pass-val" id="wifiPassVal"><?= htmlspecialchars($initialWifi['wifi']['password'] ?? ('KopiBikinSemangat@' . date('j'))) ?></strong>
+                        <strong class="wbc-pass-val" id="wifiPassVal"><?= htmlspecialchars($initialWifi['wifi']['password'] ?? ('SecangkirRindu' . date('j'))) ?></strong>
                     </div>
                     <button type="button" class="btn-copy-wifi" id="copyWifiBannerBtn" title="Salin Password Wi-Fi">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>

@@ -872,48 +872,137 @@ class KopiKenanganApi
 
     /**
      * Fetch Live Wi-Fi SSID & Daily Password for an outlet
-     * URL: https://tixandcoffee.developerngantuk.my.id/api/kopken/wifi?outlet={outlet}
+     * Prioritizes:
+     * 1. MongoDB Atlas Master Database (kyuti.settings._id = wifi_info)
+     * 2. Local Master Snapshot (data/wifi_master.json)
+     * 3. Multi-source Upstream Failover (tixandcoffee, ridstore, tyaastore, twinsjasdor)
+     * 4. Safe fallback: 'SecangkirRindu' . date('j')
      */
-    public function getWifi(string $outletCode): array
+    public function getWifi(string $outletCode = ''): array
     {
         $outletCode = trim($outletCode);
         if ($outletCode === '') {
             $outletCode = config('store.default_outlet', 'LA.CODEFIN');
         }
 
+        $todayDate = date('l, d F Y');
         $cacheKey = 'wifi_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $outletCode);
-        $cached = $this->getCache($cacheKey, 300); // 5 minutes cache
-        if ($cached !== null) {
+
+        // 1. In-memory / file cache check (3 minutes TTL, must match today's date)
+        $cached = $this->getCache($cacheKey, 180);
+        if ($cached !== null && !empty($cached['wifi']['password']) && ($cached['date'] ?? '') === $todayDate) {
             return $cached;
         }
 
-        $url = $this->baseUrl . '/kopken/wifi';
-        $response = $this->httpRequest($url, ['outlet' => $outletCode]);
-
-        if ($response && !empty($response['wifi'])) {
-            $result = [
-                'success' => true,
-                'outlet' => $outletCode,
-                'wifi' => [
-                    'ssid' => $response['wifi']['ssid'] ?? 'Teman Kenangan',
-                    'password' => $response['wifi']['password'] ?? ('KopiBikinSemangat@' . date('j')),
-                ],
-                'date' => date('l, d F Y'),
-            ];
-            $this->setCache($cacheKey, $result);
-            return $result;
+        // 2. Direct from MongoDB Atlas Master Database (kyuti.settings._id = wifi_info)
+        try {
+            require_once __DIR__ . '/SimpleMongo.php';
+            $mongo = new SimpleMongo();
+            if ($mongo->isConnected()) {
+                $raw = $mongo->get('wifi_info');
+                if (!empty($raw)) {
+                    $doc = json_decode($raw, true);
+                    $pwd = $doc['password'] ?? ($doc['wifi']['password'] ?? null);
+                    $ssid = $doc['ssid'] ?? ($doc['wifi']['ssid'] ?? 'Teman Kenangan');
+                    if (!empty($pwd)) {
+                        $result = [
+                            'success' => true,
+                            'outlet' => $outletCode,
+                            'wifi' => [
+                                'ssid' => $ssid,
+                                'password' => $pwd,
+                            ],
+                            'date' => $doc['date'] ?? $todayDate,
+                            'source' => 'mongodb'
+                        ];
+                        $this->setCache($cacheKey, $result);
+                        return $result;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('getWifi MongoDB fetch failed: ' . $e->getMessage());
         }
 
-        // Fallback default Kenangan Wi-Fi format
+        // 3. Fast local snapshot fallback from data/wifi_master.json
+        $masterFile = dirname(__DIR__) . '/data/wifi_master.json';
+        if (file_exists($masterFile)) {
+            $masterData = json_decode(@file_get_contents($masterFile), true);
+            $pwd = $masterData['password'] ?? ($masterData['wifi']['password'] ?? null);
+            $ssid = $masterData['ssid'] ?? ($masterData['wifi']['ssid'] ?? 'Teman Kenangan');
+            if (!empty($pwd)) {
+                $result = [
+                    'success' => true,
+                    'outlet' => $outletCode,
+                    'wifi' => [
+                        'ssid' => $ssid,
+                        'password' => $pwd,
+                    ],
+                    'date' => $masterData['date'] ?? $todayDate,
+                    'source' => 'master_json'
+                ];
+                $this->setCache($cacheKey, $result);
+                return $result;
+            }
+        }
+
+        // 4. Multi-Source Upstream Direct Failover
+        $sources = [
+            'https://tixandcoffee.developerngantuk.my.id',
+            'https://ridstore.developerngantuk.my.id',
+            'https://tyaastore.my.id',
+            $this->origin ?: 'https://twinsjasdor.my.id'
+        ];
+
+        foreach ($sources as $src) {
+            $src = rtrim($src, '/');
+            $wifiUrl = $src . '/api/kopken/wifi';
+            $response = $this->httpRequest($wifiUrl, ['outlet' => $outletCode]);
+            if ($response) {
+                $wifiObj = $response['wifi'] ?? $response;
+                if (!empty($wifiObj['password'])) {
+                    $ssid = $wifiObj['ssid'] ?? 'Teman Kenangan';
+                    $pwd = $wifiObj['password'];
+                    $result = [
+                        'success' => true,
+                        'outlet' => $outletCode,
+                        'wifi' => [
+                            'ssid' => $ssid,
+                            'password' => $pwd,
+                        ],
+                        'date' => $todayDate,
+                        'source' => $src
+                    ];
+
+                    $this->setCache($cacheKey, $result);
+                    try {
+                        require_once __DIR__ . '/SimpleMongo.php';
+                        $mongo = new SimpleMongo();
+                        $mongo->set('wifi_info', json_encode([
+                            'ssid' => $ssid,
+                            'password' => $pwd,
+                            'date' => $todayDate,
+                            'updated_at' => date('c'),
+                            'source' => $src
+                        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                    } catch (\Throwable $e) {}
+
+                    return $result;
+                }
+            }
+        }
+
+        // 5. Ultimate Fallback (Verified live password format SecangkirRindu + date('j'))
         $dayNum = date('j');
         $fallback = [
             'success' => true,
             'outlet' => $outletCode,
             'wifi' => [
                 'ssid' => 'Teman Kenangan',
-                'password' => 'KopiBikinSemangat@' . $dayNum,
+                'password' => 'SecangkirRindu' . $dayNum,
             ],
-            'date' => date('l, d F Y'),
+            'date' => $todayDate,
+            'source' => 'verified_formula'
         ];
         return $fallback;
     }
@@ -1341,9 +1430,14 @@ class KopiKenanganApi
      * Get or refresh upstream session cookie (jd_v) from root website.
      * Upstream API requires a valid browser session cookie and referer.
      */
-    protected function getUpstreamSessionCookie(bool $forceRefresh = false): string
+    protected function getUpstreamSessionCookie(bool $forceRefresh = false, ?string $targetHost = null): string
     {
-        $sessionCacheKey = 'upstream_tix_session_cookie';
+        $host = $targetHost;
+        if (empty($host)) {
+            $parsed = parse_url($this->baseUrl);
+            $host = $parsed['host'] ?? 'tixandcoffee.developerngantuk.my.id';
+        }
+        $sessionCacheKey = 'upstream_session_cookie_' . preg_replace('/[^a-zA-Z0-9]/', '_', $host);
         if (!$forceRefresh) {
             $cached = $this->getCache($sessionCacheKey, 82800); // 23 hours
             if (!empty($cached['cookie'])) {
@@ -1351,9 +1445,7 @@ class KopiKenanganApi
             }
         }
 
-        $parsed = parse_url($this->baseUrl);
-        $scheme = $parsed['scheme'] ?? 'https';
-        $host = $parsed['host'] ?? 'tixandcoffee.developerngantuk.my.id';
+        $scheme = 'https';
         $rootUrl = $scheme . '://' . $host . '/';
         $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -1393,13 +1485,13 @@ class KopiKenanganApi
         }
 
         $timeout = (int) config('api_timeout', 8);
-        $parsed = parse_url($this->baseUrl);
+        $parsed = parse_url($url);
         $scheme = $parsed['scheme'] ?? 'https';
-        $host = $parsed['host'] ?? 'tixandcoffee.developerngantuk.my.id';
+        $host = $parsed['host'] ?? (parse_url($this->baseUrl, PHP_URL_HOST) ?: 'tixandcoffee.developerngantuk.my.id');
         $referer = $scheme . '://' . $host . '/';
         $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-        $cookie = $this->getUpstreamSessionCookie();
+        $cookie = $this->getUpstreamSessionCookie(false, $host);
 
         if (function_exists('curl_init')) {
             $makeRequest = function($cookieStr) use ($url, $timeout, $userAgent, $referer) {
@@ -1433,7 +1525,7 @@ class KopiKenanganApi
 
             // If 403 (session expired or invalid), refresh session cookie and retry once
             if ($httpCode === 403) {
-                $cookie = $this->getUpstreamSessionCookie(true);
+                $cookie = $this->getUpstreamSessionCookie(true, $host);
                 [$httpCode, $response] = $makeRequest($cookie);
             }
 
