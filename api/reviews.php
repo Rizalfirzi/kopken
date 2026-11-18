@@ -322,7 +322,9 @@ try {
     }
 
     // Default GET (cached on Edge CDN for 3 minutes)
-    header('Cache-Control: public, max-age=60, s-maxage=180, stale-while-revalidate=360');
+    if (!headers_sent()) {
+        header('Cache-Control: public, max-age=60, s-maxage=180, stale-while-revalidate=360');
+    }
     echo json_encode([
         'success' => true,
         'reviews' => $reviews,

@@ -8,12 +8,14 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 // Set smart Edge CDN and browser cache headers (drastically cuts Vercel bandwidth & function invocations)
-$forceRefresh = isset($_GET['refresh']) && in_array(strtolower((string)$_GET['refresh']), ['1', 'true', 'yes'], true);
-if ($forceRefresh) {
-    header('Cache-Control: private, no-cache, no-store, must-revalidate');
-    header('Pragma: no-cache');
-} else {
-    header('Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+if (!headers_sent()) {
+    $forceRefresh = isset($_GET['refresh']) && in_array(strtolower((string)$_GET['refresh']), ['1', 'true', 'yes'], true);
+    if ($forceRefresh) {
+        header('Cache-Control: private, no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+    } else {
+        header('Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+    }
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {

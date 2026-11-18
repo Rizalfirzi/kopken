@@ -9,12 +9,14 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/KopiKenanganApi.php';
 
 // Smart Edge CDN and browser cache header (drastically reduces Vercel function duration & origin bandwidth)
-$forceRefresh = isset($_GET['refresh']) && in_array(strtolower((string)$_GET['refresh']), ['1', 'true', 'yes'], true);
-if ($forceRefresh) {
-    header('Cache-Control: private, no-cache, no-store, must-revalidate');
-    header('Pragma: no-cache');
-} else {
-    header('Cache-Control: public, max-age=30, s-maxage=120, stale-while-revalidate=300');
+if (!headers_sent()) {
+    $forceRefresh = isset($_GET['refresh']) && in_array(strtolower((string)$_GET['refresh']), ['1', 'true', 'yes'], true);
+    if ($forceRefresh) {
+        header('Cache-Control: private, no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+    } else {
+        header('Cache-Control: public, max-age=30, s-maxage=120, stale-while-revalidate=300');
+    }
 }
 
 $api = new KopiKenanganApi();
