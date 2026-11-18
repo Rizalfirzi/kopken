@@ -42,5 +42,45 @@ $status['sources'] = [
     'https://twinsjasdor.my.id'
 ];
 
+if (isset($_GET['test'])) {
+    require_once __DIR__ . '/../includes/KopiKenanganApi.php';
+    $api = new KopiKenanganApi();
+    $reflection = new ReflectionClass($api);
+    $method = $reflection->getMethod('getUpstreamSessionCookie');
+    $method->setAccessible(true);
+    
+    $testResults = [];
+    foreach ($status['sources'] as $s) {
+        $host = parse_url($s, PHP_URL_HOST);
+        $cookie = $method->invoke($api, true, $host);
+        
+        $ch = curl_init($s . '/api/kopken/menu?outlet=LA.CODEFIN');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 4);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        curl_setopt($ch, CURLOPT_REFERER, $s . '/');
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Accept: application/json',
+            'X-Requested-With: XMLHttpRequest',
+            'Cookie: ' . $cookie
+        ]);
+        $body = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        $testResults[$host] = [
+            'cookie' => $cookie,
+            'http_code' => $code,
+            'curl_error' => $err,
+            'body_sample' => substr((string)$body, 0, 100),
+        ];
+    }
+    $status['upstream_tests'] = $testResults;
+}
+
 echo json_encode($status, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
