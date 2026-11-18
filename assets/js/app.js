@@ -2360,7 +2360,6 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
     let msg = `୨୧ *FORMAT ORDER KEDAI KYUTI* ୨୧\n`;
     msg += `--------------------------------------\n`;
     msg += `🧾 Kode Order: *${orderCode}*\n`;
-    msg += `🔍 Link Tracking:\n${trackUrl}\n`;
     msg += `Outlet: *${outletName}*\n`;
     msg += `Nama: *${custName}*\n`;
     if (custPhone) {

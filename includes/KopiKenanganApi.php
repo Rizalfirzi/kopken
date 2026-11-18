@@ -1016,7 +1016,6 @@ class KopiKenanganApi
         $waMessage = "୨୧ *FORMAT ORDER KEDAI KYUTI* ୨୧\n";
         $waMessage .= "--------------------------------------\n";
         $waMessage .= "🧾 Kode Order: *" . $orderCode . "*\n";
-        $waMessage .= "🔍 Link Tracking:\n" . $trackUrl . "\n";
         $waMessage .= "Outlet: *" . $order['outletName'] . "*\n";
         $waMessage .= "Nama: *" . $order['customerName'] . "*\n";
         if (!empty($order['customerPhone'])) {
@@ -1538,7 +1537,8 @@ class KopiKenanganApi
                     $outlets = array_filter($outlets, function ($o) use ($q) {
                         return str_contains(strtolower($o['name'] ?? ''), $q) ||
                                str_contains(strtolower($o['address'] ?? ''), $q) ||
-                               str_contains(strtolower($o['city'] ?? ''), $q);
+                               str_contains(strtolower($o['city'] ?? ''), $q) ||
+                               str_contains(strtolower($o['code'] ?? ''), $q);
                     });
                 }
                 if ($lat !== null && $lng !== null) {

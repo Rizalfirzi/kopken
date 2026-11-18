@@ -72,16 +72,24 @@ class KopkenMongoSync:
             "X-Requested-With": "XMLHttpRequest"
         }
 
-        # Step 2: Fetch outlets
-        outlets = []
-        try:
-            req_out = urllib.request.Request(f"{base_url}/api/kopken/outlets", headers=headers)
-            with opener.open(req_out, timeout=12) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                outlets = data.get("outlets", [])
-                print(f"[+] Retrieved {len(outlets)} outlets from {base_url}")
-        except Exception as e:
-            print(f"[!] Error fetching outlets from {base_url}: {e}")
+        # Step 2: Fetch outlets (including Karawang & key major regions)
+        outlets_map = {}
+        target_queries = ["", "karawang", "cikampek", "jakarta", "bandung", "surabaya", "semarang", "yogyakarta", "medan", "bali"]
+        for tq in target_queries:
+            try:
+                out_url = f"{base_url}/api/kopken/outlets?q={urllib.parse.quote(tq)}" if tq else f"{base_url}/api/kopken/outlets"
+                req_out = urllib.request.Request(out_url, headers=headers)
+                with opener.open(req_out, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    raw_outlets = data if isinstance(data, list) else data.get("outlets", [])
+                    for o in raw_outlets:
+                        code = o.get("code")
+                        if code and code not in outlets_map:
+                            outlets_map[code] = o
+            except Exception as e:
+                pass
+        outlets = list(outlets_map.values())
+        print(f"[+] Retrieved {len(outlets)} outlets from {base_url}")
 
         # Step 3: Fetch menu
         menu_items = []
@@ -154,8 +162,21 @@ class KopkenMongoSync:
         os.makedirs(data_dir, exist_ok=True)
 
         if outlets_list:
-            with open(os.path.join(data_dir, "outlets_master.json"), "w", encoding="utf-8") as f:
-                json.dump(outlets_list, f, indent=2, ensure_ascii=False)
+            outlets_file = os.path.join(data_dir, "outlets_master.json")
+            merged_outlets = {}
+            if os.path.exists(outlets_file):
+                try:
+                    with open(outlets_file, "r", encoding="utf-8") as f:
+                        for o in json.load(f):
+                            if o.get("code"):
+                                merged_outlets[o["code"]] = o
+                except Exception:
+                    pass
+            for o in outlets_list:
+                if o.get("code"):
+                    merged_outlets[o["code"]] = o
+            with open(outlets_file, "w", encoding="utf-8") as f:
+                json.dump(list(merged_outlets.values()), f, indent=2, ensure_ascii=False)
 
         if sample_menu_full:
             sample_menu_full["items"] = menu_list

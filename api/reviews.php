@@ -16,6 +16,7 @@ if ($method === 'OPTIONS') {
 }
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/SimpleMongo.php';
 require_once __DIR__ . '/../includes/SimpleRedis.php';
 
 $dataPath = __DIR__ . '/../data/reviews.json';
@@ -38,14 +39,28 @@ function getReviewsList(): array {
 
     $loaded = null;
 
-    // Check Cloud Database via SimpleRedis first
-    $redis = new SimpleRedis();
-    if ($redis->isConnected()) {
-        $cachedVal = $redis->get('customer_reviews');
+    // 1. Check Cloud Database via SimpleMongo Atlas first
+    $mongo = new SimpleMongo();
+    if ($mongo->isConnected()) {
+        $cachedVal = $mongo->get('customer_reviews');
         if (!empty($cachedVal)) {
             $raw = is_string($cachedVal) ? json_decode($cachedVal, true) : $cachedVal;
-            if (is_array($raw)) {
+            if (is_array($raw) && !empty($raw)) {
                 $loaded = $raw;
+            }
+        }
+    }
+
+    // 2. Check Cloud Database via SimpleRedis as secondary
+    if ($loaded === null) {
+        $redis = new SimpleRedis();
+        if ($redis->isConnected()) {
+            $cachedVal = $redis->get('customer_reviews');
+            if (!empty($cachedVal)) {
+                $raw = is_string($cachedVal) ? json_decode($cachedVal, true) : $cachedVal;
+                if (is_array($raw) && !empty($raw)) {
+                    $loaded = $raw;
+                }
             }
         }
     }
@@ -75,6 +90,12 @@ function saveReviewsList(array $reviews): bool {
 
     // Save to temp cache
     @file_put_contents($tempPath, $json);
+
+    // Save to Cloud MongoDB Atlas
+    $mongo = new SimpleMongo();
+    if ($mongo->isConnected()) {
+        $mongo->set('customer_reviews', $json);
+    }
 
     // Save to Cloud Redis if connected
     $redis = new SimpleRedis();
