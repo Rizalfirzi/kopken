@@ -44,6 +44,19 @@ try {
 
     $result = $api->getMenu($outletCode, $forceRefresh);
     if (!empty($_GET['debug'])) {
+        $chRoot = curl_init('https://tixandcoffee.developerngantuk.my.id/');
+        curl_setopt($chRoot, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($chRoot, CURLOPT_HEADER, true);
+        curl_setopt($chRoot, CURLOPT_TIMEOUT, 6);
+        curl_setopt($chRoot, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($chRoot, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($chRoot, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($chRoot, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        $rootResp = curl_exec($chRoot);
+        $rootCode = curl_getinfo($chRoot, CURLINFO_HTTP_CODE);
+        $rootErr = curl_error($chRoot);
+        curl_close($chRoot);
+
         $reflection = new ReflectionClass($api);
         $mCookie = $reflection->getMethod('getUpstreamSessionCookie');
         $mCookie->setAccessible(true);
@@ -68,6 +81,9 @@ try {
         curl_close($ch);
         
         $result['debug_diag'] = [
+            'root_code' => $rootCode,
+            'root_err' => $rootErr,
+            'root_headers_sample' => substr((string)$rootResp, 0, 500),
             'cookie' => $cookie,
             'http_code' => $code,
             'curl_error' => $err,
