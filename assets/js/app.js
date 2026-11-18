@@ -4471,6 +4471,7 @@ function fetchReviews() {
                     listContainer.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:12px;">Belum ada ulasan. Jadilah yang pertama memberi ulasan! ♡</div>';
                     return;
                 }
+                const isAdminAuth = (sessionStorage.getItem('kyuti_admin_auth') === '1');
                 listContainer.innerHTML = reviews.map(rev => {
                     const ratingVal = parseInt(rev.rating, 10) || 5;
                     const stars = '★'.repeat(ratingVal) + '☆'.repeat(Math.max(0, 5 - ratingVal));
@@ -4483,6 +4484,8 @@ function fetchReviews() {
                             <img src="${escapeHtml(rev.photo)}" class="ric-photo-thumb" alt="Foto Pesanan ${escapeHtml(rev.name)}" loading="lazy" onclick="window.openReviewPhotoLightbox('${escapeHtml(rev.photo)}')">
                         </div>
                     ` : '';
+                    // Delete button is strictly hidden for regular customers/visitors, only rendered if admin is logged in
+                    const adminDeleteBtn = isAdminAuth ? `<button type="button" class="ric-delete-btn" data-id="${escapeHtml(rev.id)}" data-name="${escapeHtml(rev.name)}" title="Hapus Ulasan (Admin)">🗑️</button>` : '';
 
                     return `
                         <div class="review-item-card">
@@ -4499,7 +4502,7 @@ function fetchReviews() {
                                 </div>
                                 <div style="display:flex;align-items:center;gap:6px">
                                     <div class="ric-stars" title="${ratingVal} Bintang">${stars}</div>
-                                    <button type="button" class="ric-delete-btn" data-id="${escapeHtml(rev.id)}" data-name="${escapeHtml(rev.name)}" title="Hapus Ulasan (Admin)">🗑️</button>
+                                    ${adminDeleteBtn}
                                 </div>
                             </div>
                             ${outletBadge}
