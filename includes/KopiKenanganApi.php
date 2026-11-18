@@ -294,106 +294,108 @@ class KopiKenanganApi
             return $this->applyMenuCustomizations($cached, $outletCode);
         }
 
-        // 1. Fetch LIVE Real-time Menu & Outlet Stock from multi-source upstream
-        $sources = [
-            'https://tixandcoffee.developerngantuk.my.id',
-            'https://ridstore.developerngantuk.my.id',
-            'https://tyaastore.my.id',
-            $this->origin ?: 'https://twinsjasdor.my.id'
-        ];
-
-        $liveMenu = null;
-        foreach ($sources as $src) {
-            $src = rtrim($src, '/');
-            $url = $src . '/api/kopken/menu';
-            $response = $this->httpRequest($url, ['outlet' => $outletCode]);
-            if ($response && !empty($response['items']) && is_array($response['items']) && count($response['items']) > 5) {
-                $liveMenu = $response;
-                $liveMenu['source'] = $src;
-                $liveMenu['live'] = true;
-                break;
-            }
-        }
-
         $masterMenu = $this->getFallbackMenu($outletCode);
 
-        if ($liveMenu !== null) {
-            // Live menu from upstream contains the outlet's real-time stock
-            $menuData = $liveMenu;
-
-            // Map master items for fast metadata lookup (img, desc, largeBase, options)
-            $masterItemMap = [];
-            foreach ($masterMenu['items'] ?? [] as $mi) {
-                $mKey = $mi['key'] ?? $mi['id'] ?? '';
-                $mCode = (string)($mi['code'] ?? '');
-                if ($mKey !== '') $masterItemMap[$mKey] = $mi;
-                if ($mCode !== '') $masterItemMap[$mCode] = $mi;
-            }
-
-            // Enrich live items with master metadata if missing
-            $liveKeys = [];
-            foreach ($menuData['items'] as &$it) {
-                $iKey = $it['key'] ?? $it['id'] ?? '';
-                $iCode = (string)($it['code'] ?? '');
-                if ($iKey !== '') $liveKeys[$iKey] = true;
-                if ($iCode !== '') $liveKeys[$iCode] = true;
-
-                $ref = $masterItemMap[$iKey] ?? $masterItemMap[$iCode] ?? null;
-                if ($ref) {
-                    if (empty($it['img']) && !empty($ref['img'])) {
-                        $it['img'] = $ref['img'];
-                    }
-                    if (empty($it['desc']) && !empty($ref['desc'])) {
-                        $it['desc'] = $ref['desc'];
-                    }
-                    if (empty($it['largeBase']) && !empty($ref['largeBase'])) {
-                        $it['largeBase'] = $ref['largeBase'];
-                    }
-                    if (empty($it['options']) && !empty($ref['options'])) {
-                        $it['options'] = $ref['options'];
-                    }
-                }
-            }
-            unset($it);
-
-            // Append master items that this outlet does NOT carry, marked as notCarried / isSoldOut
-            foreach ($masterMenu['items'] ?? [] as $mi) {
-                $mKey = $mi['key'] ?? $mi['id'] ?? '';
-                $mCode = (string)($mi['code'] ?? '');
-                if (($mKey !== '' && !empty($liveKeys[$mKey])) || ($mCode !== '' && !empty($liveKeys[$mCode]))) {
-                    continue; // Already in live menu
-                }
-                // Item is not carried by this outlet
-                $notCarriedItem = $mi;
-                $notCarriedItem['isSoldOut'] = true;
-                $notCarriedItem['notCarried'] = true;
-                $menuData['items'][] = $notCarriedItem;
-            }
-        } else {
-            // Retrieve real-time outlet stock profile from MongoDB Atlas or local master snapshot
-            $outletStock = $this->getOutletStockProfile($outletCode);
-            if ($outletStock !== null && !empty($outletStock['soldOut'])) {
-                $soldOutSet = array_flip($outletStock['soldOut']);
-                foreach ($masterMenu['items'] ?? [] as &$mItem) {
+        // 1. Check real-time outlet stock profile from MongoDB Atlas or local snapshot (ultra-fast & reliable)
+        $outletStock = $this->getOutletStockProfile($outletCode);
+        if ($outletStock !== null) {
+            $soldOutList = (array)($outletStock['soldOut'] ?? []);
+            $soldOutSet = !empty($soldOutList) ? array_flip($soldOutList) : [];
+            if (!empty($masterMenu['items']) && is_array($masterMenu['items'])) {
+                foreach ($masterMenu['items'] as &$mItem) {
                     $mKey = $mItem['key'] ?? $mItem['id'] ?? '';
                     $mCode = (string)($mItem['code'] ?? '');
-                    if (isset($soldOutSet[$mKey]) || isset($soldOutSet[$mCode])) {
-                        $mItem['isSoldOut'] = true;
-                    } else {
-                        $mItem['isSoldOut'] = false;
-                    }
+                    $isSold = isset($soldOutSet[$mKey]) || isset($soldOutSet[$mCode]);
+                    $mItem['isSoldOut'] = $isSold;
+                    $mItem['notCarried'] = $isSold;
                 }
                 unset($mItem);
-                if (!empty($outletStock['isClosed'])) {
-                    $masterMenu['isClosed'] = true;
-                }
-                $masterMenu['source'] = $outletStock['source'] ?? 'mongodb_outlet_stock';
-                $masterMenu['live'] = true;
-            } else {
-                $masterMenu['source'] = 'master_database';
-                $masterMenu['live'] = false;
             }
+            if (!empty($outletStock['isClosed'])) {
+                $masterMenu['isClosed'] = true;
+            }
+            $masterMenu['source'] = $outletStock['source'] ?? 'mongodb_outlet_stock';
+            $masterMenu['live'] = true;
             $menuData = $masterMenu;
+        } else {
+            // 2. Fetch LIVE Real-time Menu from multi-source upstream if profile not found
+            $sources = [
+                'https://tixandcoffee.developerngantuk.my.id',
+                'https://ridstore.developerngantuk.my.id',
+                'https://tyaastore.my.id',
+                $this->origin ?: 'https://twinsjasdor.my.id'
+            ];
+
+            $liveMenu = null;
+            foreach ($sources as $src) {
+                $src = rtrim($src, '/');
+                $url = $src . '/api/kopken/menu';
+                $response = $this->httpRequest($url, ['outlet' => $outletCode]);
+                if ($response && !empty($response['items']) && is_array($response['items']) && count($response['items']) > 5) {
+                    $liveMenu = $response;
+                    $liveMenu['source'] = $src;
+                    $liveMenu['live'] = true;
+                    break;
+                }
+            }
+
+            if ($liveMenu !== null) {
+                // Live menu from upstream contains the outlet's real-time stock
+                $menuData = $liveMenu;
+
+                // Map master items for fast metadata lookup (img, desc, largeBase, options)
+                $masterItemMap = [];
+                foreach ($masterMenu['items'] ?? [] as $mi) {
+                    $mKey = $mi['key'] ?? $mi['id'] ?? '';
+                    $mCode = (string)($mi['code'] ?? '');
+                    if ($mKey !== '') $masterItemMap[$mKey] = $mi;
+                    if ($mCode !== '') $masterItemMap[$mCode] = $mi;
+                }
+
+                // Enrich live items with master metadata if missing
+                $liveKeys = [];
+                foreach ($menuData['items'] as &$it) {
+                    $iKey = $it['key'] ?? $it['id'] ?? '';
+                    $iCode = (string)($it['code'] ?? '');
+                    if ($iKey !== '') $liveKeys[$iKey] = true;
+                    if ($iCode !== '') $liveKeys[$iCode] = true;
+
+                    $ref = $masterItemMap[$iKey] ?? $masterItemMap[$iCode] ?? null;
+                    if ($ref) {
+                        if (empty($it['img']) && !empty($ref['img'])) {
+                            $it['img'] = $ref['img'];
+                        }
+                        if (empty($it['desc']) && !empty($ref['desc'])) {
+                            $it['desc'] = $ref['desc'];
+                        }
+                        if (empty($it['largeBase']) && !empty($ref['largeBase'])) {
+                            $it['largeBase'] = $ref['largeBase'];
+                        }
+                        if (empty($it['options']) && !empty($ref['options'])) {
+                            $it['options'] = $ref['options'];
+                        }
+                    }
+                }
+                unset($it);
+
+                // Append master items that this outlet does NOT carry, marked as notCarried / isSoldOut
+                foreach ($masterMenu['items'] ?? [] as $mi) {
+                    $mKey = $mi['key'] ?? $mi['id'] ?? '';
+                    $mCode = (string)($mi['code'] ?? '');
+                    if (($mKey !== '' && !empty($liveKeys[$mKey])) || ($mCode !== '' && !empty($liveKeys[$mCode]))) {
+                        continue; // Already in live menu
+                    }
+                    // Item is not carried by this outlet
+                    $notCarriedItem = $mi;
+                    $notCarriedItem['isSoldOut'] = true;
+                    $notCarriedItem['notCarried'] = true;
+                    $menuData['items'][] = $notCarriedItem;
+                }
+            } else {
+                $menuData = $masterMenu;
+                $menuData['source'] = 'master_database';
+                $menuData['live'] = false;
+            }
         }
 
         $outletInfo = null;
