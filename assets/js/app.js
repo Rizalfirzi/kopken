@@ -1480,14 +1480,18 @@ function unitPrice(sel = AppState.sheet?.sel) {
     const isLarge = !isNoLarge && (sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large'));
     if (isLarge) {
         if (item.largePrice) return item.largePrice;
-        // Fallback if largePrice was not pre-calculated
+        // Rumus Kedai Kyuti: (harga asli Large - 50%) + Fee
+        const origLarge = Number(item.largeBase || item.largeNormal || (item.normalPrice ? (item.normalPrice + 7000) : 0));
+        const defFee = Number(adminPricingState?.defaultMarkup ?? window.INITIAL_DATA?.pricing?.defaultMarkup ?? 5000);
+        const catMarkup = Number(adminPricingState?.categoryMarkups?.[item.category] ?? window.INITIAL_DATA?.pricing?.categoryMarkups?.[item.category] ?? defFee);
         const overrides = adminPricingState?.itemMarkupOverrides || window.INITIAL_DATA?.pricing?.itemMarkupOverrides || {};
-        const largeOverride = overrides[`${item.name} (Large)`];
-        if (largeOverride !== undefined) {
-            const defFee = adminPricingState?.defaultMarkup || 5000;
-            return (item.price || 0) + 3000 + (largeOverride - defFee);
+        const itemFee = overrides[item.name] ?? overrides[item.key] ?? catMarkup;
+        const largeFee = overrides[`${item.name} (Large)`] ?? itemFee;
+        if (origLarge > 0) {
+            const discPercent = Number(adminPricingState?.discountPercent ?? window.INITIAL_DATA?.pricing?.discountPercent ?? 50);
+            return Math.round((origLarge * (1 - (discPercent / 100))) + largeFee);
         }
-        return (item.price || 0) + 3000;
+        return (item.price || 0) + 3500;
     }
     return item.price;
 }
@@ -1508,9 +1512,10 @@ function normalPrice(sel = AppState.sheet?.sel) {
     const isLarge = !isNoLarge && (sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large'));
     if (isLarge) {
         if (item.largeNormal) return item.largeNormal;
+        if (item.largeBase) return item.largeBase;
         const isKKM = (item.name && item.name.toLowerCase().includes('kenangan mantan')) || (item.key && item.key.toLowerCase().includes('kenanganmantan'));
         if (isKKM) return (item.normalPrice && item.normalPrice >= 22000) ? 28000 : 25000;
-        return item.normalPrice ? item.normalPrice + 6000 : null;
+        return item.normalPrice ? item.normalPrice + 7000 : null;
     }
     return item.normalPrice || null;
 }

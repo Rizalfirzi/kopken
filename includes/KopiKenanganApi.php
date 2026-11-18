@@ -509,24 +509,35 @@ class KopiKenanganApi
 
                 // Determine Original Large Price (Normal / Outlet Price)
                 // Kopi Kenangan official rules:
-                // Kopi Kenangan Mantan: Regular = 19.000, Large = 25.000 (Selisih +6.000)
-                // Other drinks: Regular = $origPrice, Large = $origPrice + 6.000
-                $isKKM = str_contains($normName, 'kenanganmantan') || str_contains($normKey, 'kenanganmantan') || str_contains($normName, 'kkm') || str_contains($normKey, 'kkm');
-                if ($isKKM) {
-                    $origLarge = ($origPrice >= 22000) ? 28000.0 : 25000.0;
-                } elseif (!empty($item['largeNormal']) && (float)$item['largeNormal'] > $origPrice) {
+                // Check raw data: largeBase or largeNormal first (holds real outlet large price)
+                $origLarge = 0.0;
+                if (!empty($item['largeBase']) && (float)$item['largeBase'] > 0) {
+                    $origLarge = (float)$item['largeBase'];
+                } elseif (!empty($item['largeNormal']) && (float)$item['largeNormal'] > 0) {
                     $origLarge = (float)$item['largeNormal'];
-                } else {
-                    $origLarge = $origPrice + 6000.0;
                 }
+
+                $isKKM = str_contains($normName, 'kenanganmantan') || str_contains($normKey, 'kenanganmantan') || str_contains($normName, 'kkm') || str_contains($normKey, 'kkm');
+                if ($origLarge <= 0) {
+                    if ($isKKM) {
+                        $origLarge = ($origPrice >= 22000) ? 28000.0 : 25000.0;
+                    } elseif ($origPrice > 0) {
+                        $origLarge = $origPrice + 7000.0;
+                    }
+                } elseif ($origPrice > 0 && !empty($item['normalPrice']) && $origPrice > (float)$item['normalPrice']) {
+                    // For premium surcharge outlets (airport, etc.), scale largeBase by same difference
+                    $origLarge += ($origPrice - (float)$item['normalPrice']);
+                }
+
                 $item['largeNormal'] = $origLarge;
+                $item['largeBase'] = $origLarge;
 
                 // Calculate Large Selling Price using Kedai Kyuti Formula: (Harga Asli - 50%) + Fee
                 if ($origLarge > 0) {
                     $discountedLarge = $origLarge * (1 - ($discountPercent / 100));
                     $calcLarge = round($discountedLarge + $effectiveLargeFee);
                 } else {
-                    $calcLarge = $calculatedPrice + 3000;
+                    $calcLarge = round(($origPrice * 1.35 * (1 - ($discountPercent / 100))) + $effectiveLargeFee);
                 }
 
                 // Check manual price override for large
@@ -534,9 +545,9 @@ class KopiKenanganApi
                     $calcLarge = (float) $priceOverrides[$largeKey];
                 }
 
-                // Ensure large price is strictly higher than regular price (by at least 3.000)
+                // Ensure large price is strictly higher than regular price
                 if ($calcLarge <= $calculatedPrice) {
-                    $calcLarge = $calculatedPrice + 3000;
+                    $calcLarge = $calculatedPrice + 2000;
                 }
 
                 $item['largePrice'] = $calcLarge;
@@ -799,9 +810,11 @@ class KopiKenanganApi
                 $origBaseNormal = (float)($matchedItem['normalPrice'] ?? $matchedItem['outletPrice'] ?? 19000);
                 if ($origBaseNormal <= 0) $origBaseNormal = 19000;
 
-                $largePriceBase = (float)($matchedItem['largePrice'] ?? ($calculatedBase + 3000));
-                $origLargeNormal = (float)($matchedItem['largeNormal'] ?? ($origBaseNormal + 6000));
-                if ($origLargeNormal <= 0) $origLargeNormal = 25000;
+                $origLargeNormal = (float)($matchedItem['largeNormal'] ?? $matchedItem['largeBase'] ?? 0);
+                if ($origLargeNormal <= 0) {
+                    $origLargeNormal = $origBaseNormal + 7000;
+                }
+                $largePriceBase = (float)($matchedItem['largePrice'] ?? round(($origLargeNormal * 0.5) + 5000));
 
                 // Segregate combos into Regular vs Large to find their respective base raw prices
                 $rawRegPrices = [];
