@@ -84,6 +84,36 @@ class SimpleMongo {
     }
 
     /**
+     * Get real-time stock profile for an outlet from MongoDB Atlas 'outlet_stocks' collection
+     */
+    public function getOutletStock(string $outletCode): ?array {
+        if ($this->manager !== null) {
+            try {
+                $query = new \MongoDB\Driver\Query(['_id' => $outletCode]);
+                $cursor = $this->manager->executeQuery("{$this->database}.outlet_stocks", $query);
+                $docs = $cursor->toArray();
+                if (!empty($docs)) {
+                    $d = json_decode(json_encode($docs[0]), true);
+                    return is_array($d) ? $d : null;
+                }
+            } catch (\Throwable $e) {
+                error_log("SimpleMongo getOutletStock error: " . $e->getMessage());
+            }
+        }
+
+        // Local Python bridge fallback
+        $pyResult = $this->runPythonBridge(['get_stock', $outletCode]);
+        if ($pyResult !== null && $pyResult !== '') {
+            $decoded = json_decode($pyResult, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Set a string or JSON key into MongoDB Atlas 'settings' collection
      */
     public function set(string $key, string $value): bool {

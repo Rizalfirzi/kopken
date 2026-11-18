@@ -370,10 +370,30 @@ class KopiKenanganApi
                 $menuData['items'][] = $notCarriedItem;
             }
         } else {
-            // Fallback to master database if all upstreams are down
+            // Retrieve real-time outlet stock profile from MongoDB Atlas or local master snapshot
+            $outletStock = $this->getOutletStockProfile($outletCode);
+            if ($outletStock !== null && !empty($outletStock['soldOut'])) {
+                $soldOutSet = array_flip($outletStock['soldOut']);
+                foreach ($masterMenu['items'] ?? [] as &$mItem) {
+                    $mKey = $mItem['key'] ?? $mItem['id'] ?? '';
+                    $mCode = (string)($mItem['code'] ?? '');
+                    if (isset($soldOutSet[$mKey]) || isset($soldOutSet[$mCode])) {
+                        $mItem['isSoldOut'] = true;
+                    } else {
+                        $mItem['isSoldOut'] = false;
+                    }
+                }
+                unset($mItem);
+                if (!empty($outletStock['isClosed'])) {
+                    $masterMenu['isClosed'] = true;
+                }
+                $masterMenu['source'] = $outletStock['source'] ?? 'mongodb_outlet_stock';
+                $masterMenu['live'] = true;
+            } else {
+                $masterMenu['source'] = 'master_database';
+                $masterMenu['live'] = false;
+            }
             $menuData = $masterMenu;
-            $menuData['source'] = 'master_database';
-            $menuData['live'] = false;
         }
 
         $outletInfo = null;
@@ -1973,5 +1993,65 @@ class KopiKenanganApi
             'stats' => ['total' => 2, 'available' => 2, 'soldOut' => 0],
             'updatedAt' => date('c'),
         ];
+    }
+
+    /**
+     * Retrieve real-time outlet stock profile from MongoDB Atlas or local master snapshot.
+     */
+    public function getOutletStockProfile(string $outletCode): ?array
+    {
+        $outletCode = trim($outletCode);
+        if ($outletCode === '') {
+            $outletCode = config('store.default_outlet', 'LA.CODEFIN');
+        }
+
+        $cacheKey = 'outlet_stock_profile_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $outletCode);
+        $cached = $this->getCache($cacheKey, 60);
+        if ($cached !== null && is_array($cached)) {
+            return $cached;
+        }
+
+        // 1. Query MongoDB Atlas ('outlet_stocks' collection)
+        try {
+            require_once __DIR__ . '/SimpleMongo.php';
+            $mongo = new SimpleMongo();
+            if ($mongo->isConnected()) {
+                $stockDoc = $mongo->getOutletStock($outletCode);
+                if (!empty($stockDoc) && (isset($stockDoc['soldOut']) || isset($stockDoc['isClosed']))) {
+                    $profile = [
+                        'code' => $outletCode,
+                        'soldOut' => (array)($stockDoc['soldOut'] ?? []),
+                        'isClosed' => !empty($stockDoc['isClosed']),
+                        'source' => 'mongodb_outlet_stocks'
+                    ];
+                    $this->setCache($cacheKey, $profile);
+                    return $profile;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('getOutletStockProfile MongoDB error: ' . $e->getMessage());
+        }
+
+        // 2. Fallback to local master snapshot data/outlet_stocks_master.json (0ms bundled on Vercel)
+        $stocksFile = dirname(__DIR__) . '/data/outlet_stocks_master.json';
+        if (file_exists($stocksFile)) {
+            static $allStocks = null;
+            if ($allStocks === null) {
+                $raw = @file_get_contents($stocksFile);
+                $allStocks = json_decode((string)$raw, true) ?: [];
+            }
+            if (!empty($allStocks[$outletCode])) {
+                $profile = [
+                    'code' => $outletCode,
+                    'soldOut' => (array)($allStocks[$outletCode]['soldOut'] ?? []),
+                    'isClosed' => !empty($allStocks[$outletCode]['isClosed']),
+                    'source' => 'master_json'
+                ];
+                $this->setCache($cacheKey, $profile);
+                return $profile;
+            }
+        }
+
+        return null;
     }
 }

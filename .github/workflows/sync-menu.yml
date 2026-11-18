@@ -35,3 +35,4 @@ jobs:
           MONGODB_DATABASE: ${{ secrets.MONGODB_DATABASE || 'kyuti' }}
         run: |
           python scripts/sync_mongodb.py
+          python scripts/harvest_outlet_stocks.py
