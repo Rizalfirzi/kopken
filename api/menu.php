@@ -43,6 +43,38 @@ try {
     $forceRefresh = isset($_GET['refresh']) && in_array(strtolower((string)$_GET['refresh']), ['1', 'true', 'yes'], true);
 
     $result = $api->getMenu($outletCode, $forceRefresh);
+    if (!empty($_GET['debug'])) {
+        $reflection = new ReflectionClass($api);
+        $mCookie = $reflection->getMethod('getUpstreamSessionCookie');
+        $mCookie->setAccessible(true);
+        $cookie = $mCookie->invoke($api, true, 'tixandcoffee.developerngantuk.my.id');
+        
+        $ch = curl_init('https://tixandcoffee.developerngantuk.my.id/api/kopken/menu?outlet=' . urlencode($outletCode));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        curl_setopt($ch, CURLOPT_REFERER, 'https://tixandcoffee.developerngantuk.my.id/');
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Accept: application/json',
+            'X-Requested-With: XMLHttpRequest',
+            'Cookie: ' . $cookie
+        ]);
+        $body = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        
+        $result['debug_diag'] = [
+            'cookie' => $cookie,
+            'http_code' => $code,
+            'curl_error' => $err,
+            'body_sample' => substr((string)$body, 0, 200),
+            'curl_installed' => function_exists('curl_init')
+        ];
+    }
     echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {
     http_response_code(500);
