@@ -44,42 +44,25 @@ try {
 
     $result = $api->getMenu($outletCode, $forceRefresh);
     if (!empty($_GET['debug'])) {
-        $testSources = [
-            'tixandcoffee' => 'https://tixandcoffee.developerngantuk.my.id',
-            'ridstore' => 'https://ridstore.developerngantuk.my.id',
-            'tyaastore' => 'https://tyaastore.my.id',
-            'twinsjasdor' => 'https://twinsjasdor.my.id'
-        ];
+        $ch = curl_init('https://twinsjasdor.my.id/');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 4);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
         
-        $diag = [];
-        foreach ($testSources as $name => $sUrl) {
-            $ch = curl_init($sUrl . '/');
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HEADER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-            $h = [
-                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language: id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-                'X-Forwarded-For: 180.252.164.88',
-                'Client-IP: 180.252.164.88'
-            ];
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $h);
-            $resp = curl_exec($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $err = curl_error($ch);
-            curl_close($ch);
-            
-            $diag[$name] = [
-                'code' => $code,
-                'err' => $err,
-                'sample' => substr((string)$resp, 0, 200),
-            ];
-        }
-        $result['debug_diag'] = $diag;
+        $result['debug_diag'] = [
+            'target' => 'twinsjasdor.my.id',
+            'code' => $code,
+            'err' => $err,
+            'sample' => substr((string)$resp, 0, 300),
+        ];
     }
     echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {
