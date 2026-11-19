@@ -139,8 +139,10 @@ def harvest_all():
                     items = data.get("items", [])
                     is_closed = bool(data.get("isClosed"))
 
+                    is_premium = bool(data.get("premium") or data.get("isPremium"))
                     live_keys = set()
                     sold_out_keys = set()
+                    price_map = {}
                     for item in items:
                         key = item.get("key") or item.get("id")
                         if not key:
@@ -148,6 +150,11 @@ def harvest_all():
                         live_keys.add(key)
                         if item.get("isSoldOut") or item.get("notCarried"):
                             sold_out_keys.add(key)
+                        np = item.get("normalPrice") or item.get("outletPrice") or item.get("price")
+                        if np:
+                            price_map[key] = np
+                        if "kenangan mantan" in (item.get("name") or "").lower() and np and np >= 22000:
+                            is_premium = True
 
                     # Items not in live outlet menu are not carried (sold out)
                     for mk in all_master_keys:
@@ -158,7 +165,9 @@ def harvest_all():
                         "code": code,
                         "soldOut": sorted(list(sold_out_keys)),
                         "isClosed": is_closed,
-                        "soldOutCount": len(sold_out_keys)
+                        "soldOutCount": len(sold_out_keys),
+                        "isPremium": is_premium,
+                        "prices": price_map if is_premium else {}
                     }
             except Exception:
                 continue
@@ -174,7 +183,9 @@ def harvest_all():
                 stock_map[res["code"]] = {
                     "soldOut": res["soldOut"],
                     "isClosed": res["isClosed"],
-                    "soldOutCount": res["soldOutCount"]
+                    "soldOutCount": res["soldOutCount"],
+                    "isPremium": res.get("isPremium", False),
+                    "prices": res.get("prices", {})
                 }
             else:
                 errors += 1
@@ -204,6 +215,8 @@ def harvest_all():
                 "soldOut": info["soldOut"],
                 "isClosed": info["isClosed"],
                 "soldOutCount": info["soldOutCount"],
+                "isPremium": info.get("isPremium", False),
+                "prices": info.get("prices", {}),
                 "updated_at": datetime.now(timezone.utc)
             }
             operations.append(UpdateOne({"_id": code}, {"$set": doc}, upsert=True))

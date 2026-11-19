@@ -428,6 +428,7 @@ $config = [
             'JKT.CFPIM2',          // PIM 2
             'JKT.FCPIM3',          // Food Court PIM 3
             'TGR.TERASKOTA',       // Teras Kota
+            'TP3.SBY',             // Tunjungan Plaza 3 Surabaya
         ],
     ],
 

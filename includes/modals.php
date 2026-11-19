@@ -45,7 +45,7 @@
                 <a href="<?= htmlspecialchars(config('store.social_links.x_twitter', 'https://x.com/lolaloliyo?s=11')) ?>" target="_blank" rel="noopener" class="wc-soc-pill" title="X (Twitter) @lolaloliyo">
                     <span>🐦 X</span>
                 </a>
-                <a href="<?= htmlspecialchars(config('store.social_links.wa_channel', 'https://whatsapp.com/channel/0029VbDgR1s6BIEb4d0JWl26')) ?>" target="_blank" rel="noopener" class="wc-soc-pill" title="Saluran WhatsApp JASDORTII">
+                <a href="<?= htmlspecialchars(config('store.social_links.wa_channel', 'https://whatsapp.com/channel/0029VbDgR1s6BIEb4d0JWl26')) ?>" target="_blank" rel="noopener" class="wc-soc-pill" title="Saluran WhatsApp Kedai Kyuti">
                     <span>📢 Saluran</span>
                 </a>
             </div>

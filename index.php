@@ -79,8 +79,13 @@ $initialWifi = $api->getWifi($defaultOutletCode);
 
 // Sync initialOutlet premium & closed status with initialMenu
 if ($initialOutlet) {
-    $initialOutlet['isPremium'] = !empty($initialMenu['premium']);
-    $initialOutlet['premium'] = !empty($initialMenu['premium']);
+    $initialIsPrem = !empty($initialMenu['premium']) || $api->checkIsPremiumOutlet($initialOutlet);
+    $initialOutlet['isPremium'] = $initialIsPrem;
+    $initialOutlet['premium'] = $initialIsPrem;
+    if ($initialIsPrem) {
+        $initialMenu['premium'] = true;
+        $initialMenu['isPremium'] = true;
+    }
 
     if (!empty($initialMenu['isClosed'])) {
         $initialOutlet['canOrder'] = false;
@@ -142,7 +147,7 @@ require_once __DIR__ . '/includes/header.php';
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                     <span>X</span>
                 </a>
-                <a href="<?= htmlspecialchars($socialLinks['wa_channel'] ?? 'https://whatsapp.com/channel/0029VbDgR1s6BIEb4d0JWl26') ?>" target="_blank" rel="noopener" class="bio-social-icon-btn bio-soc-channel" title="Saluran WhatsApp JASDORTII">
+                <a href="<?= htmlspecialchars($socialLinks['wa_channel'] ?? 'https://whatsapp.com/channel/0029VbDgR1s6BIEb4d0JWl26') ?>" target="_blank" rel="noopener" class="bio-social-icon-btn bio-soc-channel" title="Saluran WhatsApp Kedai Kyuti">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                     <span>Saluran</span>
                 </a>
@@ -215,8 +220,8 @@ require_once __DIR__ . '/includes/header.php';
                 <a class="bio-link-btn" href="<?= htmlspecialchars($socialLinks['wa_channel'] ?? 'https://whatsapp.com/channel/0029VbDgR1s6BIEb4d0JWl26') ?>" target="_blank" rel="noopener">
                     <div class="bl-icon" style="color:#10B981">📢</div>
                     <div class="bl-info">
-                        <span class="bl-title">Saluran WhatsApp JASDORTII</span>
-                        <span class="bl-sub">Ikuti saluran JASDORTII di WhatsApp</span>
+                        <span class="bl-title">Saluran WhatsApp Kedai Kyuti</span>
+                        <span class="bl-sub">Ikuti saluran Kedai Kyuti di WhatsApp</span>
                     </div>
                     <div class="bl-arrow">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>

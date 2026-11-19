@@ -261,12 +261,9 @@ if (navHubToggleBtn) {
 function isPremiumOutlet(outlet) {
     if (!outlet) return false;
 
-    // 0. If explicit verified boolean exists (from live menu Mantan price >= 22k), use it directly!
-    if (typeof outlet.isPremium === 'boolean') {
-        return outlet.isPremium;
-    }
-    if (typeof outlet.premium === 'boolean') {
-        return outlet.premium;
+    // 0. If explicit verified boolean true exists, return true immediately!
+    if (outlet.isPremium === true || outlet.premium === true) {
+        return true;
     }
 
     const cat = (outlet.category || '').toLowerCase();
@@ -294,7 +291,7 @@ function isPremiumOutlet(outlet) {
         'SBY.AHMDYNMJO', 'KK.JKT.CKJNG', 'SAHID', 'KK.TRG.RKAMDMKSIN',
         'DOCOKK.TRG.DNUSMYNG', 'KK.TNR.RKMNGABRUKT', 'KK.JKT.RKPCNGAN', 'KK.JKT.RWBLNGJKT',
         'KK.BGR.SMBGR', 'KK.SKT.KPRABN', 'TGR.SDCSERPONG', 'BDG.CHMPLSWK',
-        'JKT.CFPIM2', 'JKT.FCPIM3', 'TGR.TERASKOTA'
+        'JKT.CFPIM2', 'JKT.FCPIM3', 'TGR.TERASKOTA', 'TP3.SBY'
     ];
     if (premiumCodes.includes(code)) {
         return true;
@@ -633,8 +630,11 @@ function fetchMenu(outletCode, forceRefresh = false) {
                 }
             }
 
-            // Absolute Client Rule: Single source of truth is Kopi Kenangan Mantan normalPrice >= 22k
-            let isPrem = false;
+            // Absolute Client Rule: Single source of truth is Kopi Kenangan Mantan normalPrice >= 22k or verified premium outlet
+            let isPrem = Boolean(data.premium || data.isPremium);
+            if (!isPrem && AppState.outlet) {
+                isPrem = isPremiumOutlet(AppState.outlet);
+            }
             if (Array.isArray(data.items)) {
                 const mantan = data.items.find(i => {
                     const n = (i.name || '').toLowerCase();
@@ -642,12 +642,8 @@ function fetchMenu(outletCode, forceRefresh = false) {
                 });
                 if (mantan) {
                     const normalP = Number(mantan.normalPrice || mantan.outletPrice || 0);
-                    isPrem = normalP >= 22000;
-                } else {
-                    isPrem = Boolean(data.premium);
+                    if (normalP >= 22000) isPrem = true;
                 }
-            } else {
-                isPrem = Boolean(data.premium);
             }
 
             if (AppState.outlet) {

@@ -148,12 +148,9 @@ class KopiKenanganApi
      */
     public function checkIsPremiumOutlet(array $outlet): bool
     {
-        // 0. If explicit verified boolean exists (from live menu Mantan price >= 22k), use it directly!
-        if (isset($outlet['isPremium']) && is_bool($outlet['isPremium'])) {
-            return $outlet['isPremium'];
-        }
-        if (isset($outlet['premium']) && is_bool($outlet['premium'])) {
-            return $outlet['premium'];
+        // 0. If explicit verified boolean true exists, return true immediately!
+        if (!empty($outlet['isPremium']) || !empty($outlet['premium'])) {
+            return true;
         }
 
         $category = strtolower($outlet['category'] ?? '');
@@ -298,9 +295,13 @@ class KopiKenanganApi
 
         // 1. Check real-time outlet stock profile from MongoDB Atlas or local snapshot (ultra-fast & reliable)
         $outletStock = $this->getOutletStockProfile($outletCode);
+        $outletInfo = $this->getOutletByCode($outletCode) ?: $this->evaluateOutletHours(['code' => $outletCode]);
+        $isPremiumOutlet = (!empty($outletStock['isPremium'])) || $this->checkIsPremiumOutlet($outletInfo);
+
         if ($outletStock !== null) {
             $soldOutList = (array)($outletStock['soldOut'] ?? []);
             $soldOutSet = !empty($soldOutList) ? array_flip($soldOutList) : [];
+            $pricesMap = (array)($outletStock['prices'] ?? []);
             if (!empty($masterMenu['items']) && is_array($masterMenu['items'])) {
                 foreach ($masterMenu['items'] as &$mItem) {
                     $mKey = $mItem['key'] ?? $mItem['id'] ?? '';
@@ -308,11 +309,21 @@ class KopiKenanganApi
                     $isSold = isset($soldOutSet[$mKey]) || isset($soldOutSet[$mCode]);
                     $mItem['isSoldOut'] = $isSold;
                     $mItem['notCarried'] = $isSold;
+
+                    if (isset($pricesMap[$mKey])) {
+                        $mItem['normalPrice'] = (float)$pricesMap[$mKey];
+                    } elseif (isset($pricesMap[$mCode])) {
+                        $mItem['normalPrice'] = (float)$pricesMap[$mCode];
+                    }
                 }
                 unset($mItem);
             }
             if (!empty($outletStock['isClosed'])) {
                 $masterMenu['isClosed'] = true;
+            }
+            if ($isPremiumOutlet) {
+                $masterMenu['premium'] = true;
+                $masterMenu['isPremium'] = true;
             }
             $masterMenu['source'] = $outletStock['source'] ?? 'mongodb_outlet_stock';
             $masterMenu['live'] = true;
@@ -440,7 +451,9 @@ class KopiKenanganApi
         $itemMarkupOverrides = config('pricing.item_markup_overrides', []);
         $categoryMarkups = config('pricing.category_markups', []);
         $defaultMarkup = (float) config('pricing.default_markup', 5000);
-        // Absolute Client Rule: "pokoknya kalau harga kopi kenangan mantan yang reguler naik jadi 22.000 berarti itu outlet premium ka"
+        $outletInfo = $this->getOutletByCode($outletCode) ?: $this->evaluateOutletHours(['code' => $outletCode]);
+        $isPremOutlet = !empty($menuData['premium']) || $this->checkIsPremiumOutlet($outletInfo);
+
         $mantanPrice = null;
         foreach ($items as $it) {
             $itName = strtolower($it['name'] ?? '');
@@ -449,8 +462,12 @@ class KopiKenanganApi
                 break;
             }
         }
-        if ($mantanPrice !== null && $mantanPrice > 0) {
-            $menuData['premium'] = ($mantanPrice >= 22000);
+        if ($isPremOutlet || ($mantanPrice !== null && $mantanPrice >= 22000)) {
+            $menuData['premium'] = true;
+            $menuData['isPremium'] = true;
+        } else {
+            $menuData['premium'] = false;
+            $menuData['isPremium'] = false;
         }
 
         $discountPercent = (float) config('pricing.discount_percent', 50);
@@ -477,11 +494,28 @@ class KopiKenanganApi
                 $origPrice = (float) ($item['price'] ?? 0);
             }
 
-            // Determine Markup Fee: Item override (by key or name) > Category markup > Default markup
-            $fee = null;
             $name = $item['name'] ?? '';
             $normKey = strtolower(str_replace([' ', '_', '-'], '', $key));
             $normName = strtolower(str_replace([' ', '_', '-'], '', $name));
+
+            // If outlet is Premium, ensure normalPrice reflects the verified premium pricing:
+            if (!empty($menuData['premium'])) {
+                if (str_contains($normName, 'kenanganmantan')) {
+                    $origPrice = 22000.0;
+                } elseif (str_contains($normName, 'americano') && !str_contains($normName, 'banana')) {
+                    $origPrice = 20000.0;
+                } elseif (in_array(strtolower($category), ['coffee', 'non coffee', 'frappe', 'tea']) && empty($item['isFood'])) {
+                    // Only add difference if normalPrice is still the regular base price
+                    if ($origPrice > 0 && $origPrice <= 19000) {
+                        $origPrice += 3000.0;
+                    } elseif ($origPrice > 19000 && $origPrice < 25000) {
+                        $origPrice += 2000.0;
+                    }
+                }
+            }
+
+            // Determine Markup Fee: Item override (by key or name) > Category markup > Default markup
+            $fee = null;
 
             // 1. Check Item Markup Override by key or name (excluding Large-specific overrides)
             foreach ($itemMarkupOverrides as $oKey => $oFee) {
@@ -631,9 +665,14 @@ class KopiKenanganApi
                     } elseif ($origPrice > 0) {
                         $origLarge = $origPrice + 7000.0;
                     }
-                } elseif ($origPrice > 0 && !empty($item['normalPrice']) && $origPrice > (float)$item['normalPrice']) {
-                    // For premium surcharge outlets (airport, etc.), scale largeBase by same difference
-                    $origLarge += ($origPrice - (float)$item['normalPrice']);
+                }
+                if (!empty($menuData['premium'])) {
+                    // For premium surcharge outlets, ensure origLarge scales with the premium surcharge
+                    if ($isKKM && $origLarge < 29000.0) {
+                        $origLarge = 29000.0;
+                    } elseif ($origPrice > 0 && $origLarge < ($origPrice + 6000.0)) {
+                        $origLarge = $origPrice + 6000.0;
+                    }
                 }
 
                 $item['largeNormal'] = $origLarge;
@@ -2024,6 +2063,8 @@ class KopiKenanganApi
                         'code' => $outletCode,
                         'soldOut' => (array)($stockDoc['soldOut'] ?? []),
                         'isClosed' => !empty($stockDoc['isClosed']),
+                        'isPremium' => !empty($stockDoc['isPremium']),
+                        'prices' => (array)($stockDoc['prices'] ?? []),
                         'source' => 'mongodb_outlet_stocks'
                     ];
                     $this->setCache($cacheKey, $profile);
@@ -2047,6 +2088,8 @@ class KopiKenanganApi
                     'code' => $outletCode,
                     'soldOut' => (array)($allStocks[$outletCode]['soldOut'] ?? []),
                     'isClosed' => !empty($allStocks[$outletCode]['isClosed']),
+                    'isPremium' => !empty($allStocks[$outletCode]['isPremium']),
+                    'prices' => (array)($allStocks[$outletCode]['prices'] ?? []),
                     'source' => 'master_json'
                 ];
                 $this->setCache($cacheKey, $profile);
