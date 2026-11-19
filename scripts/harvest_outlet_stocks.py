@@ -112,7 +112,8 @@ def harvest_all():
     }
     sorted_outlets = sorted(
         outlets,
-        key=lambda o: 0 if o.get("code") in priority_codes or "karawang" in o.get("name", "").lower() or "bandung" in o.get("name", "").lower() or "jakarta" in o.get("name", "").lower() else 1
+        key=lambda o: 0 if (o.get("code") in priority_codes or o.get("code") in existing_stock_map)
+        else (1 if any(k in o.get("name", "").lower() for k in ["karawang", "bandung", "jakarta", "surabaya"]) else 2)
     )
 
     stock_map = dict(existing_stock_map)
@@ -133,7 +134,7 @@ def harvest_all():
             url = f"{src_obj['base']}/api/kopken/menu?outlet={urllib.parse.quote(code)}"
             try:
                 req = urllib.request.Request(url, headers=src_obj["headers"])
-                with urllib.request.urlopen(req, timeout=3.5) as res:
+                with urllib.request.urlopen(req, timeout=2.5) as res:
                     data = json.loads(res.read().decode())
                     items = data.get("items", [])
                     is_closed = bool(data.get("isClosed"))
@@ -163,8 +164,8 @@ def harvest_all():
                 continue
         return None
 
-    print(f"[*] Harvesting stock across {len(pool)} upstream sources with 8 workers...", flush=True)
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    print(f"[*] Harvesting stock across {len(pool)} upstream sources with 10 workers...", flush=True)
+    with ThreadPoolExecutor(max_workers=10) as executor:
         future_to_code = {executor.submit(fetch_outlet, o): o["code"] for o in sorted_outlets}
         for future in as_completed(future_to_code):
             processed += 1
