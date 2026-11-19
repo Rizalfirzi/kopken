@@ -286,12 +286,14 @@ function isPremiumOutlet(outlet) {
 
     // 2. Check verified client premium outlet codes
     const premiumCodes = window.INITIAL_DATA?.premiumCodes || [
-        'KK.KWG.GLHMAS', 'KK.TNG.RKBARNSRPG', 'KK.TNG.BNTROSKTR9', 'KK.JKT.GNDRKRMTPL',
+        'KK.BDG.RKPJAJRN', 'KK.KWG.GLHMAS', 'KK.TNG.RKBARNSRPG', 'KK.TNG.BNTROSKTR9', 'KK.JKT.GNDRKRMTPL',
         'KK.JKT.RKMTRMNJT', 'SOPODEL', 'KK.YYK.BNTRBDYA', 'KK.SBY.JMSRI',
         'SBY.AHMDYNMJO', 'KK.JKT.CKJNG', 'SAHID', 'KK.TRG.RKAMDMKSIN',
         'DOCOKK.TRG.DNUSMYNG', 'KK.TNR.RKMNGABRUKT', 'KK.JKT.RKPCNGAN', 'KK.JKT.RWBLNGJKT',
         'KK.BGR.SMBGR', 'KK.SKT.KPRABN', 'TGR.SDCSERPONG', 'BDG.CHMPLSWK',
-        'JKT.CFPIM2', 'JKT.FCPIM3', 'TGR.TERASKOTA', 'TP3.SBY'
+        'JKT.CFPIM2', 'JKT.FCPIM3', 'TGR.TERASKOTA', 'TP3.SBY',
+        'JKT.STKCJBHLM', 'SBY.STPSRTURI', 'JKT.LTSHAVNU', 'BOTANI', 'KS.BGR.BTNSQ',
+        'DPR.BUNGURHRAI', 'KK.MDN.KUALNMUAPDPTR'
     ];
     if (premiumCodes.includes(code)) {
         return true;
@@ -299,11 +301,12 @@ function isPremiumOutlet(outlet) {
 
     // 3. Check verified client premium outlet names
     const premiumList = window.INITIAL_DATA?.premiumList || [
-        'buaran serpong', 'bintaro sektor 9', 'galuh mas karawang', 'gandaria kramat pela',
-        'matraman', 'sopo del', 'kota baru jogja', 'jemursari', 'ahmad yani surabaya',
-        'cikajang', 'sahid sudirman', 'ahmad muksin tenggarong', 'danau semayang',
-        'ruko mangga berau', 'pecenongan', 'rawa belong', 'summarecon bogor',
-        'keprabon', 'summarecon digital center', 'cihampelas walk', 'pim 2', 'pim 3', 'teras kota'
+        'pajajaran bandung', 'galuh mas karawang', 'buaran serpong', 'bintaro sektor 9',
+        'gandaria kramat pela', 'matraman', 'sopo del', 'kota baru jogja', 'jemursari',
+        'ahmad yani surabaya', 'cikajang', 'sahid sudirman', 'ahmad muksin tenggarong',
+        'danau semayang', 'ruko mangga berau', 'pecenongan', 'rawa belong', 'summarecon bogor',
+        'keprabon', 'summarecon digital center', 'cihampelas walk', 'pim 2', 'pim 3', 'teras kota',
+        'botani square', 'lotte mall', 'stasiun halim', 'stasiun pasar turi'
     ];
     for (const pName of premiumList) {
         const pLower = pName.toLowerCase();
@@ -313,17 +316,25 @@ function isPremiumOutlet(outlet) {
         }
     }
 
-    // 4. API explicit indicator
+    // 4. Categories for verified premium types: Mall, Train Station, Airport
+    if (cat === 'mall' || cat === 'train station' || cat === 'airport') {
+        return true;
+    }
+
+    // 5. API explicit indicator
     if (outlet.isPremium === true || outlet.premium === true) {
         return true;
     }
 
-    // 5. Major Airport Terminals & verified transport hubs keywords
-    // Note: Generic 'mall' or 'plaza' are excluded because most malls have regular 19k price!
+    // 6. Major Airport Terminals & verified transport hubs & mall keywords
     const keywords = [
+        'pajajaran bandung', 'stasiun', 'station', 'kcjb', 'gambir', 'pasar turi',
         'terminal bandara', 'keberangkatan bandara', 'airport departure', 'bandara internasional',
-        'terminal 2d', 'terminal 2e', 'terminal 3 domestic', 'terminal 3 international',
-        'grand indonesia', 'senayan city', 'pacific place', 'tunjungan plaza 3', 'pim 3'
+        'bandara', 'airport', 'terminal 2d', 'terminal 2e', 'terminal 3 domestic', 'terminal 3 international',
+        'kualanamu', 'ngurah rai', 'soekarno hatta', 'halim perdana',
+        'grand indonesia', 'senayan city', 'pacific place', 'tunjungan plaza', 'pim 2', 'pim 3',
+        'lotte mall', 'botani square', 'cihampelas walk', 'central park', 'kota kasablanka',
+        'mall', 'plaza', 'supermal', 'town square', 'citywalk'
     ];
 
     return keywords.some(k => combined.includes(k));
@@ -1475,9 +1486,11 @@ function unitPrice(sel = AppState.sheet?.sel) {
 
     const isLarge = !isNoLarge && (sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large'));
     if (isLarge) {
-        if (item.largePrice) return item.largePrice;
-        // Rumus Kedai Kyuti: (harga asli Large - 50%) + Fee
-        const origLarge = Number(item.largeBase || item.largeNormal || (item.normalPrice ? (item.normalPrice + 7000) : 0));
+        const isPrem = Boolean(AppState.outlet?.isPremium || AppState.menu?.premium);
+        const premSurcharge = isPrem ? 1500 : 0;
+        if (item.largePrice && (!prices || !Object.keys(prices).length)) return item.largePrice;
+        // Rumus Kedai Kyuti: (harga asli Large - 50%) + Fee (+ Premium Surcharge)
+        const origLarge = Number(item.largeBase || item.largeNormal || (item.normalPrice ? (item.normalPrice + (isPrem ? 7000 : 6000)) : 0));
         const defFee = Number(adminPricingState?.defaultMarkup ?? window.INITIAL_DATA?.pricing?.defaultMarkup ?? 5000);
         const catMarkup = Number(adminPricingState?.categoryMarkups?.[item.category] ?? window.INITIAL_DATA?.pricing?.categoryMarkups?.[item.category] ?? defFee);
         const overrides = adminPricingState?.itemMarkupOverrides || window.INITIAL_DATA?.pricing?.itemMarkupOverrides || {};
@@ -1485,7 +1498,7 @@ function unitPrice(sel = AppState.sheet?.sel) {
         const largeFee = overrides[`${item.name} (Large)`] ?? itemFee;
         if (origLarge > 0) {
             const discPercent = Number(adminPricingState?.discountPercent ?? window.INITIAL_DATA?.pricing?.discountPercent ?? 50);
-            return Math.round((origLarge * (1 - (discPercent / 100))) + largeFee);
+            return Math.round((origLarge * (1 - (discPercent / 100))) + largeFee + premSurcharge);
         }
         return (item.price || 0) + 3500;
     }
@@ -1507,11 +1520,12 @@ function normalPrice(sel = AppState.sheet?.sel) {
 
     const isLarge = !isNoLarge && (sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large'));
     if (isLarge) {
+        const isPrem = Boolean(AppState.outlet?.isPremium || AppState.menu?.premium);
         if (item.largeNormal) return item.largeNormal;
         if (item.largeBase) return item.largeBase;
         const isKKM = (item.name && item.name.toLowerCase().includes('kenangan mantan')) || (item.key && item.key.toLowerCase().includes('kenanganmantan'));
-        if (isKKM) return (item.normalPrice && item.normalPrice >= 22000) ? 28000 : 25000;
-        return item.normalPrice ? item.normalPrice + 7000 : null;
+        if (isKKM) return isPrem ? 28000 : 25000;
+        return item.normalPrice ? (item.normalPrice + (isPrem ? 7000 : 6000)) : null;
     }
     return item.normalPrice || null;
 }

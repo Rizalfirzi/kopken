@@ -128,18 +128,47 @@ def harvest_all():
         if not code:
             return None
 
+        cat_o = str(outlet.get("category", "")).lower()
+        name_o = str(outlet.get("name", "")).lower()
+        addr_o = str(outlet.get("address", "")).lower()
+        code_o = str(outlet.get("code", "")).upper()
+        combined_o = f"{cat_o} {name_o} {addr_o}"
+
+        is_gas_station = (
+            "gas station" in cat_o or "spbu" in combined_o or "pom bensin" in combined_o or
+            name_o.startswith("shell") or name_o.startswith("pertamina") or name_o.startswith("bp ")
+        ) and ("bandara" not in combined_o and "airport" not in combined_o)
+
+        is_known_premium = False
+        if not is_gas_station:
+            if cat_o in ["mall", "train station", "airport"]:
+                is_known_premium = True
+            elif any(k in combined_o for k in [
+                "pajajaran bandung", "stasiun", "station", "kcjb", "gambir", "pasar turi",
+                "bandara", "airport", "terminal 2d", "terminal 2e", "terminal 3",
+                "kualanamu", "ngurah rai", "soekarno hatta", "halim",
+                "lotte mall", "botani square", "cihampelas walk", "pim 2", "pim 3", "teras kota",
+                "grand indonesia", "senayan city", "pacific place", "tunjungan plaza"
+            ]):
+                is_known_premium = True
+            elif code_o in [
+                "KK.BDG.RKPJAJRN", "KK.KWG.GLHMAS", "JKT.STKCJBHLM", "SBY.STPSRTURI",
+                "JKT.LTSHAVNU", "BOTANI", "KS.BGR.BTNSQ", "DPR.BUNGURHRAI", "KK.MDN.KUALNMUAPDPTR"
+            ]:
+                is_known_premium = True
+
         # Try up to 2 sources in pool if one fails or rate limits
         for _ in range(min(len(pool), 2)):
             src_obj = next(pool_cycle)
             url = f"{src_obj['base']}/api/kopken/menu?outlet={urllib.parse.quote(code)}"
             try:
                 req = urllib.request.Request(url, headers=src_obj["headers"])
-                with urllib.request.urlopen(req, timeout=2.5) as res:
+                with urllib.request.urlopen(req, timeout=3.5) as res:
                     data = json.loads(res.read().decode())
                     items = data.get("items", [])
                     is_closed = bool(data.get("isClosed"))
 
-                    is_premium = bool(data.get("premium") or data.get("isPremium"))
+                    is_premium = bool(data.get("premium") or data.get("isPremium")) or is_known_premium
                     live_keys = set()
                     sold_out_keys = set()
                     price_map = {}
@@ -193,6 +222,32 @@ def harvest_all():
             if processed % 50 == 0 or processed == total_outlets:
                 elapsed = time.time() - start_time
                 print(f"[{processed}/{total_outlets}] outlets processed ({len(stock_map)} total stored, {errors} errors, {elapsed:.1f}s)", flush=True)
+
+    # Ensure all verified premium outlets (Pajajaran Bandung, Mall, Stasiun, Bandara) have isPremium = True
+    prem_codes_set = {
+        "KK.BDG.RKPJAJRN", "KK.KWG.GLHMAS", "JKT.STKCJBHLM", "SBY.STPSRTURI",
+        "JKT.LTSHAVNU", "BOTANI", "KS.BGR.BTNSQ", "DPR.BUNGURHRAI", "KK.MDN.KUALNMUAPDPTR",
+        "KK.TNG.RKBARNSRPG", "KK.TNG.BNTROSKTR9", "KK.JKT.GNDRKRMTPL", "KK.JKT.RKMTRMNJT",
+        "SOPODEL", "KK.YYK.BNTRBDYA", "KK.SBY.JMSRI", "SBY.AHMDYNMJO", "KK.JKT.CKJNG",
+        "SAHID", "KK.TRG.RKAMDMKSIN", "DOCOKK.TRG.DNUSMYNG", "KK.TNR.RKMNGABRUKT",
+        "KK.JKT.RKPCNGAN", "KK.JKT.RWBLNGJKT", "KK.BGR.SMBGR", "KK.SKT.KPRABN",
+        "TGR.SDCSERPONG", "BDG.CHMPLSWK", "JKT.CFPIM2", "JKT.FCPIM3", "TGR.TERASKOTA", "TP3.SBY"
+    }
+    for o in outlets:
+        c = o.get("code")
+        if not c or c not in stock_map:
+            continue
+        cat_o = str(o.get("category", "")).lower()
+        name_o = str(o.get("name", "")).lower()
+        addr_o = str(o.get("address", "")).lower()
+        comb = f"{cat_o} {name_o} {addr_o}"
+        is_spbu = ("gas station" in cat_o or "spbu" in comb or "pom bensin" in comb) and ("bandara" not in comb and "airport" not in comb)
+        if not is_spbu:
+            if cat_o in ["mall", "train station", "airport"] or c in prem_codes_set or any(k in comb for k in [
+                "pajajaran bandung", "stasiun", "station", "kcjb", "gambir", "pasar turi",
+                "bandara", "airport", "lotte mall", "botani square", "cihampelas walk", "pim 2", "pim 3", "teras kota"
+            ]):
+                stock_map[c]["isPremium"] = True
 
     # Save to data/outlet_stocks_master.json
     with open(stocks_file, "w", encoding="utf-8") as f:

@@ -159,7 +159,7 @@ class KopiKenanganApi
         $code = strtoupper($outlet['code'] ?? '');
         $combined = $category . ' ' . $name . ' ' . $address;
 
-        // 1. Check verified client premium outlet codes
+        // 1. Check verified client premium outlet codes (Pajajaran Bandung, Galuh Mas, Stasiun, Bandara, etc.)
         $premiumCodes = config('outlets.premium_codes', []);
         if (in_array($code, $premiumCodes, true)) {
             return true;
@@ -190,17 +190,25 @@ class KopiKenanganApi
             return false;
         }
 
-        // 4. Upstream explicit indicator (if provided and not gas station)
+        // 4. Categories for verified premium types: Mall, Train Station, Airport
+        if ($category === 'mall' || $category === 'train station' || $category === 'airport') {
+            return true;
+        }
+
+        // 5. Upstream explicit indicator (if provided and not gas station)
         if (!empty($outlet['isPremium']) || !empty($outlet['premium'])) {
             return true;
         }
 
-        // 5. Keywords for verified premium locations (Airports, major international transport hubs)
-        // Note: Generic 'mall' or 'plaza' are excluded because most malls have regular 19k price!
+        // 6. Keywords for verified premium locations (Mall, Stasiun, Bandara, Transport Hubs)
         $premiumKeywords = [
+            'pajajaran bandung', 'stasiun', 'station', 'kcjb', 'gambir', 'pasar turi',
             'terminal bandara', 'keberangkatan bandara', 'airport departure', 'bandara internasional',
-            'terminal 2d', 'terminal 2e', 'terminal 3 domestic', 'terminal 3 international',
-            'grand indonesia', 'senayan city', 'pacific place', 'tunjungan plaza 3', 'pim 3'
+            'bandara', 'airport', 'terminal 2d', 'terminal 2e', 'terminal 3 domestic', 'terminal 3 international',
+            'kualanamu', 'ngurah rai', 'soekarno hatta', 'halim perdana',
+            'grand indonesia', 'senayan city', 'pacific place', 'tunjungan plaza', 'pim 2', 'pim 3',
+            'lotte mall', 'botani square', 'cihampelas walk', 'central park', 'kota kasablanka',
+            'mall', 'plaza', 'supermal', 'town square', 'citywalk'
         ];
 
         foreach ($premiumKeywords as $kw) {
@@ -500,10 +508,18 @@ class KopiKenanganApi
 
             // If outlet is Premium, ensure normalPrice reflects the verified premium pricing:
             if (!empty($menuData['premium'])) {
-                if (str_contains($normName, 'kenanganmantan')) {
+                if (str_contains($normName, 'oatside') && str_contains($normName, 'kenanganmantan')) {
+                    $origPrice = 25000.0;
+                } elseif (str_contains($normName, 'kenanganmantan') && !str_contains($normName, 'frappe')) {
                     $origPrice = 22000.0;
+                } elseif (str_contains($normName, 'blackaren') || str_contains($normName, 'blacksaren')) {
+                    $origPrice = 23000.0;
+                } elseif (str_contains($normName, 'tarocloudlatte') || str_contains($normName, 'tarocloudmatcha')) {
+                    $origPrice = 25000.0;
                 } elseif (str_contains($normName, 'americano') && !str_contains($normName, 'banana')) {
                     $origPrice = 20000.0;
+                } elseif (str_contains($normName, 'frappe')) {
+                    if ($origPrice < 31000.0) $origPrice = 31000.0;
                 } elseif (in_array(strtolower($category), ['coffee', 'non coffee', 'frappe', 'tea']) && empty($item['isFood'])) {
                     // Only add difference if normalPrice is still the regular base price
                     if ($origPrice > 0 && $origPrice <= 19000) {
@@ -555,23 +571,19 @@ class KopiKenanganApi
                 $fee = $defaultMarkup;
             }
 
-            // Fee difference from default markup (if user configures a custom fee per category or item)
-            $feeDelta = $fee - $defaultMarkup;
+            // Upstream API surcharge for verified premium outlets (+1.500, total fee +6.500)
+            $premiumSurcharge = !empty($menuData['premium']) ? 1500.0 : 0.0;
+            $effectiveFee = $fee + $premiumSurcharge;
 
             // Raw price from API
             $rawApiPrice = isset($item['price']) ? (float)$item['price'] : 0;
 
-            // Calculate Selling Price using Kedai Kyuti Formula: (Harga Asli - 50%) + Fee
-            // Catatan: Upstream API menambahkan fee +6.500 (surcharge +1.500) pada outlet premium.
-            // Oleh karena itu, kita hitung murni dari $origPrice (normalPrice / outletPrice)
-            // agar fee tetap konsisten sesuai aturan Kedai Kyuti (+5.000 / setting admin).
+            // Calculate Selling Price using Kedai Kyuti Formula: (Harga Asli - 50%) + Fee (+ Premium Surcharge)
             if ($origPrice > 0) {
                 $discountedBase = $origPrice * (1 - ($discountPercent / 100));
-                $calculatedPrice = round($discountedBase + $fee);
+                $calculatedPrice = round($discountedBase + $effectiveFee);
             } elseif ($rawApiPrice > 0) {
-                // Fallback jika item tidak memiliki normalPrice di upstream API
-                $baseRaw = (!empty($menuData['premium']) && $rawApiPrice > 1500) ? ($rawApiPrice - 1500) : $rawApiPrice;
-                $calculatedPrice = round($baseRaw + $feeDelta);
+                $calculatedPrice = round($rawApiPrice);
             } else {
                 $calculatedPrice = (float)($item['price'] ?? 0);
             }
@@ -667,23 +679,24 @@ class KopiKenanganApi
                     }
                 }
                 if (!empty($menuData['premium'])) {
-                    // For premium surcharge outlets, ensure origLarge scales with the premium surcharge
-                    if ($isKKM && $origLarge < 29000.0) {
-                        $origLarge = 29000.0;
-                    } elseif ($origPrice > 0 && $origLarge < ($origPrice + 6000.0)) {
-                        $origLarge = $origPrice + 6000.0;
+                    // For premium surcharge outlets, ensure origLarge reflects official premium largeBase
+                    if ($isKKM) {
+                        $origLarge = 28000.0;
+                    } elseif ($origLarge > 0 && $origLarge < 29000.0) {
+                        $origLarge += 3000.0;
                     }
                 }
 
                 $item['largeNormal'] = $origLarge;
                 $item['largeBase'] = $origLarge;
 
-                // Calculate Large Selling Price using Kedai Kyuti Formula: (Harga Asli - 50%) + Fee
+                // Calculate Large Selling Price using Kedai Kyuti Formula: (Harga Asli Large - 50%) + Fee (+ Premium Surcharge)
+                $effectiveLargeMarkup = $effectiveLargeFee + $premiumSurcharge;
                 if ($origLarge > 0) {
                     $discountedLarge = $origLarge * (1 - ($discountPercent / 100));
-                    $calcLarge = round($discountedLarge + $effectiveLargeFee);
+                    $calcLarge = round($discountedLarge + $effectiveLargeMarkup);
                 } else {
-                    $calcLarge = round(($origPrice * 1.35 * (1 - ($discountPercent / 100))) + $effectiveLargeFee);
+                    $calcLarge = round(($origPrice * 1.35 * (1 - ($discountPercent / 100))) + $effectiveLargeMarkup);
                 }
 
                 // Check manual price override for large

@@ -377,9 +377,10 @@ $config = [
 
         // Daftar Outlet Premium yang dikonfirmasi Klien
         'premium_list' => [
+            'pajajaran bandung',
+            'galuh mas karawang',
             'buaran serpong',
             'bintaro sektor 9',
-            'galuh mas karawang',
             'gandaria kramat pela',
             'matraman',
             'sopo del',
@@ -401,10 +402,17 @@ $config = [
             'pim 2',
             'pim 3',
             'teras kota',
+            'botani square',
+            'lotte mall',
+            'stasiun halim',
+            'stasiun pasar turi',
+            'stasiun gambir',
+            'stasiun bandung',
         ],
 
         // Kode Outlet Premium terdaftar
         'premium_codes' => [
+            'KK.BDG.RKPJAJRN',     // Pajajaran Bandung
             'KK.KWG.GLHMAS',       // Galuh Mas Karawang
             'KK.TNG.RKBARNSRPG',   // Buaran Serpong
             'KK.TNG.BNTROSKTR9',   // Bintaro Sektor 9
@@ -429,6 +437,13 @@ $config = [
             'JKT.FCPIM3',          // Food Court PIM 3
             'TGR.TERASKOTA',       // Teras Kota
             'TP3.SBY',             // Tunjungan Plaza 3 Surabaya
+            'JKT.STKCJBHLM',       // Stasiun KCJB Halim
+            'SBY.STPSRTURI',       // Stasiun Pasar Turi
+            'JKT.LTSHAVNU',        // Lotte Mall Jakarta LG
+            'BOTANI',              // Botani Square Mall
+            'KS.BGR.BTNSQ',        // Kenangan Signature Botani Square
+            'DPR.BUNGURHRAI',      // Bandara Ngurah Rai Bali
+            'KK.MDN.KUALNMUAPDPTR',// Bandara Kualanamu
         ],
     ],
 
