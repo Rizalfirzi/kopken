@@ -31,7 +31,7 @@ jobs:
       - name: Run Multi-Source Sync to MongoDB Atlas
         env:
           PYTHONUNBUFFERED: "1"
-          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb+srv://technologyswamp_db_user:EmmGSARebSpWS0Sw@cluster-utama.eyzthyo.mongodb.net/kyuti?retryWrites=true&w=majority' }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb+srv://technologyswamp_db_user:EmmGSARebSpWS0Sw@cluster-utama.eyzthyo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-Utama' }}
           MONGODB_DATABASE: ${{ secrets.MONGODB_DATABASE || 'kyuti' }}
         run: |
           python scripts/sync_mongodb.py

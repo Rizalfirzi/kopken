@@ -15,11 +15,10 @@ from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pymongo import MongoClient, UpdateOne
 
-MONGODB_URI = os.getenv(
-    "MONGODB_URI",
+MONGODB_URI = os.getenv("MONGODB_URI") or (
     "mongodb+srv://technologyswamp_db_user:EmmGSARebSpWS0Sw@cluster-utama.eyzthyo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-Utama"
 )
-DB_NAME = os.getenv("MONGODB_DATABASE", "kyuti")
+DB_NAME = os.getenv("MONGODB_DATABASE") or "kyuti"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 SOURCES = [
@@ -50,19 +49,27 @@ def init_source_pool():
     pool = []
     for s in SOURCES:
         c = get_cookie(s)
+        headers = {
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json",
+            "Referer": f"{s}/",
+            "X-Requested-With": "XMLHttpRequest"
+        }
         if c:
+            headers["Cookie"] = c
             pool.append({
                 "base": s,
                 "cookie": c,
-                "headers": {
-                    "User-Agent": USER_AGENT,
-                    "Accept": "application/json",
-                    "Referer": f"{s}/",
-                    "X-Requested-With": "XMLHttpRequest",
-                    "Cookie": c
-                }
+                "headers": headers
             })
             print(f"[+] Active source pool added: {s}", flush=True)
+        else:
+            pool.append({
+                "base": s,
+                "cookie": "",
+                "headers": headers
+            })
+            print(f"[*] Fallback source added: {s}", flush=True)
     return pool
 
 
@@ -72,8 +79,12 @@ def harvest_all():
 
     pool = init_source_pool()
     if not pool:
-        print("[X] Could not connect to any upstream source.", flush=True)
-        sys.exit(1)
+        print("[!] Upstream source pool empty, using direct failover headers.", flush=True)
+        pool = [{
+            "base": s,
+            "cookie": "",
+            "headers": {"User-Agent": USER_AGENT, "Accept": "application/json", "Referer": f"{s}/"}
+        } for s in SOURCES]
 
     data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
     outlets_file = os.path.join(data_dir, "outlets_master.json")
@@ -163,7 +174,7 @@ def harvest_all():
             url = f"{src_obj['base']}/api/kopken/menu?outlet={urllib.parse.quote(code)}"
             try:
                 req = urllib.request.Request(url, headers=src_obj["headers"])
-                with urllib.request.urlopen(req, timeout=3.5) as res:
+                with urllib.request.urlopen(req, timeout=2.0) as res:
                     data = json.loads(res.read().decode())
                     items = data.get("items", [])
                     is_closed = bool(data.get("isClosed"))
@@ -202,8 +213,8 @@ def harvest_all():
                 continue
         return None
 
-    print(f"[*] Harvesting stock across {len(pool)} upstream sources with 10 workers...", flush=True)
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    print(f"[*] Harvesting stock across {len(pool)} upstream sources with 25 workers...", flush=True)
+    with ThreadPoolExecutor(max_workers=25) as executor:
         future_to_code = {executor.submit(fetch_outlet, o): o["code"] for o in sorted_outlets}
         for future in as_completed(future_to_code):
             processed += 1
