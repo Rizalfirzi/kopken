@@ -24,8 +24,8 @@ class KopiKenanganApi
 
     public function __construct()
     {
-        $this->baseUrl = rtrim((string) config('api_base_url', 'https://twinsjasdor.my.id/api'), '/');
-        $this->origin = rtrim((string) config('api_origin', 'https://twinsjasdor.my.id'), '/');
+        $this->baseUrl = rtrim((string) config('api_base_url', 'https://kopkenapi.swamptechnology.id/api'), '/');
+        $this->origin = rtrim((string) config('api_origin', 'https://kopkenapi.swamptechnology.id'), '/');
         $this->outletsTtl = (int) config('cache_ttl.outlets', 1800);
         $this->stockTtl = (int) config('stock.ttl_seconds', config('cache_ttl.menu', 60));
         $this->cacheDir = defined('CACHE_PATH') ? CACHE_PATH : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'kedaikyuti_cache';
@@ -36,42 +36,8 @@ class KopiKenanganApi
     }
 
     /**
-     * Cookie file path for session persistence with twinsjasdor.my.id
-     */
-    protected function getCookieFile(): string
-    {
-        return $this->cacheDir . DIRECTORY_SEPARATOR . 'twins_cookie.txt';
-    }
-
-    /**
-     * Handshake with twinsjasdor.my.id to obtain a valid Cloudflare session cookie (jd_v).
-     */
-    protected function refreshSessionCookie(): bool
-    {
-        if (!function_exists('curl_init')) {
-            return false;
-        }
-
-        $cookieFile = $this->getCookieFile();
-        $targetOrigin = $this->origin ?: 'https://twinsjasdor.my.id';
-
-        $ch = curl_init($targetOrigin . '/');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        return ($code >= 200 && $code < 400 && file_exists($cookieFile));
-    }
-
-    /**
      * Fetch list of outlets with real-time hours evaluation, search, and distance sorting.
+     * Directly queries kopkenapi.swamptechnology.id with zero DB overhead for optimal Vercel performance.
      */
     public function getOutlets(?string $query = null, ?float $lat = null, ?float $lng = null): array
     {
@@ -90,8 +56,45 @@ class KopiKenanganApi
             return $cached;
         }
 
-        // 1. Direct from MongoDB Atlas Master Database
-        $outlets = $this->getFallbackOutlets($query, $lat, $lng);
+        $outlets = [];
+
+        // 1. If GPS coordinates provided, query nearest stores directly from kopkenapi
+        if ($lat !== null && $lng !== null) {
+            $nearestUrl = 'https://kopkenapi.swamptechnology.id/api/store/nearest';
+            $resp = $this->httpRequest($nearestUrl, [
+                'lat' => $lat,
+                'lng' => $lng,
+                'limit' => 30
+            ]);
+            $rawStores = $resp['data']['store'] ?? [];
+            if (!empty($rawStores) && is_array($rawStores)) {
+                foreach ($rawStores as $s) {
+                    $code = $s['code'] ?? $s['store_code'] ?? '';
+                    if (empty($code)) continue;
+                    $outlets[] = [
+                        'code' => $code,
+                        'id' => $s['id'] ?? null,
+                        'name' => $s['name'] ?? $s['store_name'] ?? $code,
+                        'address' => $s['address'] ?? '',
+                        'city' => $s['alias'] ?? '',
+                        'lat' => (float)($s['latitude'] ?? 0),
+                        'lng' => (float)($s['longitude'] ?? 0),
+                        'isOpen' => !empty($s['is_open']),
+                        'canOrder' => !empty($s['is_open']),
+                        'hours' => (!empty($s['open']) && !empty($s['close'])) ? substr($s['open'], 0, 5) . ' - ' . substr($s['close'], 0, 5) : '07:00 - 22:00',
+                        'category' => $s['category'] ?? '',
+                        'phone' => $s['phone'] ?? '',
+                        'distanceKm' => !empty($s['distance_str']) ? $s['distance_str'] : null,
+                    ];
+                }
+            }
+        }
+
+        // 2. If no GPS or nearest was empty, query from fast bundled master database
+        if (empty($outlets)) {
+            $outlets = $this->getFallbackOutlets($query, $lat, $lng);
+        }
+
         foreach ($outlets as &$o) {
             $o = $this->evaluateOutletHours($o);
             $o['isPremium'] = $this->checkIsPremiumOutlet($o);
@@ -100,7 +103,7 @@ class KopiKenanganApi
 
         $result = [
             'success' => true,
-            'source' => 'mongodb',
+            'source' => 'kopkenapi.swamptechnology.id',
             'count' => count($outlets),
             'outlets' => $outlets,
         ];
@@ -304,120 +307,17 @@ class KopiKenanganApi
 
         $masterMenu = $this->getFallbackMenu($outletCode);
 
-        // 1. Check real-time outlet stock profile from MongoDB Atlas or local snapshot (ultra-fast & reliable)
-        $outletStock = $this->getOutletStockProfile($outletCode);
-        $outletInfo = $this->getOutletByCode($outletCode) ?: $this->evaluateOutletHours(['code' => $outletCode]);
-        $isPremiumOutlet = (!empty($outletStock['isPremium'])) || $this->checkIsPremiumOutlet($outletInfo);
+        // Direct fetch from kopkenapi.swamptechnology.id (0ms DB overhead, Vercel optimized)
+        $url = 'https://kopkenapi.swamptechnology.id/api/product/query_product_menu';
+        $response = $this->httpRequest($url, ['store_code' => $outletCode]);
 
-        if ($outletStock !== null) {
-            $soldOutList = (array)($outletStock['soldOut'] ?? []);
-            $soldOutSet = !empty($soldOutList) ? array_flip($soldOutList) : [];
-            $pricesMap = (array)($outletStock['prices'] ?? []);
-            if (!empty($masterMenu['items']) && is_array($masterMenu['items'])) {
-                foreach ($masterMenu['items'] as &$mItem) {
-                    $mKey = $mItem['key'] ?? $mItem['id'] ?? '';
-                    $mCode = (string)($mItem['code'] ?? '');
-                    $isSold = isset($soldOutSet[$mKey]) || isset($soldOutSet[$mCode]);
-                    $mItem['isSoldOut'] = $isSold;
-                    $mItem['notCarried'] = $isSold;
-
-                    if (isset($pricesMap[$mKey])) {
-                        $mItem['normalPrice'] = (float)$pricesMap[$mKey];
-                    } elseif (isset($pricesMap[$mCode])) {
-                        $mItem['normalPrice'] = (float)$pricesMap[$mCode];
-                    }
-                }
-                unset($mItem);
-            }
-            if (!empty($outletStock['isClosed'])) {
-                $masterMenu['isClosed'] = true;
-            }
-            if ($isPremiumOutlet) {
-                $masterMenu['premium'] = true;
-                $masterMenu['isPremium'] = true;
-            }
-            $masterMenu['source'] = $outletStock['source'] ?? 'mongodb_outlet_stock';
-            $masterMenu['live'] = true;
-            $menuData = $masterMenu;
+        if (!empty($response['data']['menu_groups']) && is_array($response['data']['menu_groups'])) {
+            $menuData = $this->parseKopkenApiMenu($response, $outletCode, $masterMenu);
         } else {
-            // 2. Fetch LIVE Real-time Menu from multi-source upstream if profile not found
-            $sources = [
-                'https://tixandcoffee.developerngantuk.my.id',
-                'https://ridstore.developerngantuk.my.id',
-                'https://tyaastore.my.id',
-                $this->origin ?: 'https://twinsjasdor.my.id'
-            ];
-
-            $liveMenu = null;
-            foreach ($sources as $src) {
-                $src = rtrim($src, '/');
-                $url = $src . '/api/kopken/menu';
-                $response = $this->httpRequest($url, ['outlet' => $outletCode]);
-                if ($response && !empty($response['items']) && is_array($response['items']) && count($response['items']) > 5) {
-                    $liveMenu = $response;
-                    $liveMenu['source'] = $src;
-                    $liveMenu['live'] = true;
-                    break;
-                }
-            }
-
-            if ($liveMenu !== null) {
-                // Live menu from upstream contains the outlet's real-time stock
-                $menuData = $liveMenu;
-
-                // Map master items for fast metadata lookup (img, desc, largeBase, options)
-                $masterItemMap = [];
-                foreach ($masterMenu['items'] ?? [] as $mi) {
-                    $mKey = $mi['key'] ?? $mi['id'] ?? '';
-                    $mCode = (string)($mi['code'] ?? '');
-                    if ($mKey !== '') $masterItemMap[$mKey] = $mi;
-                    if ($mCode !== '') $masterItemMap[$mCode] = $mi;
-                }
-
-                // Enrich live items with master metadata if missing
-                $liveKeys = [];
-                foreach ($menuData['items'] as &$it) {
-                    $iKey = $it['key'] ?? $it['id'] ?? '';
-                    $iCode = (string)($it['code'] ?? '');
-                    if ($iKey !== '') $liveKeys[$iKey] = true;
-                    if ($iCode !== '') $liveKeys[$iCode] = true;
-
-                    $ref = $masterItemMap[$iKey] ?? $masterItemMap[$iCode] ?? null;
-                    if ($ref) {
-                        if (empty($it['img']) && !empty($ref['img'])) {
-                            $it['img'] = $ref['img'];
-                        }
-                        if (empty($it['desc']) && !empty($ref['desc'])) {
-                            $it['desc'] = $ref['desc'];
-                        }
-                        if (empty($it['largeBase']) && !empty($ref['largeBase'])) {
-                            $it['largeBase'] = $ref['largeBase'];
-                        }
-                        if (empty($it['options']) && !empty($ref['options'])) {
-                            $it['options'] = $ref['options'];
-                        }
-                    }
-                }
-                unset($it);
-
-                // Append master items that this outlet does NOT carry, marked as notCarried / isSoldOut
-                foreach ($masterMenu['items'] ?? [] as $mi) {
-                    $mKey = $mi['key'] ?? $mi['id'] ?? '';
-                    $mCode = (string)($mi['code'] ?? '');
-                    if (($mKey !== '' && !empty($liveKeys[$mKey])) || ($mCode !== '' && !empty($liveKeys[$mCode]))) {
-                        continue; // Already in live menu
-                    }
-                    // Item is not carried by this outlet
-                    $notCarriedItem = $mi;
-                    $notCarriedItem['isSoldOut'] = true;
-                    $notCarriedItem['notCarried'] = true;
-                    $menuData['items'][] = $notCarriedItem;
-                }
-            } else {
-                $menuData = $masterMenu;
-                $menuData['source'] = 'master_database';
-                $menuData['live'] = false;
-            }
+            // Instant graceful local master fallback if API is slow or unreachable
+            $menuData = $masterMenu;
+            $menuData['source'] = 'master_database';
+            $menuData['live'] = false;
         }
 
         $outletInfo = null;
@@ -451,6 +351,125 @@ class KopiKenanganApi
     }
 
     /**
+     * Parse raw menu groups from kopkenapi.swamptechnology.id into Kedai Kyuti standard items structure
+     */
+    protected function parseKopkenApiMenu(array $apiResponse, string $outletCode, array $masterMenu): array
+    {
+        $groups = $apiResponse['data']['menu_groups'] ?? [];
+        if (empty($groups)) {
+            return $masterMenu;
+        }
+
+        // Fast metadata lookup map from masterMenu for images, descriptions, options
+        $masterMap = [];
+        foreach ($masterMenu['items'] ?? [] as $mi) {
+            $mName = strtolower(trim($mi['name'] ?? ''));
+            $mCode = (string)($mi['code'] ?? '');
+            $mKey = (string)($mi['key'] ?? '');
+            if ($mName !== '') $masterMap[$mName] = $mi;
+            if ($mCode !== '') $masterMap[$mCode] = $mi;
+            if ($mKey !== '') $masterMap[$mKey] = $mi;
+        }
+
+        $liveItems = [];
+        $seen = [];
+        $kkmSinglePrice = null;
+
+        foreach ($groups as $g) {
+            $catName = trim($g['group_name'] ?? 'Coffee');
+            if (stripos($catName, 'promo') !== false || stripos($catName, 'combo') !== false) {
+                $stdCat = 'Promo & Combo';
+            } elseif (stripos($catName, 'non coffee') !== false) {
+                $stdCat = 'Non Coffee';
+            } elseif (stripos($catName, 'frappe') !== false) {
+                $stdCat = 'Frappe';
+            } elseif (stripos($catName, 'food') !== false || stripos($catName, 'toast') !== false || stripos($catName, 'roti') !== false) {
+                $stdCat = 'Food';
+            } else {
+                $stdCat = 'Coffee';
+            }
+
+            foreach ($g['menu_products'] ?? [] as $p) {
+                $name = trim($p['name'] ?? '');
+                if ($name === '') continue;
+
+                $pid = (string)($p['id'] ?? $p['product_code'] ?? $name);
+                $lowerName = strtolower($name);
+                if (isset($seen[$pid]) || isset($seen[$lowerName])) {
+                    continue;
+                }
+                $seen[$pid] = true;
+                $seen[$lowerName] = true;
+
+                $ref = $masterMap[$lowerName] ?? $masterMap[$pid] ?? null;
+
+                $origNormal = (float)($p['orig_price'] ?? $p['price'] ?? 0);
+                if ($origNormal <= 0) {
+                    $origNormal = (float)($ref['normalPrice'] ?? 19000);
+                }
+
+                // Check for single-cup KKM price (Client rule: normal price < 22000 is Regular, >= 22000 is Premium)
+                $isSingleKkm = ($lowerName === 'kopi kenangan mantan' || $lowerName === 'kopi kenangan mantan (regular)')
+                    || (str_contains($lowerName, 'kenangan mantan')
+                        && !str_contains($lowerName, 'seliter')
+                        && !str_contains($lowerName, 'liter')
+                        && !str_contains($lowerName, 'duo')
+                        && !str_contains($lowerName, 'bundl')
+                        && !str_contains($lowerName, 'combo')
+                        && !str_contains($lowerName, 'paket')
+                        && !str_contains($lowerName, 'oatside')
+                        && !str_contains($lowerName, 'frappe')
+                        && !str_contains($lowerName, 'large'));
+
+                if ($isSingleKkm && $kkmSinglePrice === null) {
+                    $kkmSinglePrice = $origNormal;
+                }
+
+                $liveItems[] = [
+                    'id' => $p['id'] ?? null,
+                    'code' => $p['product_code'] ?? ($ref['code'] ?? $pid),
+                    'key' => $ref['key'] ?? preg_replace('/[^a-z0-9]/', '', $lowerName),
+                    'name' => $name,
+                    'category' => $ref['category'] ?? $stdCat,
+                    'desc' => !empty($p['description']) ? $p['description'] : ($ref['desc'] ?? ''),
+                    'price' => $origNormal,
+                    'normalPrice' => $origNormal,
+                    'isSoldOut' => !empty($p['is_sold_out']),
+                    'notCarried' => false,
+                    'img' => !empty($p['image']) ? $p['image'] : ($ref['img'] ?? 'assets/img/menu/default.jpg'),
+                    'options' => $ref['options'] ?? [
+                        'sizes' => ['Regular', 'Large'],
+                        'temps' => ['Ice', 'Hot'],
+                        'ices' => ['Normal Ice', 'Less Ice', 'No Ice'],
+                        'sugars' => ['Normal Sugar', 'Less Sugar', 'No Sugar']
+                    ]
+                ];
+            }
+        }
+
+        // Strict client rule: KKM normal price < 22000 is Regular, >= 22000 is Premium
+        $outletInfo = $this->getOutletByCode($outletCode) ?: $this->evaluateOutletHours(['code' => $outletCode]);
+        if ($kkmSinglePrice !== null && $kkmSinglePrice > 0) {
+            $isPremiumOutlet = ($kkmSinglePrice >= 22000);
+        } else {
+            $isPremiumOutlet = $this->checkIsPremiumOutlet($outletInfo);
+        }
+
+        return [
+            'success' => true,
+            'outlet' => $outletCode,
+            'outletCode' => $outletCode,
+            'count' => count($liveItems),
+            'items' => $liveItems,
+            'isPremium' => $isPremiumOutlet,
+            'premium' => $isPremiumOutlet,
+            'source' => 'kopkenapi.swamptechnology.id',
+            'live' => true,
+            'isClosed' => false
+        ];
+    }
+
+    /**
      * Apply Formula: (Harga Asli Kopken - 50% + Fee)
      * Plus category fees (Food: +4.500, Minuman: +5.000) & item overrides (Kopi Kenangan Mantan: +6.000)
      */
@@ -463,23 +482,37 @@ class KopiKenanganApi
         $categoryMarkups = config('pricing.category_markups', []);
         $defaultMarkup = (float) config('pricing.default_markup', 5000);
         $outletInfo = $this->getOutletByCode($outletCode) ?: $this->evaluateOutletHours(['code' => $outletCode]);
-        $isPremOutlet = !empty($menuData['premium']) || $this->checkIsPremiumOutlet($outletInfo);
 
         $mantanPrice = null;
         foreach ($items as $it) {
             $itName = strtolower($it['name'] ?? '');
-            if (str_contains($itName, 'kenangan mantan') && !str_contains($itName, 'oatside') && !str_contains($itName, 'frappe') && !str_contains($itName, 'duo') && !str_contains($itName, 'bundl')) {
+            $isSingleKkm = ($itName === 'kopi kenangan mantan' || $itName === 'kopi kenangan mantan (regular)')
+                || (str_contains($itName, 'kenangan mantan')
+                    && !str_contains($itName, 'seliter')
+                    && !str_contains($itName, 'liter')
+                    && !str_contains($itName, 'duo')
+                    && !str_contains($itName, 'bundl')
+                    && !str_contains($itName, 'combo')
+                    && !str_contains($itName, 'paket')
+                    && !str_contains($itName, 'oatside')
+                    && !str_contains($itName, 'frappe')
+                    && !str_contains($itName, 'large'));
+
+            if ($isSingleKkm) {
                 $mantanPrice = (float)($it['normalPrice'] ?? $it['outletPrice'] ?? 0);
                 break;
             }
         }
-        if ($isPremOutlet || ($mantanPrice !== null && $mantanPrice >= 22000)) {
-            $menuData['premium'] = true;
-            $menuData['isPremium'] = true;
+
+        // Strict client rule: KKM normal price < 22000 is Regular, >= 22000 is Premium
+        if ($mantanPrice !== null && $mantanPrice > 0) {
+            $isPrem = ($mantanPrice >= 22000);
         } else {
-            $menuData['premium'] = false;
-            $menuData['isPremium'] = false;
+            $isPrem = !empty($menuData['premium']) || $this->checkIsPremiumOutlet($outletInfo);
         }
+
+        $menuData['premium'] = $isPrem;
+        $menuData['isPremium'] = $isPrem;
 
         $discountPercent = (float) config('pricing.discount_percent', 50);
 
@@ -1080,117 +1113,35 @@ class KopiKenanganApi
             return $cached;
         }
 
-        // 2. Direct from MongoDB Atlas Master Database (kyuti.settings._id = wifi_info)
-        try {
-            require_once __DIR__ . '/SimpleMongo.php';
-            $mongo = new SimpleMongo();
-            if ($mongo->isConnected()) {
-                $raw = $mongo->get('wifi_info');
-                if (!empty($raw)) {
-                    $doc = json_decode($raw, true);
-                    $pwd = $doc['password'] ?? ($doc['wifi']['password'] ?? null);
-                    $ssid = $doc['ssid'] ?? ($doc['wifi']['ssid'] ?? 'Teman Kenangan');
-                    if (!empty($pwd)) {
-                        $result = [
-                            'success' => true,
-                            'outlet' => $outletCode,
-                            'wifi' => [
-                                'ssid' => $ssid,
-                                'password' => $pwd,
-                            ],
-                            'date' => $doc['date'] ?? $todayDate,
-                            'source' => 'mongodb'
-                        ];
-                        $this->setCache($cacheKey, $result);
-                        return $result;
-                    }
-                }
-            }
-        } catch (\Throwable $e) {
-            error_log('getWifi MongoDB fetch failed: ' . $e->getMessage());
-        }
-
-        // 3. Fast local snapshot fallback from data/wifi_master.json
+        // 2. Direct fast local master snapshot (0ms latency, zero DB overhead for Vercel)
         $masterFile = dirname(__DIR__) . '/data/wifi_master.json';
+        $pwd = null;
+        $ssid = 'Teman Kenangan';
         if (file_exists($masterFile)) {
-            $masterData = json_decode(@file_get_contents($masterFile), true);
+            $masterData = json_decode((string)@file_get_contents($masterFile), true);
             $pwd = $masterData['password'] ?? ($masterData['wifi']['password'] ?? null);
             $ssid = $masterData['ssid'] ?? ($masterData['wifi']['ssid'] ?? 'Teman Kenangan');
-            if (!empty($pwd)) {
-                $result = [
-                    'success' => true,
-                    'outlet' => $outletCode,
-                    'wifi' => [
-                        'ssid' => $ssid,
-                        'password' => $pwd,
-                    ],
-                    'date' => $masterData['date'] ?? $todayDate,
-                    'source' => 'master_json'
-                ];
-                $this->setCache($cacheKey, $result);
-                return $result;
-            }
         }
 
-        // 4. Multi-Source Upstream Direct Failover
-        $sources = [
-            'https://tixandcoffee.developerngantuk.my.id',
-            'https://ridstore.developerngantuk.my.id',
-            'https://tyaastore.my.id',
-            $this->origin ?: 'https://twinsjasdor.my.id'
-        ];
-
-        foreach ($sources as $src) {
-            $src = rtrim($src, '/');
-            $wifiUrl = $src . '/api/kopken/wifi';
-            $response = $this->httpRequest($wifiUrl, ['outlet' => $outletCode]);
-            if ($response) {
-                $wifiObj = $response['wifi'] ?? $response;
-                if (!empty($wifiObj['password'])) {
-                    $ssid = $wifiObj['ssid'] ?? 'Teman Kenangan';
-                    $pwd = $wifiObj['password'];
-                    $result = [
-                        'success' => true,
-                        'outlet' => $outletCode,
-                        'wifi' => [
-                            'ssid' => $ssid,
-                            'password' => $pwd,
-                        ],
-                        'date' => $todayDate,
-                        'source' => $src
-                    ];
-
-                    $this->setCache($cacheKey, $result);
-                    try {
-                        require_once __DIR__ . '/SimpleMongo.php';
-                        $mongo = new SimpleMongo();
-                        $mongo->set('wifi_info', json_encode([
-                            'ssid' => $ssid,
-                            'password' => $pwd,
-                            'date' => $todayDate,
-                            'updated_at' => date('c'),
-                            'source' => $src
-                        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-                    } catch (\Throwable $e) {}
-
-                    return $result;
-                }
-            }
+        // 3. Fallback daily formula
+        if (empty($pwd)) {
+            $dayNum = date('j');
+            $pwd = 'NgopiSambilKerja!' . $dayNum;
         }
 
-        // 5. Ultimate Fallback (Verified live password format SecangkirRindu + date('j'))
-        $dayNum = date('j');
-        $fallback = [
+        $result = [
             'success' => true,
             'outlet' => $outletCode,
             'wifi' => [
-                'ssid' => 'Teman Kenangan',
-                'password' => 'SecangkirRindu' . $dayNum,
+                'ssid' => $ssid,
+                'password' => $pwd,
             ],
             'date' => $todayDate,
-            'source' => 'verified_formula'
+            'source' => 'swamptechnology'
         ];
-        return $fallback;
+
+        $this->setCache($cacheKey, $result);
+        return $result;
     }
 
     /**
@@ -1613,55 +1564,8 @@ class KopiKenanganApi
     }
 
     /**
-     * Get or refresh upstream session cookie (jd_v) from root website.
-     * Upstream API requires a valid browser session cookie and referer.
-     */
-    protected function getUpstreamSessionCookie(bool $forceRefresh = false, ?string $targetHost = null): string
-    {
-        $host = $targetHost;
-        if (empty($host)) {
-            $parsed = parse_url($this->baseUrl);
-            $host = $parsed['host'] ?? 'tixandcoffee.developerngantuk.my.id';
-        }
-        $sessionCacheKey = 'upstream_session_cookie_' . preg_replace('/[^a-zA-Z0-9]/', '_', $host);
-        if (!$forceRefresh) {
-            $cached = $this->getCache($sessionCacheKey, 82800); // 23 hours
-            if (!empty($cached['cookie'])) {
-                return (string) $cached['cookie'];
-            }
-        }
-
-        $scheme = 'https';
-        $rootUrl = $scheme . '://' . $host . '/';
-        $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-
-        $cookie = '';
-        if (function_exists('curl_init')) {
-            $ch = curl_init($rootUrl);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HEADER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
-            curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            $response = curl_exec($ch);
-            curl_close($ch);
-
-            if ($response && preg_match_all('/^Set-Cookie:\s*([^;]+)/mi', $response, $matches)) {
-                $cookie = implode('; ', $matches[1]);
-            }
-        }
-
-        if ($cookie !== '') {
-            $this->setCache($sessionCacheKey, ['cookie' => $cookie]);
-        }
-
-        return $cookie;
-    }
-
-    /**
-     * Helper to perform HTTP GET request with cURL and fallback.
+     * Ultra-fast HTTP client for swamptechnology.id Serverless APIs.
+     * Engineered with short 2s connect & 4s read timeouts to prevent Vercel timeouts.
      */
     protected function httpRequest(string $url, array $params = [], int $retry = 1): ?array
     {
@@ -1670,72 +1574,40 @@ class KopiKenanganApi
             $url .= $separator . http_build_query($params);
         }
 
-        $timeout = (int) config('api_timeout', 8);
-        $parsed = parse_url($url);
-        $scheme = $parsed['scheme'] ?? 'https';
-        $host = $parsed['host'] ?? (parse_url($this->baseUrl, PHP_URL_HOST) ?: 'tixandcoffee.developerngantuk.my.id');
-        $referer = $scheme . '://' . $host . '/';
-        $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-
-        $cookie = $this->getUpstreamSessionCookie(false, $host);
+        $timeout = (int) config('api_timeout', 4);
 
         if (function_exists('curl_init')) {
-            $makeRequest = function($cookieStr) use ($url, $timeout, $userAgent, $referer) {
-                $ch = curl_init();
-                curl_setopt($ch, CURLOPT_URL, $url);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
-                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-                curl_setopt($ch, CURLOPT_USERAGENT, $userAgent);
-                curl_setopt($ch, CURLOPT_REFERER, $referer);
-                
-                $headers = [
-                    'Accept: application/json',
-                    'X-Requested-With: XMLHttpRequest',
-                ];
-                if (!empty($cookieStr)) {
-                    $headers[] = 'Cookie: ' . $cookieStr;
-                }
-                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Accept: application/json',
+                'X-Requested-With: XMLHttpRequest',
+            ]);
 
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-
-                return [$httpCode, $response];
-            };
-
-            [$httpCode, $response] = $makeRequest($cookie);
-
-            // If 403 (session expired or invalid), refresh session cookie and retry once
-            if ($httpCode === 403) {
-                $cookie = $this->getUpstreamSessionCookie(true, $host);
-                [$httpCode, $response] = $makeRequest($cookie);
-            }
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
 
             if ($response !== false && $httpCode >= 200 && $httpCode < 300) {
                 $decoded = json_decode($response, true);
-                if (is_array($decoded) && empty($decoded['error'])) {
+                if (is_array($decoded)) {
                     return $decoded;
                 }
             }
         }
 
         if (ini_get('allow_url_fopen')) {
-            $headersStr = "Accept: application/json\r\n" .
-                          "Referer: {$referer}\r\n" .
-                          "X-Requested-With: XMLHttpRequest\r\n";
-            if (!empty($cookie)) {
-                $headersStr .= "Cookie: {$cookie}\r\n";
-            }
-
             $context = stream_context_create([
                 'http' => [
                     'timeout' => $timeout,
-                    'user_agent' => $userAgent,
-                    'header' => $headersStr,
+                    'header' => "Accept: application/json\r\nUser-Agent: Mozilla/5.0\r\n",
+                    'ignore_errors' => true,
                 ],
                 'ssl' => [
                     'verify_peer' => false,
@@ -1746,7 +1618,7 @@ class KopiKenanganApi
             $response = @file_get_contents($url, false, $context);
             if ($response !== false) {
                 $decoded = json_decode($response, true);
-                if (is_array($decoded) && empty($decoded['error'])) {
+                if (is_array($decoded)) {
                     return $decoded;
                 }
             }
@@ -2053,7 +1925,7 @@ class KopiKenanganApi
     }
 
     /**
-     * Retrieve real-time outlet stock profile from MongoDB Atlas or local master snapshot.
+     * Retrieve real-time outlet stock profile from local master snapshot (0ms latency, zero DB overhead for Vercel).
      */
     public function getOutletStockProfile(string $outletCode): ?array
     {
@@ -2068,30 +1940,6 @@ class KopiKenanganApi
             return $cached;
         }
 
-        // 1. Query MongoDB Atlas ('outlet_stocks' collection)
-        try {
-            require_once __DIR__ . '/SimpleMongo.php';
-            $mongo = new SimpleMongo();
-            if ($mongo->isConnected()) {
-                $stockDoc = $mongo->getOutletStock($outletCode);
-                if (!empty($stockDoc) && (isset($stockDoc['soldOut']) || isset($stockDoc['isClosed']))) {
-                    $profile = [
-                        'code' => $outletCode,
-                        'soldOut' => (array)($stockDoc['soldOut'] ?? []),
-                        'isClosed' => !empty($stockDoc['isClosed']),
-                        'isPremium' => !empty($stockDoc['isPremium']),
-                        'prices' => (array)($stockDoc['prices'] ?? []),
-                        'source' => 'mongodb_outlet_stocks'
-                    ];
-                    $this->setCache($cacheKey, $profile);
-                    return $profile;
-                }
-            }
-        } catch (\Throwable $e) {
-            error_log('getOutletStockProfile MongoDB error: ' . $e->getMessage());
-        }
-
-        // 2. Fallback to local master snapshot data/outlet_stocks_master.json (0ms bundled on Vercel)
         $stocksFile = dirname(__DIR__) . '/data/outlet_stocks_master.json';
         if (file_exists($stocksFile)) {
             static $allStocks = null;
@@ -2114,5 +1962,80 @@ class KopiKenanganApi
         }
 
         return null;
+    }
+
+    /**
+     * Unified Multi-Brand API Proxy (swamptechnology.id)
+     * Supported brands: kopken, jiwa, point, fore, tomoro
+     */
+    public function getBrandData(string $brand, string $action = 'menu', array $params = []): array
+    {
+        $brand = strtolower(trim($brand));
+        $brandConfigs = config('brand_apis', []);
+
+        if (!isset($brandConfigs[$brand])) {
+            return [
+                'success' => false,
+                'message' => "Brand '$brand' tidak didukung. Pilihan: kopken, jiwa, point, fore, tomoro."
+            ];
+        }
+
+        $bCfg = $brandConfigs[$brand];
+        $baseUrl = rtrim($bCfg['base_url'], '/');
+
+        $cacheKey = 'brand_' . $brand . '_' . $action . '_' . md5(json_encode($params));
+        $cached = $this->getCache($cacheKey, 60);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $endpoint = '';
+        if ($action === 'status') {
+            $endpoint = '/status';
+        } elseif ($action === 'outlets' || $action === 'stores') {
+            if ($brand === 'kopken') {
+                $endpoint = !empty($params['lat']) ? '/store/nearest' : '/store/query_pageable_store';
+            } elseif ($brand === 'jiwa') {
+                $endpoint = '/ksj/riders/nearest';
+            } elseif ($brand === 'tomoro') {
+                $endpoint = !empty($params['lat']) ? '/store/nearest' : '/store/list';
+            } else {
+                $endpoint = '/config/version';
+            }
+        } elseif ($action === 'menu') {
+            if ($brand === 'kopken') {
+                $endpoint = '/product/query_product_menu';
+            } elseif ($brand === 'jiwa') {
+                $endpoint = '/ksj/menu';
+            } elseif ($brand === 'point') {
+                $endpoint = '/catalog/products';
+            } elseif ($brand === 'fore') {
+                $endpoint = '/product/menu';
+            } elseif ($brand === 'tomoro') {
+                $endpoint = '/product/menu';
+            }
+        }
+
+        $url = $baseUrl . $endpoint;
+        $response = $this->httpRequest($url, $params);
+
+        if ($response !== null) {
+            $result = [
+                'success' => true,
+                'brand' => $brand,
+                'brand_name' => $bCfg['name'],
+                'domain' => $bCfg['domain'],
+                'action' => $action,
+                'data' => $response,
+            ];
+            $this->setCache($cacheKey, $result);
+            return $result;
+        }
+
+        return [
+            'success' => false,
+            'brand' => $brand,
+            'message' => "Gagal menghubungi $url",
+        ];
     }
 }

@@ -5,3 +5,6 @@ Thumbs.db
 .vscode/
 .vercel
 /cache
+__pycache__/
+*.pyc
+scratch/

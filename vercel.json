@@ -54,6 +54,10 @@
       "dest": "/api/order.php"
     },
     {
+      "src": "/api/brand/?",
+      "dest": "/api/brand.php"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1"
     },

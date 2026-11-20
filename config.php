@@ -455,21 +455,50 @@ $config = [
         'overrides' => [],
     ],
 
-    // External Live API Endpoint
-    'api_base_url' => 'https://twinsjasdor.my.id/api',
-    'api_origin' => 'https://twinsjasdor.my.id',
-    'api_timeout' => 15,
+    // =========================================================================
+    // 7. MULTI-BRAND REAL-TIME APIS (swamptechnology.id)
+    // Direct link to brand microservices without DB overhead for ultra-fast Vercel delivery
+    // =========================================================================
+    'brand_apis' => [
+        'kopken' => [
+            'name' => 'Kopi Kenangan',
+            'domain' => 'kopkenapi.swamptechnology.id',
+            'base_url' => 'https://kopkenapi.swamptechnology.id/api',
+            'origin' => 'https://kopkenapi.swamptechnology.id',
+        ],
+        'jiwa' => [
+            'name' => 'Janji Jiwa',
+            'domain' => 'jiwaapi.swamptechnology.id',
+            'base_url' => 'https://jiwaapi.swamptechnology.id/api',
+            'origin' => 'https://jiwaapi.swamptechnology.id',
+        ],
+        'point' => [
+            'name' => 'Point Coffee',
+            'domain' => 'pointapi.swamptechnology.id',
+            'base_url' => 'https://pointapi.swamptechnology.id/api',
+            'origin' => 'https://pointapi.swamptechnology.id',
+        ],
+        'fore' => [
+            'name' => 'Fore Coffee',
+            'domain' => 'foreapi.swamptechnology.id',
+            'base_url' => 'https://foreapi.swamptechnology.id/api',
+            'origin' => 'https://foreapi.swamptechnology.id',
+        ],
+        'tomoro' => [
+            'name' => 'Tomoro Coffee',
+            'domain' => 'tomoroapi.swamptechnology.id',
+            'base_url' => 'https://tomoroapi.swamptechnology.id/api',
+            'origin' => 'https://tomoroapi.swamptechnology.id',
+        ],
+    ],
+
+    // Primary Active API Endpoint (Kopi Kenangan)
+    'api_base_url' => 'https://kopkenapi.swamptechnology.id/api',
+    'api_origin' => 'https://kopkenapi.swamptechnology.id',
+    'api_timeout' => 5,
     'cache_ttl' => [
         'outlets' => 1800,
         'menu' => 60,
-    ],
-
-    // =========================================================================
-    // 7B. MONGODB ATLAS CONFIGURATION
-    // =========================================================================
-    'mongodb' => [
-        'uri' => getenv('MONGODB_URI') ?: 'mongodb+srv://technologyswamp_db_user:EmmGSARebSpWS0Sw@cluster-utama.eyzthyo.mongodb.net/kyuti?retryWrites=true&w=majority',
-        'database' => 'kyuti',
     ],
 
     // =========================================================================
