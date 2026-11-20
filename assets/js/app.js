@@ -316,8 +316,9 @@ function isPremiumOutlet(outlet) {
         }
     }
 
-    // 4. Categories for verified premium types: Mall, Train Station, Airport
-    if (cat === 'mall' || cat === 'train station' || cat === 'airport') {
+    // 4. Categories for verified premium transport hubs: Train Station, Airport
+    // Note: Generic 'mall' or 'plaza' are excluded because most regional malls (e.g. Karawang Central Plaza, Blok M Plaza) have regular 19k price!
+    if (cat === 'train station' || cat === 'airport') {
         return true;
     }
 
@@ -326,15 +327,17 @@ function isPremiumOutlet(outlet) {
         return true;
     }
 
-    // 6. Major Airport Terminals & verified transport hubs & mall keywords
+    // 6. Major Airport Terminals, verified transport hubs & iconic verified premium malls
+    // Generic 'mall', 'plaza', 'square', 'supermal' are excluded!
     const keywords = [
-        'pajajaran bandung', 'stasiun', 'station', 'kcjb', 'gambir', 'pasar turi',
+        'pajajaran bandung', 'stasiun kcjb', 'stasiun pasar turi', 'stasiun gambir', 'stasiun bandung',
         'terminal bandara', 'keberangkatan bandara', 'airport departure', 'bandara internasional',
-        'bandara', 'airport', 'terminal 2d', 'terminal 2e', 'terminal 3 domestic', 'terminal 3 international',
+        'terminal 2d', 'terminal 2e', 'terminal 3 domestic', 'terminal 3 international',
         'kualanamu', 'ngurah rai', 'soekarno hatta', 'halim perdana',
-        'grand indonesia', 'senayan city', 'pacific place', 'tunjungan plaza', 'pim 2', 'pim 3',
-        'lotte mall', 'botani square', 'cihampelas walk', 'central park', 'kota kasablanka',
-        'mall', 'plaza', 'supermal', 'town square', 'citywalk'
+        'grand indonesia', 'senayan city', 'pacific place', 'plaza senayan', 'tunjungan plaza',
+        'pim 2', 'pim 3', 'pondok indah mall', 'lotte mall', 'botani square', 'cihampelas walk',
+        'central park', 'kota kasablanka', 'epicentrum walk', 'fx sudirman', 'margo city depok',
+        'sdc serpong', 'teras kota'
     ];
 
     return keywords.some(k => combined.includes(k));

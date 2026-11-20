@@ -141,14 +141,14 @@ def harvest_all():
 
         is_known_premium = False
         if not is_gas_station:
-            if cat_o in ["mall", "train station", "airport"]:
+            if cat_o in ["train station", "airport"]:
                 is_known_premium = True
             elif any(k in combined_o for k in [
-                "pajajaran bandung", "stasiun", "station", "kcjb", "gambir", "pasar turi",
+                "pajajaran bandung", "stasiun kcjb", "stasiun pasar turi", "stasiun gambir", "stasiun bandung",
                 "bandara", "airport", "terminal 2d", "terminal 2e", "terminal 3",
                 "kualanamu", "ngurah rai", "soekarno hatta", "halim",
                 "lotte mall", "botani square", "cihampelas walk", "pim 2", "pim 3", "teras kota",
-                "grand indonesia", "senayan city", "pacific place", "tunjungan plaza"
+                "grand indonesia", "senayan city", "pacific place", "plaza senayan", "tunjungan plaza"
             ]):
                 is_known_premium = True
             elif code_o in [
@@ -243,11 +243,15 @@ def harvest_all():
         comb = f"{cat_o} {name_o} {addr_o}"
         is_spbu = ("gas station" in cat_o or "spbu" in comb or "pom bensin" in comb) and ("bandara" not in comb and "airport" not in comb)
         if not is_spbu:
-            if cat_o in ["mall", "train station", "airport"] or c in prem_codes_set or any(k in comb for k in [
-                "pajajaran bandung", "stasiun", "station", "kcjb", "gambir", "pasar turi",
+            if cat_o in ["train station", "airport"] or c in prem_codes_set or any(k in comb for k in [
+                "pajajaran bandung", "stasiun kcjb", "stasiun pasar turi", "stasiun gambir", "stasiun bandung",
                 "bandara", "airport", "lotte mall", "botani square", "cihampelas walk", "pim 2", "pim 3", "teras kota"
             ]):
                 stock_map[c]["isPremium"] = True
+            else:
+                # Regular outlets (including regional malls like Karawang Central Plaza)
+                if c not in prem_codes_set:
+                    stock_map[c]["isPremium"] = False
 
     # Save to data/outlet_stocks_master.json
     with open(stocks_file, "w", encoding="utf-8") as f:
