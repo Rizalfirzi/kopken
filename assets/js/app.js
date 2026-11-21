@@ -738,7 +738,24 @@ function renderMenu() {
         if ((item.category === 'Bundling' || item.isBundling) && bStatus && item.key && bStatus[item.key] === false) {
             return false;
         }
-        const matchesCat = AppState.activeCategory === 'all' || item.category === AppState.activeCategory;
+
+        // Exclude upstream promo/combo items (PEKA, PaHe, Savory Toasts, etc.)
+        const cLower = (item.category || '').toLowerCase();
+        const nLower = (item.name || '').toLowerCase();
+        if (
+            (cLower.includes('promo') && cLower.includes('combo')) ||
+            /^(peka\s*\d|pahe\s*\d|2\s+savory\s+toasts|paket\s+|combo\s+)/i.test(nLower) ||
+            nLower.startsWith('peka ') ||
+            nLower.startsWith('pahe ') ||
+            nLower.includes('savory toasts')
+        ) {
+            return false;
+        }
+
+        const normItemCat = (item.category || '').toLowerCase().replace(/[\s-_]/g, '');
+        const normActiveCat = (AppState.activeCategory || '').toLowerCase().replace(/[\s-_]/g, '');
+        const matchesCat = AppState.activeCategory === 'all' || normItemCat === normActiveCat;
+
         const matchesSearch = !AppState.searchQuery || 
             item.name.toLowerCase().includes(AppState.searchQuery) ||
             (item.desc && item.desc.toLowerCase().includes(AppState.searchQuery));
@@ -1493,7 +1510,7 @@ function unitPrice(sel = AppState.sheet?.sel) {
         const premSurcharge = isPrem ? 1500 : 0;
         if (item.largePrice && (!prices || !Object.keys(prices).length)) return item.largePrice;
         // Rumus Kedai Kyuti: (harga asli Large - 50%) + Fee (+ Premium Surcharge)
-        const origLarge = Number(item.largeBase || item.largeNormal || (item.normalPrice ? (item.normalPrice + (isPrem ? 7000 : 6000)) : 0));
+        const origLarge = Number(item.largeBase || item.largeNormal || (item.normalPrice ? (item.normalPrice >= 26000 ? item.normalPrice + 8000 : item.normalPrice + (isPrem ? 7000 : 6000)) : 0));
         const defFee = Number(adminPricingState?.defaultMarkup ?? window.INITIAL_DATA?.pricing?.defaultMarkup ?? 5000);
         const catMarkup = Number(adminPricingState?.categoryMarkups?.[item.category] ?? window.INITIAL_DATA?.pricing?.categoryMarkups?.[item.category] ?? defFee);
         const overrides = adminPricingState?.itemMarkupOverrides || window.INITIAL_DATA?.pricing?.itemMarkupOverrides || {};
@@ -1528,7 +1545,7 @@ function normalPrice(sel = AppState.sheet?.sel) {
         if (item.largeBase) return item.largeBase;
         const isKKM = (item.name && item.name.toLowerCase().includes('kenangan mantan')) || (item.key && item.key.toLowerCase().includes('kenanganmantan'));
         if (isKKM) return isPrem ? 28000 : 25000;
-        return item.normalPrice ? (item.normalPrice + (isPrem ? 7000 : 6000)) : null;
+        return item.normalPrice ? (item.normalPrice >= 26000 ? item.normalPrice + 8000 : item.normalPrice + (isPrem ? 7000 : 6000)) : null;
     }
     return item.normalPrice || null;
 }

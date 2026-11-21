@@ -360,15 +360,17 @@ class KopiKenanganApi
             return $masterMenu;
         }
 
-        // Fast metadata lookup map from masterMenu for images, descriptions, options
+        // Fast metadata lookup map from masterMenu for images, descriptions, options, largeBase
         $masterMap = [];
         foreach ($masterMenu['items'] ?? [] as $mi) {
             $mName = strtolower(trim($mi['name'] ?? ''));
             $mCode = (string)($mi['code'] ?? '');
             $mKey = (string)($mi['key'] ?? '');
+            $norm = strtolower(preg_replace('/[^a-z0-9]/', '', $mName));
             if ($mName !== '') $masterMap[$mName] = $mi;
             if ($mCode !== '') $masterMap[$mCode] = $mi;
             if ($mKey !== '') $masterMap[$mKey] = $mi;
+            if ($norm !== '') $masterMap[$norm] = $mi;
         }
 
         $liveItems = [];
@@ -377,9 +379,21 @@ class KopiKenanganApi
 
         foreach ($groups as $g) {
             $catName = trim($g['group_name'] ?? 'Coffee');
-            if (stripos($catName, 'promo') !== false || stripos($catName, 'combo') !== false) {
-                $stdCat = 'Promo & Combo';
-            } elseif (stripos($catName, 'non coffee') !== false) {
+            $catLower = strtolower($catName);
+
+            // Exclude upstream promo & combo groups (PEKA, PaHe, 2 Savory Toasts, Paket, etc.)
+            // Kedai Kyuti operates as Jasdor with regular menu 50% + custom bundling packages
+            if (
+                str_contains($catLower, 'promo') ||
+                str_contains($catLower, 'combo') ||
+                str_contains($catLower, 'peka') ||
+                str_contains($catLower, 'pahe') ||
+                str_contains($catLower, 'paket')
+            ) {
+                continue;
+            }
+
+            if (stripos($catName, 'non coffee') !== false) {
                 $stdCat = 'Non Coffee';
             } elseif (stripos($catName, 'frappe') !== false) {
                 $stdCat = 'Frappe';
@@ -393,15 +407,27 @@ class KopiKenanganApi
                 $name = trim($p['name'] ?? '');
                 if ($name === '') continue;
 
-                $pid = (string)($p['id'] ?? $p['product_code'] ?? $name);
                 $lowerName = strtolower($name);
+                $normProduct = strtolower(preg_replace('/[^a-z0-9]/', '', $name));
+
+                // Exclude any upstream promo & combo items by name
+                if (
+                    preg_match('/^(peka\s*\d|pahe\s*\d|paket\s+|combo\s+|2\s+savory\s+toasts)/i', $name) ||
+                    str_contains($lowerName, 'peka ') ||
+                    str_contains($lowerName, 'pahe ') ||
+                    str_contains($lowerName, 'savory toasts')
+                ) {
+                    continue;
+                }
+
+                $pid = (string)($p['id'] ?? $p['product_code'] ?? $name);
                 if (isset($seen[$pid]) || isset($seen[$lowerName])) {
                     continue;
                 }
                 $seen[$pid] = true;
                 $seen[$lowerName] = true;
 
-                $ref = $masterMap[$lowerName] ?? $masterMap[$pid] ?? null;
+                $ref = $masterMap[$lowerName] ?? $masterMap[$pid] ?? $masterMap[$normProduct] ?? null;
 
                 $origNormal = (float)($p['orig_price'] ?? $p['price'] ?? 0);
                 if ($origNormal <= 0) {
@@ -425,20 +451,35 @@ class KopiKenanganApi
                     $kkmSinglePrice = $origNormal;
                 }
 
+                // Category classification (Revisi: Dua Shot Iced Shaken -> Coffee, Oreo Shake -> Non Coffee)
+                $itemCat = $ref['category'] ?? $stdCat;
+                if ($normProduct === 'duashoticedshaken') {
+                    $itemCat = 'Coffee';
+                } elseif ($normProduct === 'oreoshake') {
+                    $itemCat = 'Non Coffee';
+                }
+
+                $origLargeBase = (float)($ref['largeBase'] ?? $ref['largeNormal'] ?? 0);
+                $hasNoLarge = !empty($ref['noLarge']) || str_contains($normProduct, 'butterscotchseasaltcrumble');
+
                 $liveItems[] = [
                     'id' => $p['id'] ?? null,
                     'code' => $p['product_code'] ?? ($ref['code'] ?? $pid),
-                    'key' => $ref['key'] ?? preg_replace('/[^a-z0-9]/', '', $lowerName),
+                    'key' => $ref['key'] ?? $normProduct,
                     'name' => $name,
-                    'category' => $ref['category'] ?? $stdCat,
+                    'category' => $itemCat,
                     'desc' => !empty($p['description']) ? $p['description'] : ($ref['desc'] ?? ''),
                     'price' => $origNormal,
                     'normalPrice' => $origNormal,
+                    'largeBase' => (!$hasNoLarge && $origLargeBase > 0) ? $origLargeBase : null,
+                    'largeNormal' => (!$hasNoLarge && $origLargeBase > 0) ? $origLargeBase : null,
+                    'largePrice' => (!$hasNoLarge && !empty($ref['largePrice'])) ? (float)$ref['largePrice'] : null,
+                    'noLarge' => $hasNoLarge,
                     'isSoldOut' => !empty($p['is_sold_out']),
                     'notCarried' => false,
                     'img' => !empty($p['image']) ? $p['image'] : ($ref['img'] ?? 'assets/img/menu/default.jpg'),
                     'options' => $ref['options'] ?? [
-                        'sizes' => ['Regular', 'Large'],
+                        'sizes' => $hasNoLarge ? ['Regular'] : ['Regular', 'Large'],
                         'temps' => ['Ice', 'Hot'],
                         'ices' => ['Normal Ice', 'Less Ice', 'No Ice'],
                         'sugars' => ['Normal Sugar', 'Less Sugar', 'No Sugar']
@@ -518,9 +559,35 @@ class KopiKenanganApi
 
         // 1. Process API items
         $processedItems = [];
+        $masterItemsCache = null;
+
         foreach ($items as &$item) {
             $key = $item['key'] ?? $item['id'] ?? '';
             $category = $item['category'] ?? 'Coffee';
+            $name = $item['name'] ?? '';
+            $normKey = strtolower(str_replace([' ', '_', '-'], '', (string)$key));
+            $normName = strtolower(str_replace([' ', '_', '-'], '', (string)$name));
+            $catLower = strtolower((string)$category);
+
+            // Filter out upstream promo & combo items (e.g. PEKA 1, PEKA 2, 2 Savory Toasts, PaHe 1)
+            // Kedai Kyuti uses custom bundling packages, not upstream combos
+            if (
+                (str_contains($catLower, 'promo') && str_contains($catLower, 'combo')) ||
+                preg_match('/^(peka\s*\d|pahe\s*\d|2\s+savory\s+toasts|paket\s+|combo\s+)/i', $name) ||
+                (str_contains($normName, 'peka') && preg_match('/\d/', $normName)) ||
+                (str_contains($normName, 'pahe') && preg_match('/\d/', $normName))
+            ) {
+                continue;
+            }
+
+            // Category classification fix (Revisi: Dua Shot Iced Shaken -> Coffee, Oreo Shake -> Non Coffee)
+            if ($normKey === 'duashoticedshaken' || str_contains($normName, 'duashoticedshaken')) {
+                $item['category'] = 'Coffee';
+                $category = 'Coffee';
+            } elseif ($normKey === 'oreoshake' || str_contains($normName, 'oreoshake')) {
+                $item['category'] = 'Non Coffee';
+                $category = 'Non Coffee';
+            }
 
             // Synchronize stock: if item is sold out or not carried at this outlet, mark as isSoldOut
             if (!empty($item['notCarried'])) {
@@ -537,10 +604,6 @@ class KopiKenanganApi
             if ($origPrice <= 0) {
                 $origPrice = (float) ($item['price'] ?? 0);
             }
-
-            $name = $item['name'] ?? '';
-            $normKey = strtolower(str_replace([' ', '_', '-'], '', $key));
-            $normName = strtolower(str_replace([' ', '_', '-'], '', $name));
 
             // If outlet is Premium, ensure normalPrice reflects the verified premium pricing:
             if (!empty($menuData['premium'])) {
@@ -706,12 +769,31 @@ class KopiKenanganApi
                     $origLarge = (float)$item['largeNormal'];
                 }
 
+                // If not directly on item, check master database
+                if ($origLarge <= 0) {
+                    if ($masterItemsCache === null) {
+                        $masterMenu = $this->getFallbackMenu($outletCode);
+                        $masterItemsCache = [];
+                        foreach ($masterMenu['items'] ?? [] as $mi) {
+                            $mn = strtolower(preg_replace('/[^a-z0-9]/', '', $mi['name'] ?? ''));
+                            $mk = strtolower(preg_replace('/[^a-z0-9]/', '', $mi['key'] ?? ''));
+                            if ($mn !== '') $masterItemsCache[$mn] = $mi;
+                            if ($mk !== '') $masterItemsCache[$mk] = $mi;
+                        }
+                    }
+                    $refMaster = $masterItemsCache[$normName] ?? $masterItemsCache[$normKey] ?? null;
+                    if ($refMaster && !empty($refMaster['largeBase']) && (float)$refMaster['largeBase'] > 0) {
+                        $origLarge = (float)$refMaster['largeBase'];
+                    }
+                }
+
                 $isKKM = str_contains($normName, 'kenanganmantan') || str_contains($normKey, 'kenanganmantan') || str_contains($normName, 'kkm') || str_contains($normKey, 'kkm');
                 if ($origLarge <= 0) {
                     if ($isKKM) {
                         $origLarge = ($origPrice >= 22000) ? 28000.0 : 25000.0;
                     } elseif ($origPrice > 0) {
-                        $origLarge = $origPrice + 7000.0;
+                        $diff = ($origPrice >= 26000) ? 8000.0 : 6000.0;
+                        $origLarge = $origPrice + $diff;
                     }
                 }
                 if (!empty($menuData['premium'])) {
