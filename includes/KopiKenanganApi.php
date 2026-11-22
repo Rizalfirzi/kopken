@@ -101,6 +101,16 @@ class KopiKenanganApi
         }
         unset($o);
 
+        // Filter out excluded outlets per client request (Ruko Ambengan Surabaya)
+        $outlets = array_values(array_filter($outlets, function ($o) {
+            $code = $o['code'] ?? '';
+            $name = $o['name'] ?? '';
+            if ($code === 'KK.SBY.RKABNGAN' || stripos($name, 'Ambengan') !== false) {
+                return false;
+            }
+            return true;
+        }));
+
         $result = [
             'success' => true,
             'source' => 'kopkenapi.swamptechnology.id',
@@ -118,7 +128,7 @@ class KopiKenanganApi
     public function getOutletByCode(string $code): ?array
     {
         $code = trim($code);
-        if ($code === '') {
+        if ($code === '' || $code === 'KK.SBY.RKABNGAN' || stripos($code, 'Ambengan') !== false) {
             return null;
         }
 
@@ -393,11 +403,32 @@ class KopiKenanganApi
                 continue;
             }
 
+            // Exclude merchandise & seliter groups (Tumbler, Drip Bag, Seliter, Kenangan at Home, etc.)
+            if (
+                str_contains($catLower, 'merchandise') ||
+                str_contains($catLower, 'tumbler') ||
+                str_contains($catLower, 'seliter') ||
+                str_contains($catLower, 'liter') ||
+                str_contains($catLower, 'home')
+            ) {
+                continue;
+            }
+
             if (stripos($catName, 'non coffee') !== false) {
                 $stdCat = 'Non Coffee';
             } elseif (stripos($catName, 'frappe') !== false) {
                 $stdCat = 'Frappe';
-            } elseif (stripos($catName, 'food') !== false || stripos($catName, 'toast') !== false || stripos($catName, 'roti') !== false) {
+            } elseif (
+                stripos($catName, 'food') !== false ||
+                stripos($catName, 'toast') !== false ||
+                stripos($catName, 'roti') !== false ||
+                stripos($catName, 'chicken') !== false ||
+                stripos($catName, 'pastry') !== false ||
+                stripos($catName, 'bakery') !== false ||
+                stripos($catName, 'snack') !== false ||
+                stripos($catName, 'meal') !== false ||
+                stripos($catName, 'chiller') !== false
+            ) {
                 $stdCat = 'Food';
             } else {
                 $stdCat = 'Coffee';
@@ -416,6 +447,26 @@ class KopiKenanganApi
                     str_contains($lowerName, 'peka ') ||
                     str_contains($lowerName, 'pahe ') ||
                     str_contains($lowerName, 'savory toasts')
+                ) {
+                    continue;
+                }
+
+                // Exclude merchandise & seliter items (Tumbler, Drip Bag, Seliter, Sachet, Bottle, etc.)
+                if (
+                    str_contains($catLower, 'merchandise') ||
+                    str_contains($catLower, 'tumbler') ||
+                    str_contains($catLower, 'seliter') ||
+                    str_contains($lowerName, 'tumbler') ||
+                    str_contains($lowerName, 'drip bag') ||
+                    str_contains($lowerName, 'seliter') ||
+                    str_contains($lowerName, '1 liter') ||
+                    str_contains($lowerName, '1l') ||
+                    str_contains($lowerName, 'sachet') ||
+                    str_contains($lowerName, 'tote bag') ||
+                    str_contains($lowerName, 'totebag') ||
+                    str_contains($lowerName, 'jug ') ||
+                    str_contains($lowerName, 'bottle') ||
+                    str_contains($lowerName, 'merchandise')
                 ) {
                     continue;
                 }
@@ -451,16 +502,26 @@ class KopiKenanganApi
                     $kkmSinglePrice = $origNormal;
                 }
 
+                // Food classification check
+                $isFoodItem = (
+                    $stdCat === 'Food' ||
+                    (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $name)
+                );
+
                 // Category classification (Revisi: Dua Shot Iced Shaken -> Coffee, Oreo Shake -> Non Coffee)
-                $itemCat = $ref['category'] ?? $stdCat;
-                if ($normProduct === 'duashoticedshaken') {
-                    $itemCat = 'Coffee';
-                } elseif ($normProduct === 'oreoshake') {
-                    $itemCat = 'Non Coffee';
+                if ($isFoodItem) {
+                    $itemCat = 'Food';
+                } else {
+                    $itemCat = $ref['category'] ?? $stdCat;
+                    if ($normProduct === 'duashoticedshaken') {
+                        $itemCat = 'Coffee';
+                    } elseif ($normProduct === 'oreoshake') {
+                        $itemCat = 'Non Coffee';
+                    }
                 }
 
                 $origLargeBase = (float)($ref['largeBase'] ?? $ref['largeNormal'] ?? 0);
-                $hasNoLarge = !empty($ref['noLarge']) || str_contains($normProduct, 'butterscotchseasaltcrumble');
+                $hasNoLarge = $isFoodItem || !empty($ref['noLarge']) || str_contains($normProduct, 'butterscotchseasaltcrumble');
 
                 $liveItems[] = [
                     'id' => $p['id'] ?? null,
@@ -468,9 +529,10 @@ class KopiKenanganApi
                     'key' => $ref['key'] ?? $normProduct,
                     'name' => $name,
                     'category' => $itemCat,
+                    'isFood' => $isFoodItem,
                     'desc' => !empty($p['description']) ? $p['description'] : ($ref['desc'] ?? ''),
                     'price' => $origNormal,
-                    'normalPrice' => $origNormal,
+                    'normalPrice' => $isFoodItem ? 0 : $origNormal,
                     'largeBase' => (!$hasNoLarge && $origLargeBase > 0) ? $origLargeBase : null,
                     'largeNormal' => (!$hasNoLarge && $origLargeBase > 0) ? $origLargeBase : null,
                     'largePrice' => (!$hasNoLarge && !empty($ref['largePrice'])) ? (float)$ref['largePrice'] : null,
@@ -478,20 +540,25 @@ class KopiKenanganApi
                     'isSoldOut' => !empty($p['is_sold_out']),
                     'notCarried' => false,
                     'img' => !empty($p['image']) ? $p['image'] : ($ref['img'] ?? 'assets/img/menu/default.jpg'),
-                    'options' => $ref['options'] ?? [
+                    'options' => $isFoodItem ? [
+                        'sizes' => [],
+                        'temps' => [],
+                        'ices' => [],
+                        'sugars' => []
+                    ] : ($ref['options'] ?? [
                         'sizes' => $hasNoLarge ? ['Regular'] : ['Regular', 'Large'],
                         'temps' => ['Ice', 'Hot'],
                         'ices' => ['Normal Ice', 'Less Ice', 'No Ice'],
                         'sugars' => ['Normal Sugar', 'Less Sugar', 'No Sugar']
-                    ]
+                    ])
                 ];
             }
         }
 
-        // Strict client rule: KKM normal price < 22000 is Regular, >= 22000 is Premium
+        // Outlet premium classification (KKM normal price > 22000 e.g. Bandara/Stasiun or verified luxury mall)
         $outletInfo = $this->getOutletByCode($outletCode) ?: $this->evaluateOutletHours(['code' => $outletCode]);
         if ($kkmSinglePrice !== null && $kkmSinglePrice > 0) {
-            $isPremiumOutlet = ($kkmSinglePrice >= 22000);
+            $isPremiumOutlet = ($kkmSinglePrice > 22000) || $this->checkIsPremiumOutlet($outletInfo);
         } else {
             $isPremiumOutlet = $this->checkIsPremiumOutlet($outletInfo);
         }
@@ -545,9 +612,9 @@ class KopiKenanganApi
             }
         }
 
-        // Strict client rule: KKM normal price < 22000 is Regular, >= 22000 is Premium
+        // Outlet premium classification (KKM normal price > 22000 e.g. Bandara/Stasiun or verified luxury mall)
         if ($mantanPrice !== null && $mantanPrice > 0) {
-            $isPrem = ($mantanPrice >= 22000);
+            $isPrem = ($mantanPrice > 22000) || $this->checkIsPremiumOutlet($outletInfo);
         } else {
             $isPrem = !empty($menuData['premium']) || $this->checkIsPremiumOutlet($outletInfo);
         }
@@ -578,6 +645,41 @@ class KopiKenanganApi
                 (str_contains($normName, 'pahe') && preg_match('/\d/', $normName))
             ) {
                 continue;
+            }
+
+            // Filter out merchandise & seliter items (Tumbler, Drip Bag, Seliter, Sachet, Bottle, etc.)
+            if (
+                str_contains($catLower, 'merchandise') ||
+                str_contains($catLower, 'tumbler') ||
+                str_contains($catLower, 'seliter') ||
+                str_contains($normName, 'tumbler') ||
+                str_contains($normName, 'dripbag') ||
+                str_contains($normName, 'seliter') ||
+                str_contains($normName, '1liter') ||
+                str_contains($normName, '1l') ||
+                str_contains($normName, 'sachet') ||
+                str_contains($normName, 'totebag') ||
+                str_contains($normName, 'jug') ||
+                str_contains($normName, 'bottle') ||
+                str_contains($normName, 'merchandise')
+            ) {
+                continue;
+            }
+
+            // Food classification check
+            $isFood = !empty($item['isFood']) || $category === 'Food' || (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $name);
+            if ($isFood) {
+                $category = 'Food';
+                $item['category'] = 'Food';
+                $item['isFood'] = true;
+                $item['noLarge'] = true;
+                unset($item['largePrice'], $item['largeNormal'], $item['largeBase']);
+                $item['options'] = [
+                    'sizes' => [],
+                    'temps' => [],
+                    'ices' => [],
+                    'sugars' => []
+                ];
             }
 
             // Category classification fix (Revisi: Dua Shot Iced Shaken -> Coffee, Oreo Shake -> Non Coffee)
@@ -695,7 +797,7 @@ class KopiKenanganApi
             }
 
             $item['price'] = $calculatedPrice;
-            $item['normalPrice'] = $origPrice;
+            $item['normalPrice'] = $isFood ? 0 : $origPrice;
 
             // Menu khusus ukuran Regular saja (misal: Butterscotch Sea Salt Crumble tidak ada ukuran Large)
             $regularOnlyList = config('store.regular_only_items', [
@@ -856,64 +958,57 @@ class KopiKenanganApi
         }
         $items = array_merge($availList, $soldList);
 
-        // 2. Prepend Bundling Packages (Hanya untuk Outlet Regular, tidak tersedia di Outlet Premium per SOP Klien)
+        // 2. Prepend Bundling Packages (Selalu tersedia untuk pelanggan)
         $categories = $menuData['categories'] ?? [];
-        if (empty($menuData['premium'])) {
-            $bundlingItems = config('bundling_items', []);
-            $bundlingStatus = config('pricing.bundling_status', []);
-            $bundlingFormatted = [];
-            if (!empty($bundlingItems) && is_array($bundlingItems)) {
-                foreach ($bundlingItems as $b) {
-                    // Check if package is disabled by admin
-                    if (isset($bundlingStatus[$b['key']]) && $bundlingStatus[$b['key']] === false) {
-                        continue;
-                    }
-                    $bundlingFormatted[] = [
-                        'key' => $b['key'],
-                        'id' => $b['key'],
-                        'name' => $b['name'],
-                        'category' => 'Bundling',
-                        'img' => $b['img'],
-                        'desc' => $b['desc'] ?? '',
-                        'price' => (float) $b['price'],
-                        'priceLabel' => $b['priceLabel'] ?? '',
-                        'normalPrice' => (float) ($b['normalPrice'] ?? 0),
-                        'isSoldOut' => !empty($b['isSoldOut']),
-                        'tag' => $b['tag'] ?? 'BUNDLING',
-                        'size' => $b['size'] ?? '',
-                        'isBundling' => true,
-                        'slots' => $b['slots'] ?? [],
-                        'options' => $b['options'] ?? [
-                            'ices' => ['Normal Ice', 'Less Ice'],
-                            'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
-                        ],
-                    ];
+        $bundlingItems = config('bundling_items', []);
+        $bundlingStatus = config('pricing.bundling_status', []);
+        $bundlingFormatted = [];
+        if (!empty($bundlingItems) && is_array($bundlingItems)) {
+            foreach ($bundlingItems as $b) {
+                // Check if package is disabled by admin
+                if (isset($bundlingStatus[$b['key']]) && $bundlingStatus[$b['key']] === false) {
+                    continue;
                 }
+                $bundlingFormatted[] = [
+                    'key' => $b['key'],
+                    'id' => $b['key'],
+                    'name' => $b['name'],
+                    'category' => 'Bundling',
+                    'img' => $b['img'],
+                    'desc' => $b['desc'] ?? '',
+                    'price' => (float) $b['price'],
+                    'priceLabel' => $b['priceLabel'] ?? '',
+                    'normalPrice' => (float) ($b['normalPrice'] ?? 0),
+                    'isSoldOut' => !empty($b['isSoldOut']),
+                    'tag' => $b['tag'] ?? 'BUNDLING',
+                    'size' => $b['size'] ?? '',
+                    'isBundling' => true,
+                    'slots' => $b['slots'] ?? [],
+                    'options' => $b['options'] ?? [
+                        'ices' => ['Normal Ice', 'Less Ice'],
+                        'sugars' => ['Normal Sugar', 'Less Sugar (50%)', 'No Sugar'],
+                    ],
+                ];
             }
+        }
 
-            // Merge Bundling items at the beginning
-            $items = array_merge($bundlingFormatted, $items);
+        // Merge Bundling items at the beginning
+        $items = array_merge($bundlingFormatted, $items);
 
-            // Ensure Bundling category is in categories list
-            $hasBundlingCat = false;
-            foreach ($categories as $cat) {
-                if (($cat['id'] ?? '') === 'item-bundling' || ($cat['name'] ?? '') === 'Bundling') {
-                    $hasBundlingCat = true;
-                    break;
-                }
+        // Ensure Bundling category is in categories list
+        $hasBundlingCat = false;
+        foreach ($categories as $cat) {
+            if (($cat['id'] ?? '') === 'item-bundling' || ($cat['name'] ?? '') === 'Bundling') {
+                $hasBundlingCat = true;
+                break;
             }
-            if (!$hasBundlingCat) {
-                array_unshift($categories, [
-                    'id' => 'item-bundling',
-                    'name' => '🎀 Paket Bundling',
-                    'kind' => 'item',
-                ]);
-            }
-        } else {
-            // Remove bundling category if present in categories list for premium outlets
-            $categories = array_values(array_filter($categories, function($cat) {
-                return ($cat['id'] ?? '') !== 'item-bundling' && ($cat['name'] ?? '') !== 'Bundling';
-            }));
+        }
+        if (!$hasBundlingCat) {
+            array_unshift($categories, [
+                'id' => 'item-bundling',
+                'name' => '🎀 Paket Bundling',
+                'kind' => 'item',
+            ]);
         }
 
         // 3. Recalculate Live Stock Statistics
@@ -992,6 +1087,27 @@ class KopiKenanganApi
         if ($rawResponse && is_array($rawResponse)) {
             // Deep copy so upstream cache remains untouched and pure
             $response = json_decode(json_encode($rawResponse), true);
+
+            // Check if item is food (Food items have NO drink groups/options: sizes, temps, ices, sugars)
+            $isFoodItem = (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $itemKey . ' ' . $itemCode);
+            if (!$isFoodItem) {
+                $menu = $this->getMenu($outletCode);
+                foreach ($menu['items'] ?? [] as $mi) {
+                    if (($itemKey !== '' && ($mi['key'] ?? '') === $itemKey) || ($itemCode !== '' && ($mi['code'] ?? '') === $itemCode)) {
+                        if (!empty($mi['isFood']) || ($mi['category'] ?? '') === 'Food') {
+                            $isFoodItem = true;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if ($isFoodItem) {
+                $response['groups'] = [];
+                $response['addons'] = [];
+                $response['isFood'] = true;
+                return $response;
+            }
 
             // 1. Remove 'Jumbo' from groups and detect 'Large' IDs
             $jumboIds = [];
@@ -1191,43 +1307,62 @@ class KopiKenanganApi
             $outletCode = config('store.default_outlet', 'LA.CODEFIN');
         }
 
-        $todayDate = date('l, d F Y');
-        $cacheKey = 'wifi_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $outletCode);
+        // Exact 31-day password table strictly per client reference (Gambar 6)
+        $wifiDailyPasswords = [
+            1 => 'NgopiSantuy#01',
+            2 => 'KopiPenyemangat@02',
+            3 => 'SemangatBaru03',
+            4 => 'HariCeria=04',
+            5 => 'KopiTemanSetia!05',
+            6 => 'NgopiSeru#06',
+            7 => 'KopiTemanPagi@07',
+            8 => 'KopiPenutupSore08',
+            9 => 'SegarnyaKopi=09',
+            10 => 'NgopiBarengYuk!10',
+            11 => 'KenanganIndah#11',
+            12 => 'KopiJodohSejati@12',
+            13 => 'HangatnyaKopi13',
+            14 => 'PagiSemangat=14',
+            15 => 'NgopiDuluGaes!15',
+            16 => 'KopiPenyelamat#16',
+            17 => 'RasaKangen@17',
+            18 => 'SecangkirRindu18',
+            19 => 'KopiTanpaBatas=19',
+            20 => 'NgopiSambilKerja!20',
+            21 => 'KenanganManis#21',
+            22 => 'KopiTemanCurhat@22',
+            23 => 'BahagiaItuSederhana23',
+            24 => 'NgopiPenuhCinta=24',
+            25 => 'KopiRasaCinta!25',
+            26 => 'SemangatPejuang#26',
+            27 => 'KopiBikinSemangat@27',
+            28 => 'PagiPenuhSyukur28',
+            29 => 'KenanganTakTelupa=29',
+            30 => 'KopiSelaluSetia!30',
+            31 => 'NgopiSampaiPuas#31',
+        ];
 
-        // 1. In-memory / file cache check (3 minutes TTL, must match today's date)
-        $cached = $this->getCache($cacheKey, 180);
-        if ($cached !== null && !empty($cached['wifi']['password']) && ($cached['date'] ?? '') === $todayDate) {
-            return $cached;
-        }
-
-        // 2. Direct fast local master snapshot (0ms latency, zero DB overhead for Vercel)
-        $masterFile = dirname(__DIR__) . '/data/wifi_master.json';
-        $pwd = null;
+        $tz = new DateTimeZone('Asia/Jakarta');
+        $now = new DateTime('now', $tz);
+        $todayDate = $now->format('l, d F Y');
+        $dayNum = (int) $now->format('j');
+        $pwd = $wifiDailyPasswords[$dayNum] ?? ('NgopiSantuy#' . sprintf('%02d', $dayNum));
         $ssid = 'Teman Kenangan';
-        if (file_exists($masterFile)) {
-            $masterData = json_decode((string)@file_get_contents($masterFile), true);
-            $pwd = $masterData['password'] ?? ($masterData['wifi']['password'] ?? null);
-            $ssid = $masterData['ssid'] ?? ($masterData['wifi']['ssid'] ?? 'Teman Kenangan');
-        }
-
-        // 3. Fallback daily formula
-        if (empty($pwd)) {
-            $dayNum = date('j');
-            $pwd = 'NgopiSambilKerja!' . $dayNum;
-        }
+        $username = 'kopi kenangan';
 
         $result = [
             'success' => true,
             'outlet' => $outletCode,
             'wifi' => [
                 'ssid' => $ssid,
+                'username' => $username,
                 'password' => $pwd,
             ],
             'date' => $todayDate,
+            'day' => $dayNum,
             'source' => 'swamptechnology'
         ];
 
-        $this->setCache($cacheKey, $result);
         return $result;
     }
 
@@ -1341,7 +1476,8 @@ class KopiKenanganApi
         foreach ($order['items'] as $idx => $item) {
             $options = [];
             $isBundling = !empty($item['isBundling']) || ($item['category'] ?? '') === 'Bundling';
-            if (!$isBundling) {
+            $isFood = !empty($item['isFood']) || ($item['category'] ?? '') === 'Food' || preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $item['name'] ?? '');
+            if (!$isBundling && !$isFood) {
                 if (!empty($item['size'])) $options[] = $item['size'];
                 if (!empty($item['temp'])) $options[] = $item['temp'];
                 if (!empty($item['ice'])) $options[] = $item['ice'];
@@ -1875,23 +2011,6 @@ class KopiKenanganApi
                 'img' => 'https://cdn.kopikenangan.com/public/8f19b461-7e86-b8dc-6f0f-d225299d387a',
                 'category' => 'Mall',
                 'phone' => '08170110244',
-                'distanceKm' => null,
-            ],
-            [
-                'code' => 'KK.SBY.RKABNGAN',
-                'id' => 3627,
-                'name' => 'Ruko Ambengan Surabaya',
-                'address' => 'Ruko Ambengan Surabaya, Jl. Ambengan, Ketabang, Surabaya 60179',
-                'city' => 'Surabaya',
-                'lat' => -7.255728,
-                'lng' => 112.749807,
-                'isOpen' => true,
-                'canOrder' => true,
-                'statusText' => 'Buka',
-                'hours' => '06:00 - 23:00',
-                'img' => 'https://cdn.kopikenangan.com/ID/release/pub/b/m/dc7c918d-e6d7-4282-9b81-0b38b848f076',
-                'category' => 'Shop House',
-                'phone' => '0817 6562 292',
                 'distanceKm' => null,
             ],
             [

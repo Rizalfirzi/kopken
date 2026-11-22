@@ -735,21 +735,44 @@ function renderMenu() {
     const filtered = items.filter(item => {
         // Hide items that this outlet does not carry (discontinued seasonal promos / not sold here)
         if (item.notCarried) return false;
-        if ((item.category === 'Bundling' || item.isBundling) && bStatus && item.key && bStatus[item.key] === false) {
+        const isBundle = item.category === 'Bundling' || item.isBundling;
+        if (isBundle && bStatus && item.key && bStatus[item.key] === false) {
             return false;
         }
 
-        // Exclude upstream promo/combo items (PEKA, PaHe, Savory Toasts, etc.)
-        const cLower = (item.category || '').toLowerCase();
-        const nLower = (item.name || '').toLowerCase();
-        if (
-            (cLower.includes('promo') && cLower.includes('combo')) ||
-            /^(peka\s*\d|pahe\s*\d|2\s+savory\s+toasts|paket\s+|combo\s+)/i.test(nLower) ||
-            nLower.startsWith('peka ') ||
-            nLower.startsWith('pahe ') ||
-            nLower.includes('savory toasts')
-        ) {
-            return false;
+        // Exclude upstream promo/combo items (PEKA, PaHe, Savory Toasts, etc.) & merchandise
+        if (!isBundle) {
+            const cLower = (item.category || '').toLowerCase();
+            const nLower = (item.name || '').toLowerCase();
+            if (
+                (cLower.includes('promo') && cLower.includes('combo')) ||
+                /^(peka\s*\d|pahe\s*\d|2\s+savory\s+toasts|paket\s+|combo\s+)/i.test(nLower) ||
+                nLower.startsWith('peka ') ||
+                nLower.startsWith('pahe ') ||
+                nLower.includes('savory toasts')
+            ) {
+                return false;
+            }
+
+            // Exclude merchandise & seliter items per client revision
+            if (
+                cLower.includes('merchandise') ||
+                cLower.includes('tumbler') ||
+                cLower.includes('seliter') ||
+                nLower.includes('tumbler') ||
+                nLower.includes('drip bag') ||
+                nLower.includes('seliter') ||
+                nLower.includes('1 liter') ||
+                nLower.includes('1l') ||
+                nLower.includes('sachet') ||
+                nLower.includes('tote bag') ||
+                nLower.includes('totebag') ||
+                nLower.includes('jug ') ||
+                nLower.includes('bottle') ||
+                nLower.includes('merchandise')
+            ) {
+                return false;
+            }
         }
 
         const normItemCat = (item.category || '').toLowerCase().replace(/[\s-_]/g, '');
@@ -853,7 +876,7 @@ function renderMenu() {
                         <div class="product-cat">${item.category || 'Minuman'}</div>
                         <div class="product-price-row">
                             <span class="product-price">${item.priceLabel ? item.priceLabel : formatRp(item.price)}</span>
-                            ${item.normalPrice && item.normalPrice > item.price ? `<span class="product-normal-price">${formatRp(item.normalPrice)}</span>` : ''}
+                            ${!isFoodItem(item) && item.normalPrice && item.normalPrice > item.price ? `<span class="product-normal-price">${formatRp(item.normalPrice)}</span>` : ''}
                         </div>
                         <button class="product-add-btn" type="button" ${btnDisabled ? 'disabled aria-disabled="true"' : ''}>
                             ${btnText}
@@ -927,6 +950,20 @@ function isBundlingFoodItem(name) {
     const n = String(name).toLowerCase().trim();
     if (BUNDLING_FOOD_ITEMS.has(n)) return true;
     return /croissant|panini|toast|bread|cookie|donut|bagel|puff|bake|srikaya|roti/i.test(n);
+}
+
+function isFoodItem(item) {
+    if (!item) return false;
+    if (typeof item === 'string') {
+        const n = item.toLowerCase().trim();
+        if (BUNDLING_FOOD_ITEMS.has(n)) return true;
+        return /spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i.test(n);
+    }
+    if (item.isFood) return true;
+    const cat = (item.category || '').toLowerCase();
+    if (cat.includes('food') || cat.includes('toast') || cat.includes('roti') || cat.includes('snack') || cat.includes('boulangerie') || cat.includes('pastry') || cat.includes('bakery')) return true;
+    const name = (item.name || item.key || '').toLowerCase();
+    return /spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i.test(name);
 }
 
 function isSingleItemSoldOut(name) {
@@ -1393,7 +1430,7 @@ if (addBundleToCartBtn) {
 
 function defaultAddons(item) {
     const target = item || AppState.sheet?.item || AppState.selectedProduct;
-    if (target && (target.isFood || (target.category && target.category.toLowerCase().includes('food')))) {
+    if (isFoodItem(target)) {
         return [];
     }
     if (window.INITIAL_DATA && Array.isArray(window.INITIAL_DATA.addons) && window.INITIAL_DATA.addons.length) {
@@ -1420,8 +1457,11 @@ function defaultAddons(item) {
 }
 
 function staticGroups(item) {
+    if (isFoodItem(item)) {
+        return [];
+    }
     const o = item.options || {};
-    const isFood = item.isFood || (item.category && item.category.toLowerCase().includes('food'));
+    const isFood = false;
     const isNoLarge = Boolean(item.noLarge) ||
         (item.name && item.name.toLowerCase().includes('butterscotch sea salt crumble')) ||
         (item.key && item.key.toLowerCase().includes('butterscotchseasaltcrumble'));
@@ -1528,6 +1568,7 @@ function unitPrice(sel = AppState.sheet?.sel) {
 function normalPrice(sel = AppState.sheet?.sel) {
     const sh = AppState.sheet;
     if (!sh || !sh.item) return null;
+    if (isFoodItem(sh.item)) return null;
     const { item, normals, prices } = sh;
     if (prices && normals) {
         const key = comboKey(sel);
@@ -1651,6 +1692,13 @@ function renderOptions() {
 async function loadItemDetail(item, line) {
     const sheet = AppState.sheet;
     if (!sheet) return;
+    if (isFoodItem(item)) {
+        sheet.groups = [];
+        sheet.addons = [];
+        sheet.loading = false;
+        renderOptions();
+        return;
+    }
     sheet.loading = true;
     renderOptions();
     try {
@@ -1858,19 +1906,22 @@ if (addToCartBtn) {
         const addonsTotal = addonTotal();
         const finalPrice = variant + addonsTotal;
         const note = document.getElementById('modalItemNote')?.value.trim() || '';
-        const choices = currentChoices(sh.groups, sh.sel);
-        const pickedAddons = pickedChoices();
+        const isFood = isFoodItem(sh.item);
+        const choices = isFood ? [] : currentChoices(sh.groups, sh.sel);
+        const pickedAddons = isFood ? [] : pickedChoices();
         const allChoices = [...choices, ...pickedAddons];
 
-        const sizeVal = choices.find(c => c.group.toLowerCase().includes('size') || c.group.toLowerCase().includes('ukuran'))?.value || 'Regular';
-        const tempVal = choices.find(c => c.group.toLowerCase().includes('temp') || c.group.toLowerCase().includes('suhu'))?.value || 'Ice';
-        const iceVal = choices.find(c => c.group.toLowerCase().includes('ice') || c.group.toLowerCase().includes('es'))?.value || '';
-        const sugarVal = choices.find(c => c.group.toLowerCase().includes('sugar') || c.group.toLowerCase().includes('gula'))?.value || '';
+        const sizeVal = isFood ? '' : (choices.find(c => c.group.toLowerCase().includes('size') || c.group.toLowerCase().includes('ukuran'))?.value || '');
+        const tempVal = isFood ? '' : (choices.find(c => c.group.toLowerCase().includes('temp') || c.group.toLowerCase().includes('suhu'))?.value || '');
+        const iceVal = isFood ? '' : (choices.find(c => c.group.toLowerCase().includes('ice') || c.group.toLowerCase().includes('es'))?.value || '');
+        const sugarVal = isFood ? '' : (choices.find(c => c.group.toLowerCase().includes('sugar') || c.group.toLowerCase().includes('gula'))?.value || '');
 
         const itemToAdd = {
             id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
             key: sh.item.key || sh.item.id,
             name: sh.item.name,
+            category: isFood ? 'Food' : (sh.item.category || 'Coffee'),
+            isFood: isFood,
             price: finalPrice,
             basePrice: variant,
             qty: sh.qty,
@@ -1878,9 +1929,9 @@ if (addToCartBtn) {
             temp: tempVal,
             ice: iceVal,
             sugar: sugarVal,
-            choices: allChoices,
-            variantText: optionText(choices),
-            optionsText: optionText(allChoices),
+            choices: isFood ? pickedAddons : allChoices,
+            variantText: isFood ? '' : optionText(choices),
+            optionsText: isFood ? optionText(pickedAddons) : optionText(allChoices),
             addons: pickedAddons,
             addonsTotal: addonsTotal,
             note: note,
@@ -2089,7 +2140,7 @@ function renderCartItemsList() {
             <img src="${item.img || 'https://placehold.co/80x80'}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;">
             <div style="flex:1;overflow:hidden">
                 <div style="font-size:13px;font-weight:800;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
-                <div style="font-size:11px;color:var(--text-muted)">${item.variantText || `${item.size ? item.size + ' • ' : ''}${item.temp || 'Ice'}${item.sugar ? ' • ' + item.sugar : ''}`}</div>
+                <div style="font-size:11px;color:var(--text-muted)">${item.variantText || (!isFoodItem(item) && !item.isBundling ? `${item.size ? item.size + ' • ' : ''}${item.temp || 'Ice'}${item.sugar ? ' • ' + item.sugar : ''}` : '')}</div>
                 ${item.bundleChoices ? `<div style="font-size:10px;color:var(--brand-primary-dark);font-weight:700">${item.bundleChoices}</div>` : ''}
                 ${item.addons && item.addons.length ? `<div style="font-size:10px;color:var(--brand-primary-dark);font-weight:700;margin-top:2px">+ ${item.addons.map(a => `${a.name || a.text || a.value} (+${formatRp(a.price)})`).join(', ')}</div>` : ''}
                 ${item.note ? `<div style="font-size:10px;color:var(--text-muted);font-style:italic">"${item.note}"</div>` : ''}
@@ -2405,8 +2456,9 @@ function generateClientOrder({ custName, custPhone, notes, pickupTime }) {
 
     AppState.cart.forEach((item, idx) => {
         const isBundling = !!item.isBundling || item.category === 'Bundling';
+        const isFood = isFoodItem(item);
         let optStr = '';
-        if (!isBundling) {
+        if (!isBundling && !isFood) {
             const options = [];
             if (item.size) options.push(item.size);
             if (item.temp) options.push(item.temp);
@@ -3844,6 +3896,40 @@ function populateMenuDropdown() {
 // 12. WI-FI OUTLET INTEGRATION (Revisi Client ala Referensi)
 // =========================================================================
 
+const WIFI_DAILY_PASSWORDS = {
+    1: 'NgopiSantuy#01',
+    2: 'KopiPenyemangat@02',
+    3: 'SemangatBaru03',
+    4: 'HariCeria=04',
+    5: 'KopiTemanSetia!05',
+    6: 'NgopiSeru#06',
+    7: 'KopiTemanPagi@07',
+    8: 'KopiPenutupSore08',
+    9: 'SegarnyaKopi=09',
+    10: 'NgopiBarengYuk!10',
+    11: 'KenanganIndah#11',
+    12: 'KopiJodohSejati@12',
+    13: 'HangatnyaKopi13',
+    14: 'PagiSemangat=14',
+    15: 'NgopiDuluGaes!15',
+    16: 'KopiPenyelamat#16',
+    17: 'RasaKangen@17',
+    18: 'SecangkirRindu18',
+    19: 'KopiTanpaBatas=19',
+    20: 'NgopiSambilKerja!20',
+    21: 'KenanganManis#21',
+    22: 'KopiTemanCurhat@22',
+    23: 'BahagiaItuSederhana23',
+    24: 'NgopiPenuhCinta=24',
+    25: 'KopiRasaCinta!25',
+    26: 'SemangatPejuang#26',
+    27: 'KopiBikinSemangat@27',
+    28: 'PagiPenuhSyukur28',
+    29: 'KenanganTakTelupa=29',
+    30: 'KopiSelaluSetia!30',
+    31: 'NgopiSampaiPuas#31'
+};
+
 async function fetchWifi(outletCode) {
     const code = outletCode || AppState.outlet?.code || 'LA.CODEFIN';
     try {
@@ -3856,9 +3942,12 @@ async function fetchWifi(outletCode) {
     } catch (err) {
         console.warn('fetchWifi error:', err);
     }
+    const day = new Date().getDate();
+    const fallbackPass = WIFI_DAILY_PASSWORDS[day] || 'KopiTemanCurhat@22';
     const fallback = window.INITIAL_DATA?.wifi?.wifi || window.INITIAL_DATA?.wifi || {
         ssid: 'Teman Kenangan',
-        password: 'SecangkirRindu' + new Date().getDate()
+        username: 'kopi kenangan',
+        password: fallbackPass
     };
     updateWifiUI({ outlet: code, wifi: fallback, date: new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) });
     return fallback;
@@ -3867,7 +3956,8 @@ async function fetchWifi(outletCode) {
 function updateWifiUI(data) {
     if (!data || !data.wifi) return;
     const ssid = data.wifi.ssid || 'Teman Kenangan';
-    const pass = data.wifi.password || ('SecangkirRindu' + new Date().getDate());
+    const day = new Date().getDate();
+    const pass = data.wifi.password || WIFI_DAILY_PASSWORDS[day] || 'KopiTemanCurhat@22';
     const dateText = data.date || new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     // 1. Update Banner Card in Store View

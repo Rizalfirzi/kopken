@@ -720,6 +720,10 @@
                 <small style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Nama Jaringan (SSID)</small>
                 <strong id="wifiModalSsid" style="font-size:15px;color:var(--text-main)">Teman Kenangan</strong>
             </div>
+            <div style="background:var(--bg-page);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px 14px">
+                <small style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Username</small>
+                <strong id="wifiModalUser" style="font-size:15px;color:var(--text-main)">kopi kenangan</strong>
+            </div>
             <div style="background:var(--bg-page);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
                 <div>
                     <small style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:700">Password Hari Ini</small>
