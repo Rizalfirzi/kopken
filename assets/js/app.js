@@ -1506,11 +1506,10 @@ function unitPrice(sel = AppState.sheet?.sel) {
 
     const isLarge = !isNoLarge && (sel?.size === 'Large' || sel?.['size'] === 'Large' || Object.values(sel || {}).includes('Large'));
     if (isLarge) {
-        const isPrem = Boolean(AppState.outlet?.isPremium || AppState.menu?.premium);
-        const premSurcharge = isPrem ? 1500 : 0;
         if (item.largePrice && (!prices || !Object.keys(prices).length)) return item.largePrice;
-        // Rumus Kedai Kyuti: (harga asli Large - 50%) + Fee (+ Premium Surcharge)
-        const origLarge = Number(item.largeBase || item.largeNormal || (item.normalPrice ? (item.normalPrice >= 26000 ? item.normalPrice + 8000 : item.normalPrice + (isPrem ? 7000 : 6000)) : 0));
+        // Rumus Kedai Kyuti: (harga asli Large - 50%) + Fee
+        const isPrem = Boolean(AppState.outlet?.isPremium || AppState.menu?.premium);
+        const origLarge = Number(item.largeBase || item.largeNormal || (item.normalPrice ? (item.normalPrice >= 26000 ? item.normalPrice + 8000 : item.normalPrice + 6000) : 0));
         const defFee = Number(adminPricingState?.defaultMarkup ?? window.INITIAL_DATA?.pricing?.defaultMarkup ?? 5000);
         const catMarkup = Number(adminPricingState?.categoryMarkups?.[item.category] ?? window.INITIAL_DATA?.pricing?.categoryMarkups?.[item.category] ?? defFee);
         const overrides = adminPricingState?.itemMarkupOverrides || window.INITIAL_DATA?.pricing?.itemMarkupOverrides || {};
@@ -1518,7 +1517,7 @@ function unitPrice(sel = AppState.sheet?.sel) {
         const largeFee = overrides[`${item.name} (Large)`] ?? itemFee;
         if (origLarge > 0) {
             const discPercent = Number(adminPricingState?.discountPercent ?? window.INITIAL_DATA?.pricing?.discountPercent ?? 50);
-            return Math.round((origLarge * (1 - (discPercent / 100))) + largeFee + premSurcharge);
+            return Math.round((origLarge * (1 - (discPercent / 100))) + largeFee);
         }
         return (item.price || 0) + 3500;
     }

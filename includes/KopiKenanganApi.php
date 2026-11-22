@@ -605,8 +605,8 @@ class KopiKenanganApi
                 $origPrice = (float) ($item['price'] ?? 0);
             }
 
-            // If outlet is Premium, ensure normalPrice reflects the verified premium pricing:
-            if (!empty($menuData['premium'])) {
+            // If outlet is Premium and NOT live data (master database fallback mode only), adjust standard base prices:
+            if (!empty($menuData['premium']) && empty($menuData['live'])) {
                 if (str_contains($normName, 'oatside') && str_contains($normName, 'kenanganmantan')) {
                     $origPrice = 25000.0;
                 } elseif (str_contains($normName, 'kenanganmantan') && !str_contains($normName, 'frappe')) {
@@ -620,7 +620,6 @@ class KopiKenanganApi
                 } elseif (str_contains($normName, 'frappe')) {
                     if ($origPrice < 31000.0) $origPrice = 31000.0;
                 } elseif (in_array(strtolower($category), ['coffee', 'non coffee', 'frappe', 'tea']) && empty($item['isFood'])) {
-                    // Only add difference if normalPrice is still the regular base price
                     if ($origPrice > 0 && $origPrice <= 19000) {
                         $origPrice += 3000.0;
                     } elseif ($origPrice > 19000 && $origPrice < 25000) {
@@ -670,14 +669,13 @@ class KopiKenanganApi
                 $fee = $defaultMarkup;
             }
 
-            // Upstream API surcharge for verified premium outlets (+1.500, total fee +6.500)
-            $premiumSurcharge = !empty($menuData['premium']) ? 1500.0 : 0.0;
-            $effectiveFee = $fee + $premiumSurcharge;
+            // Formula Fee (Murni: harga asli - 50% + fee, tanpa surcharge tambahan agar harga sesuai aplikasi asli)
+            $effectiveFee = $fee;
 
             // Raw price from API
             $rawApiPrice = isset($item['price']) ? (float)$item['price'] : 0;
 
-            // Calculate Selling Price using Kedai Kyuti Formula: (Harga Asli - 50%) + Fee (+ Premium Surcharge)
+            // Calculate Selling Price using Kedai Kyuti Formula: (Harga Asli - 50%) + Fee
             if ($origPrice > 0) {
                 $discountedBase = $origPrice * (1 - ($discountPercent / 100));
                 $calculatedPrice = round($discountedBase + $effectiveFee);
@@ -788,28 +786,35 @@ class KopiKenanganApi
                 }
 
                 $isKKM = str_contains($normName, 'kenanganmantan') || str_contains($normKey, 'kenanganmantan') || str_contains($normName, 'kkm') || str_contains($normKey, 'kkm');
-                if ($origLarge <= 0) {
+                if (!empty($menuData['premium'])) {
                     if ($isKKM) {
-                        $origLarge = ($origPrice >= 22000) ? 28000.0 : 25000.0;
-                    } elseif ($origPrice > 0) {
+                        $origLarge = max($origLarge, $origPrice + 6000.0);
+                    } elseif ($origLarge <= 0 || $origLarge <= $origPrice) {
                         $diff = ($origPrice >= 26000) ? 8000.0 : 6000.0;
                         $origLarge = $origPrice + $diff;
                     }
-                }
-                if (!empty($menuData['premium'])) {
-                    // For premium surcharge outlets, ensure origLarge reflects official premium largeBase
-                    if ($isKKM) {
-                        $origLarge = 28000.0;
-                    } elseif ($origLarge > 0 && $origLarge < 29000.0) {
-                        $origLarge += 3000.0;
+                } else {
+                    if ($origLarge <= 0) {
+                        if ($isKKM) {
+                            $origLarge = 25000.0;
+                        } elseif ($origPrice > 0) {
+                            $diff = ($origPrice >= 26000) ? 8000.0 : 6000.0;
+                            $origLarge = $origPrice + $diff;
+                        }
                     }
+                }
+
+                // Ensure large normal price is always higher than regular normal price
+                if ($origLarge <= $origPrice) {
+                    $diff = ($origPrice >= 26000) ? 8000.0 : 6000.0;
+                    $origLarge = $origPrice + $diff;
                 }
 
                 $item['largeNormal'] = $origLarge;
                 $item['largeBase'] = $origLarge;
 
-                // Calculate Large Selling Price using Kedai Kyuti Formula: (Harga Asli Large - 50%) + Fee (+ Premium Surcharge)
-                $effectiveLargeMarkup = $effectiveLargeFee + $premiumSurcharge;
+                // Calculate Large Selling Price using Kedai Kyuti Formula: (Harga Asli Large - 50%) + Fee
+                $effectiveLargeMarkup = $effectiveLargeFee;
                 if ($origLarge > 0) {
                     $discountedLarge = $origLarge * (1 - ($discountPercent / 100));
                     $calcLarge = round($discountedLarge + $effectiveLargeMarkup);
