@@ -238,6 +238,21 @@ if (openPricelistBtn) {
     openPricelistBtn.addEventListener('click', openStoreView);
 }
 
+const openBundlingHubBtn = document.getElementById('openBundlingHubBtn');
+if (openBundlingHubBtn) {
+    openBundlingHubBtn.addEventListener('click', () => {
+        openStoreView();
+        // Activate Bundling category tab directly
+        const bundlingPill = document.querySelector('.cat-pill[data-cat="Bundling"]');
+        if (bundlingPill) {
+            document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+            bundlingPill.classList.add('active');
+            AppState.activeCategory = 'Bundling';
+            renderMenu();
+        }
+    });
+}
+
 const backToHubBtn = document.getElementById('backToHubBtn');
 if (backToHubBtn) {
     backToHubBtn.addEventListener('click', openHubView);
@@ -629,6 +644,20 @@ function fetchMenu(outletCode, forceRefresh = false) {
                 }
             }
 
+            // Guarantee bundling packages are never lost if stripped by upstream
+            if (data && Array.isArray(data.items)) {
+                const hasBundles = data.items.some(i => i.category === 'Bundling' || i.isBundling);
+                if (!hasBundles && Array.isArray(window.INITIAL_DATA?.bundlingItems) && window.INITIAL_DATA.bundlingItems.length > 0) {
+                    const bItems = window.INITIAL_DATA.bundlingItems.map(b => ({
+                        ...b,
+                        id: b.key,
+                        category: 'Bundling',
+                        isBundling: true,
+                    }));
+                    data.items = [...bItems, ...data.items];
+                }
+            }
+
             AppState.menu = data;
 
             // Sync closed status if data indicates isClosed
@@ -731,7 +760,14 @@ function renderMenu() {
     const items = AppState.menu?.items || [];
     const outletClosed = isOutletClosed();
     
-    const bStatus = adminPricingState?.bundlingStatus || window.INITIAL_DATA?.pricing?.bundlingStatus;
+    const rawBStatus = adminPricingState?.bundlingStatus || window.INITIAL_DATA?.pricing?.bundlingStatus || {};
+    const bStatus = Object.assign({
+        bundle_2_cup_large: true,
+        bundle_2_frappe: true,
+        promo_minuman_special: true,
+        bundle_hemat_3_item: true
+    }, rawBStatus);
+
     const filtered = items.filter(item => {
         // Hide items that this outlet does not carry (discontinued seasonal promos / not sold here)
         if (item.notCarried) return false;
@@ -777,7 +813,9 @@ function renderMenu() {
 
         const normItemCat = (item.category || '').toLowerCase().replace(/[\s-_]/g, '');
         const normActiveCat = (AppState.activeCategory || '').toLowerCase().replace(/[\s-_]/g, '');
-        const matchesCat = AppState.activeCategory === 'all' || normItemCat === normActiveCat;
+        const matchesCat = AppState.activeCategory === 'all' || 
+                           normItemCat === normActiveCat || 
+                           (isBundle && normActiveCat === 'bundling');
 
         const matchesSearch = !AppState.searchQuery || 
             item.name.toLowerCase().includes(AppState.searchQuery) ||
@@ -785,11 +823,16 @@ function renderMenu() {
         return matchesCat && matchesSearch;
     });
 
-    // Sort: Available items first, sold-out items at the bottom
+    // Sort: Available items first, sold-out items at the bottom; Bundling items ALWAYS pinned at top of available!
     filtered.sort((a, b) => {
-        const aSold = Boolean(a.isSoldOut);
-        const bSold = Boolean(b.isSoldOut);
+        const aSold = Boolean(a.isSoldOut || a.notCarried);
+        const bSold = Boolean(b.isSoldOut || b.notCarried);
         if (aSold !== bSold) return aSold ? 1 : -1;
+
+        const aBundle = Boolean(a.category === 'Bundling' || a.isBundling);
+        const bBundle = Boolean(b.category === 'Bundling' || b.isBundling);
+        if (aBundle !== bBundle) return aBundle ? -1 : 1;
+
         return 0;
     });
 

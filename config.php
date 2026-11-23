@@ -615,7 +615,12 @@ if (is_array($dynamicData)) {
         $config['fees']['plastic_bag_fee'] = max(0, (float)$dynamicData['plastic_bag_fee']);
     }
     if (isset($dynamicData['bundling_status']) && is_array($dynamicData['bundling_status'])) {
-        $config['pricing']['bundling_status'] = $dynamicData['bundling_status'];
+        $config['pricing']['bundling_status'] = array_merge([
+            'bundle_2_cup_large' => true,
+            'bundle_2_frappe' => true,
+            'promo_minuman_special' => true,
+            'bundle_hemat_3_item' => true,
+        ], $dynamicData['bundling_status']);
     }
     if (isset($dynamicData['disabled_bundling_options']) && is_array($dynamicData['disabled_bundling_options'])) {
         $config['pricing']['disabled_bundling_options'] = $dynamicData['disabled_bundling_options'];

@@ -961,7 +961,13 @@ class KopiKenanganApi
         // 2. Prepend Bundling Packages (Selalu tersedia untuk pelanggan)
         $categories = $menuData['categories'] ?? [];
         $bundlingItems = config('bundling_items', []);
-        $bundlingStatus = config('pricing.bundling_status', []);
+        $rawBundlingStatus = config('pricing.bundling_status', []);
+        $bundlingStatus = array_merge([
+            'bundle_2_cup_large' => true,
+            'bundle_2_frappe' => true,
+            'promo_minuman_special' => true,
+            'bundle_hemat_3_item' => true,
+        ], is_array($rawBundlingStatus) ? $rawBundlingStatus : []);
         $bundlingFormatted = [];
         if (!empty($bundlingItems) && is_array($bundlingItems)) {
             foreach ($bundlingItems as $b) {

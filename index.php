@@ -167,6 +167,19 @@ require_once __DIR__ . '/includes/header.php';
                     </div>
                 </button>
 
+                <!-- 1b. Menu Paket Bundling (Direct Shortcut ke Menu Bundling Hemat) -->
+                <button class="bio-link-btn bio-btn-bundling" id="openBundlingHubBtn" type="button" style="border: 1.5px solid #F472B6; background: linear-gradient(135deg, #FFF0F5 0%, #FFFFFF 100%);">
+                    <div class="bl-icon" style="color:#DB2777">🎀</div>
+                    <div class="bl-info">
+                        <span class="bl-title" style="color:#BE185D;font-weight:800">Menu Paket Bundling</span>
+                        <span class="bl-sub">2 Cup Large, 2 Frappe, Hemat 3 Item & Promo Spesial</span>
+                    </div>
+                    <div class="bl-arrow">
+                        <span class="bl-tag" style="background:#FCE7F3;color:#BE185D;font-weight:700">PROMO ♡</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DB2777" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                    </div>
+                </button>
+
                 <!-- 2. Review & Testimoni Customer (Fitur Baru) -->
                 <button class="bio-link-btn" id="openReviewsHubBtn" type="button">
                     <div class="bl-icon" style="color:#F59E0B">⭐</div>
