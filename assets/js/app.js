@@ -995,18 +995,25 @@ function isBundlingFoodItem(name) {
     return /croissant|panini|toast|bread|cookie|donut|bagel|puff|bake|srikaya|roti/i.test(n);
 }
 
+function isDrinkBeverage(name) {
+    if (!name) return false;
+    return /latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i.test(String(name));
+}
+
 function isFoodItem(item) {
     if (!item) return false;
     if (typeof item === 'string') {
         const n = item.toLowerCase().trim();
+        if (isDrinkBeverage(n)) return false;
         if (BUNDLING_FOOD_ITEMS.has(n)) return true;
-        return /spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i.test(n);
+        return /spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i.test(n);
     }
+    const name = (item.name || item.key || '').toLowerCase();
+    if (isDrinkBeverage(name)) return false;
     if (item.isFood) return true;
     const cat = (item.category || '').toLowerCase();
     if (cat.includes('food') || cat.includes('toast') || cat.includes('roti') || cat.includes('snack') || cat.includes('boulangerie') || cat.includes('pastry') || cat.includes('bakery')) return true;
-    const name = (item.name || item.key || '').toLowerCase();
-    return /spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i.test(name);
+    return /spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i.test(name);
 }
 
 function isSingleItemSoldOut(name) {

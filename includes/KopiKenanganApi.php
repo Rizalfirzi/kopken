@@ -502,22 +502,37 @@ class KopiKenanganApi
                     $kkmSinglePrice = $origNormal;
                 }
 
+                // Beverage check: Any drink is NEVER a food item!
+                $isDrink = (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $name);
+
                 // Food classification check
-                $isFoodItem = (
+                $isFoodItem = !$isDrink && (
                     $stdCat === 'Food' ||
-                    (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $name)
+                    (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $name)
                 );
 
-                // Category classification (Revisi: Dua Shot Iced Shaken -> Coffee, Oreo Shake -> Non Coffee)
+                // Category classification (Revisi: Dua Shot Iced Shaken -> Coffee, Oreo Shake -> Non Coffee, Frappe -> Frappe)
                 if ($isFoodItem) {
                     $itemCat = 'Food';
+                } elseif (stripos($name, 'frappe') !== false || stripos($catName, 'frappe') !== false) {
+                    $itemCat = 'Frappe';
+                } elseif ($normProduct === 'duashoticedshaken') {
+                    $itemCat = 'Coffee';
+                } elseif ($normProduct === 'oreoshake') {
+                    $itemCat = 'Non Coffee';
+                } elseif ($isDrink) {
+                    if (
+                        preg_match('/matcha|tea|lemonade|babyccino|hibiscus|oreo\s*shake/i', $name) &&
+                        !preg_match('/coffee|kopi|espresso|americano|cappuccino|macchiato|latte/i', $name)
+                    ) {
+                        $itemCat = 'Non Coffee';
+                    } elseif (stripos($catName, 'non coffee') !== false && !preg_match('/coffee|kopi|espresso|americano|cappuccino|macchiato|latte/i', $name)) {
+                        $itemCat = 'Non Coffee';
+                    } else {
+                        $itemCat = 'Coffee';
+                    }
                 } else {
                     $itemCat = $ref['category'] ?? $stdCat;
-                    if ($normProduct === 'duashoticedshaken') {
-                        $itemCat = 'Coffee';
-                    } elseif ($normProduct === 'oreoshake') {
-                        $itemCat = 'Non Coffee';
-                    }
                 }
 
                 $origLargeBase = (float)($ref['largeBase'] ?? $ref['largeNormal'] ?? 0);
@@ -666,8 +681,14 @@ class KopiKenanganApi
                 continue;
             }
 
-            // Food classification check
-            $isFood = !empty($item['isFood']) || $category === 'Food' || (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $name);
+            // Food classification check: A drink/beverage is NEVER a food item!
+            $isDrink = (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $name);
+
+            $isFood = !$isDrink && (
+                !empty($item['isFood']) ||
+                $category === 'Food' ||
+                (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $name)
+            );
             if ($isFood) {
                 $category = 'Food';
                 $item['category'] = 'Food';
@@ -680,15 +701,22 @@ class KopiKenanganApi
                     'ices' => [],
                     'sugars' => []
                 ];
-            }
-
-            // Category classification fix (Revisi: Dua Shot Iced Shaken -> Coffee, Oreo Shake -> Non Coffee)
-            if ($normKey === 'duashoticedshaken' || str_contains($normName, 'duashoticedshaken')) {
-                $item['category'] = 'Coffee';
-                $category = 'Coffee';
-            } elseif ($normKey === 'oreoshake' || str_contains($normName, 'oreoshake')) {
-                $item['category'] = 'Non Coffee';
-                $category = 'Non Coffee';
+            } else {
+                $item['isFood'] = false;
+                // Category classification fix (Revisi: Dua Shot Iced Shaken -> Coffee, Oreo Shake -> Non Coffee, Frappe -> Frappe)
+                if (stripos($name, 'frappe') !== false) {
+                    $item['category'] = 'Frappe';
+                    $category = 'Frappe';
+                } elseif ($normKey === 'duashoticedshaken' || str_contains($normName, 'duashoticedshaken')) {
+                    $item['category'] = 'Coffee';
+                    $category = 'Coffee';
+                } elseif ($normKey === 'oreoshake' || str_contains($normName, 'oreoshake')) {
+                    $item['category'] = 'Non Coffee';
+                    $category = 'Non Coffee';
+                } elseif (stripos($name, 'latte') !== false && !str_contains($normName, 'matcha')) {
+                    $item['category'] = 'Coffee';
+                    $category = 'Coffee';
+                }
             }
 
             // Synchronize stock: if item is sold out or not carried at this outlet, mark as isSoldOut
@@ -1095,8 +1123,9 @@ class KopiKenanganApi
             $response = json_decode(json_encode($rawResponse), true);
 
             // Check if item is food (Food items have NO drink groups/options: sizes, temps, ices, sugars)
-            $isFoodItem = (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $itemKey . ' ' . $itemCode);
-            if (!$isFoodItem) {
+            $isDrinkKey = (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $itemKey . ' ' . $itemCode);
+            $isFoodItem = !$isDrinkKey && (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $itemKey . ' ' . $itemCode);
+            if (!$isFoodItem && !$isDrinkKey) {
                 $menu = $this->getMenu($outletCode);
                 foreach ($menu['items'] ?? [] as $mi) {
                     if (($itemKey !== '' && ($mi['key'] ?? '') === $itemKey) || ($itemCode !== '' && ($mi['code'] ?? '') === $itemCode)) {
@@ -1482,7 +1511,8 @@ class KopiKenanganApi
         foreach ($order['items'] as $idx => $item) {
             $options = [];
             $isBundling = !empty($item['isBundling']) || ($item['category'] ?? '') === 'Bundling';
-            $isFood = !empty($item['isFood']) || ($item['category'] ?? '') === 'Food' || preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cake|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $item['name'] ?? '');
+            $isDrink = (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $item['name'] ?? '');
+            $isFood = !$isDrink && (!empty($item['isFood']) || ($item['category'] ?? '') === 'Food' || preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $item['name'] ?? ''));
             if (!$isBundling && !$isFood) {
                 if (!empty($item['size'])) $options[] = $item['size'];
                 if (!empty($item['temp'])) $options[] = $item['temp'];
