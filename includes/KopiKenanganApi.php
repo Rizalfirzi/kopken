@@ -502,14 +502,17 @@ class KopiKenanganApi
                     $kkmSinglePrice = $origNormal;
                 }
 
+                // Clear food items: bakery, toast, bread, pastry, cookies, meals (NEVER a drink, even with choco/susu flavour)
+                $isDefiniteFood = (bool) preg_match('/puff|croissant|panini|toast|bread|roti|donut|bagel|cookie|bungeoppang|nugget|nasi|chicken|spaghetti|pasta|danish|snack|pie|bolognese|carbonara|aglio/i', $name);
+
                 // Beverage check: Any drink is NEVER a food item!
-                $isDrink = (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $name);
+                $isDrink = !$isDefiniteFood && (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $name);
 
                 // Food classification check
-                $isFoodItem = !$isDrink && (
+                $isFoodItem = $isDefiniteFood || (!$isDrink && (
                     $stdCat === 'Food' ||
-                    (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $name)
-                );
+                    (bool) preg_match('/cheesycake|\bcake\b|chiller|meal/i', $name)
+                ));
 
                 // Category classification (Revisi: Dua Shot Iced Shaken -> Coffee, Oreo Shake -> Non Coffee, Frappe -> Frappe)
                 if ($isFoodItem) {
@@ -681,14 +684,17 @@ class KopiKenanganApi
                 continue;
             }
 
-            // Food classification check: A drink/beverage is NEVER a food item!
-            $isDrink = (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $name);
+            // Clear food items: bakery, toast, bread, pastry, cookies, meals (NEVER a drink)
+            $isDefiniteFood = (bool) preg_match('/puff|croissant|panini|toast|bread|roti|donut|bagel|cookie|bungeoppang|nugget|nasi|chicken|spaghetti|pasta|danish|snack|pie|bolognese|carbonara|aglio/i', $name);
 
-            $isFood = !$isDrink && (
+            // Food classification check: A drink/beverage is NEVER a food item!
+            $isDrink = !$isDefiniteFood && (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $name);
+
+            $isFood = $isDefiniteFood || (!$isDrink && (
                 !empty($item['isFood']) ||
                 $category === 'Food' ||
-                (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $name)
-            );
+                (bool) preg_match('/cheesycake|\bcake\b|chiller|meal/i', $name)
+            ));
             if ($isFood) {
                 $category = 'Food';
                 $item['category'] = 'Food';
@@ -1123,8 +1129,9 @@ class KopiKenanganApi
             $response = json_decode(json_encode($rawResponse), true);
 
             // Check if item is food (Food items have NO drink groups/options: sizes, temps, ices, sugars)
-            $isDrinkKey = (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $itemKey . ' ' . $itemCode);
-            $isFoodItem = !$isDrinkKey && (bool) preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $itemKey . ' ' . $itemCode);
+            $isDefiniteFood = (bool) preg_match('/puff|croissant|panini|toast|bread|roti|donut|bagel|cookie|bungeoppang|nugget|nasi|chicken|spaghetti|pasta|danish|snack|pie|bolognese|carbonara|aglio/i', $itemKey . ' ' . $itemCode);
+            $isDrinkKey = !$isDefiniteFood && (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $itemKey . ' ' . $itemCode);
+            $isFoodItem = $isDefiniteFood || (!$isDrinkKey && (bool) preg_match('/cheesycake|\bcake\b|chiller|meal/i', $itemKey . ' ' . $itemCode));
             if (!$isFoodItem && !$isDrinkKey) {
                 $menu = $this->getMenu($outletCode);
                 foreach ($menu['items'] ?? [] as $mi) {
@@ -1330,7 +1337,7 @@ class KopiKenanganApi
     /**
      * Fetch Live Wi-Fi SSID & Daily Password for an outlet
      * Prioritizes:
-     * 1. MongoDB Atlas Master Database (kyuti.settings._id = wifi_info)
+     * 1. Exact 31-day daily rotation password table strictly per client reference
      * 2. Local Master Snapshot (data/wifi_master.json)
      * 3. Multi-source Upstream Failover (tixandcoffee, ridstore, tyaastore, twinsjasdor)
      * 4. Safe fallback: 'SecangkirRindu' . date('j')
@@ -1511,8 +1518,9 @@ class KopiKenanganApi
         foreach ($order['items'] as $idx => $item) {
             $options = [];
             $isBundling = !empty($item['isBundling']) || ($item['category'] ?? '') === 'Bundling';
-            $isDrink = (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $item['name'] ?? '');
-            $isFood = !$isDrink && (!empty($item['isFood']) || ($item['category'] ?? '') === 'Food' || preg_match('/spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i', $item['name'] ?? ''));
+            $isDefiniteFood = (bool) preg_match('/puff|croissant|panini|toast|bread|roti|donut|bagel|cookie|bungeoppang|nugget|nasi|chicken|spaghetti|pasta|danish|snack|pie|bolognese|carbonara|aglio/i', $item['name'] ?? '');
+            $isDrink = !$isDefiniteFood && (bool) preg_match('/latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i', $item['name'] ?? '');
+            $isFood = $isDefiniteFood || (!$isDrink && (!empty($item['isFood']) || ($item['category'] ?? '') === 'Food' || preg_match('/cheesycake|\bcake\b|chiller|meal/i', $item['name'] ?? '')));
             if (!$isBundling && !$isFood) {
                 if (!empty($item['size'])) $options[] = $item['size'];
                 if (!empty($item['temp'])) $options[] = $item['temp'];

@@ -33,25 +33,7 @@ def main():
     db = get_db()
     col = db["settings"]
 
-    if cmd == "get_stock":
-        stock_col = db["outlet_stocks"]
-        doc = stock_col.find_one({"_id": key})
-        if not doc:
-            # Check settings all_outlet_stocks
-            settings_doc = col.find_one({"_id": "all_outlet_stocks"})
-            if settings_doc and "data" in settings_doc and key in settings_doc["data"]:
-                doc = settings_doc["data"][key]
-        if doc:
-            # Remove MongoDB _id if ObjectId for clean JSON
-            if "_id" in doc:
-                doc["_id"] = str(doc["_id"])
-            if "updated_at" in doc and hasattr(doc["updated_at"], "isoformat"):
-                doc["updated_at"] = doc["updated_at"].isoformat()
-            sys.stdout.write(json.dumps(doc, ensure_ascii=False))
-        else:
-            sys.exit(2)
-
-    elif cmd == "get":
+    if cmd == "get":
         doc = col.find_one({"_id": key})
         if doc:
             if "raw_json" in doc and doc["raw_json"]:

@@ -1004,16 +1004,18 @@ function isFoodItem(item) {
     if (!item) return false;
     if (typeof item === 'string') {
         const n = item.toLowerCase().trim();
+        if (/puff|croissant|panini|toast|bread|roti|donut|bagel|cookie|bungeoppang|nugget|nasi|chicken|spaghetti|pasta|danish|snack|pie|bolognese|carbonara|aglio/i.test(n)) return true;
         if (isDrinkBeverage(n)) return false;
         if (BUNDLING_FOOD_ITEMS.has(n)) return true;
-        return /spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i.test(n);
+        return /cheesycake|\bcake\b|chiller|meal/i.test(n);
     }
     const name = (item.name || item.key || '').toLowerCase();
+    if (/puff|croissant|panini|toast|bread|roti|donut|bagel|cookie|bungeoppang|nugget|nasi|chicken|spaghetti|pasta|danish|snack|pie|bolognese|carbonara|aglio/i.test(name)) return true;
     if (isDrinkBeverage(name)) return false;
     if (item.isFood) return true;
     const cat = (item.category || '').toLowerCase();
     if (cat.includes('food') || cat.includes('toast') || cat.includes('roti') || cat.includes('snack') || cat.includes('boulangerie') || cat.includes('pastry') || cat.includes('bakery')) return true;
-    return /spaghetti|pasta|tuna|panini|toast|croissant|donut|bungeoppang|nugget|nasi|chicken|bread|roti|cheesycake|\bcake\b|snack|pie|cookie|danish|roll|chiller|meal|bolognese|carbonara|aglio/i.test(name);
+    return /cheesycake|\bcake\b|chiller|meal/i.test(name);
 }
 
 function isSingleItemSoldOut(name) {
