@@ -56,7 +56,7 @@ if (!$initialOutlet && !empty($initialOutlets)) {
     $defaultOutletCode = $initialOutlet['code'];
 }
 
-// Keep initial HTML ultra-lean: 40 popular outlets + active outlet (full 1,148+ outlets live-searchable via api/outlets.php)
+// Keep initial HTML ultra-lean: 40 popular outlets + active outlet (full 1,387+ outlets live-searchable via api/outlets.php)
 $initialOutletsForJs = array_slice($initialOutlets, 0, 40);
 if ($initialOutlet) {
     $foundInSlice = false;

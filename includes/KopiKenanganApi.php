@@ -58,8 +58,8 @@ class KopiKenanganApi
 
         $outlets = [];
 
-        // 1. If GPS coordinates provided, query nearest stores directly from kopkenapi
-        if ($lat !== null && $lng !== null) {
+        // 1. If GPS coordinates provided and no search query, query nearest stores directly from kopkenapi
+        if ($lat !== null && $lng !== null && !$isSearch) {
             $nearestUrl = 'https://kopkenapi.swamptechnology.id/api/store/nearest';
             $resp = $this->httpRequest($nearestUrl, [
                 'lat' => $lat,
@@ -1950,13 +1950,81 @@ class KopiKenanganApi
             if (is_array($json) && !empty($json)) {
                 $outlets = $json;
                 if ($query !== '') {
-                    $q = strtolower(trim($query));
-                    $outlets = array_filter($outlets, function ($o) use ($q) {
-                        return str_contains(strtolower($o['name'] ?? ''), $q) ||
-                               str_contains(strtolower($o['address'] ?? ''), $q) ||
-                               str_contains(strtolower($o['city'] ?? ''), $q) ||
-                               str_contains(strtolower($o['code'] ?? ''), $q);
-                    });
+                    $qRaw = strtolower(trim($query));
+
+                    // 1. Exact outlet code match
+                    $exactCode = [];
+                    foreach ($outlets as $o) {
+                        if (strcasecmp($o['code'] ?? '', $qRaw) === 0) {
+                            $exactCode[] = $o;
+                        }
+                    }
+                    if (!empty($exactCode)) {
+                        return array_values($exactCode);
+                    }
+
+                    // 2. Tokenize search words
+                    $cleanQuery = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $qRaw);
+                    $words = array_values(array_filter(preg_split('/\s+/', trim((string)$cleanQuery))));
+
+                    // Filter out common prefix stop words if user typed more words
+                    $stopWords = ['kopi', 'kenangan', 'kopken', 'kedai', 'outlet', 'cabang', 'store', 'toko'];
+                    $meaningfulWords = array_values(array_filter($words, fn($w) => !in_array($w, $stopWords, true)));
+                    $searchWords = !empty($meaningfulWords) ? $meaningfulWords : $words;
+
+                    $compactQuery = preg_replace('/[^\p{L}\p{N}]/u', '', $qRaw);
+
+                    $scoredOutlets = [];
+
+                    foreach ($outlets as $o) {
+                        $name = strtolower($o['name'] ?? '');
+                        $addr = strtolower($o['address'] ?? '');
+                        $city = strtolower($o['city'] ?? '');
+                        $code = strtolower($o['code'] ?? '');
+                        $cat = strtolower($o['category'] ?? '');
+
+                        $haystack = "$name $city $code $addr $cat";
+                        $compactHaystack = preg_replace('/[^\p{L}\p{N}]/u', '', $haystack);
+
+                        // Match compact query (e.g. "galuhmas" matches "galuh mas")
+                        if ($compactQuery !== '' && strlen($compactQuery) >= 3 && str_contains($compactHaystack, $compactQuery)) {
+                            $score = 15;
+                            if (str_contains($name, $qRaw)) $score += 25;
+                            if (str_contains($city, $qRaw)) $score += 15;
+                            $scoredOutlets[] = ['outlet' => $o, 'score' => $score];
+                            continue;
+                        }
+
+                        // Check if all search words match in haystack or compact haystack
+                        $allMatched = true;
+                        $score = 0;
+                        foreach ($searchWords as $w) {
+                            $wClean = preg_replace('/[^\p{L}\p{N}]/u', '', $w);
+                            $inName = str_contains($name, $w);
+                            $inCity = str_contains($city, $w);
+                            $inCode = str_contains($code, $w);
+                            $inAddr = str_contains($addr, $w);
+                            $inCompact = ($wClean !== '' && str_contains($compactHaystack, $wClean));
+
+                            if ($inName || $inCity || $inCode || $inAddr || $inCompact) {
+                                if ($inName) $score += 12;
+                                if ($inCity) $score += 8;
+                                if ($inCode) $score += 10;
+                                if ($inAddr) $score += 4;
+                            } else {
+                                $allMatched = false;
+                                break;
+                            }
+                        }
+
+                        if ($allMatched) {
+                            $scoredOutlets[] = ['outlet' => $o, 'score' => $score];
+                        }
+                    }
+
+                    // Sort by relevance score desc
+                    usort($scoredOutlets, fn($a, $b) => $b['score'] <=> $a['score']);
+                    $outlets = array_map(fn($item) => $item['outlet'], $scoredOutlets);
                 }
                 if ($lat !== null && $lng !== null) {
                     foreach ($outlets as &$o) {
