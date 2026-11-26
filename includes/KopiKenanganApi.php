@@ -439,7 +439,7 @@ class KopiKenanganApi
                 if ($name === '') continue;
 
                 $lowerName = strtolower($name);
-                $normProduct = strtolower(preg_replace('/[^a-z0-9]/', '', $name));
+                $normProduct = preg_replace('/[^a-z0-9]/', '', $lowerName);
 
                 // Exclude any upstream promo & combo items by name
                 if (

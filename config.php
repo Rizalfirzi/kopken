@@ -33,7 +33,7 @@ $config = [
     'app_name' => 'Kedai Kyuti',
     'app_domain' => 'kedaikyuti.my.id',
     'app_env' => 'production',
-    'version' => '2.1.0',
+    'version' => '2.2.0',
 
     // =========================================================================
     // 1. BRANDING, NAMA WEB & BIO PROFILE (Revisi Poin 1, 2, 5)

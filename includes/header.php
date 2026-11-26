@@ -46,7 +46,10 @@ $borderColor = config('theme.border_color', '#FBCFE8');
     <meta property="og:image" content="<?= htmlspecialchars($logoImg ?: 'assets/img/logo/kyuti.jpeg') ?>">
 
     <!-- Native Stylesheet with Cache Buster -->
-    <?php $cssVer = file_exists(__DIR__ . '/../assets/css/style.css') ? filemtime(__DIR__ . '/../assets/css/style.css') : time(); ?>
+    <?php
+    $cssFile = __DIR__ . '/../assets/css/style.css';
+    $cssVer = config('version', '2.2.0') . '.' . (file_exists($cssFile) ? substr(md5_file($cssFile), 0, 8) : time());
+    ?>
     <link rel="stylesheet" href="assets/css/style.css?v=<?= $cssVer ?>">
 
     <!-- Dynamic Theme Customization (from config.php) -->
