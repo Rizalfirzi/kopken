@@ -811,7 +811,17 @@ function renderMenu() {
             }
         }
 
-        const normItemCat = (item.category || '').toLowerCase().replace(/[\s-_]/g, '');
+        // Ensure any beverage is never shown as Food
+        let itemCat = item.category || 'Coffee';
+        if (isDrinkBeverage(item.name)) {
+            if (itemCat === 'Food') {
+                itemCat = item.name.toLowerCase().includes('frappe') ? 'Frappe' : 'Coffee';
+                item.category = itemCat;
+                item.isFood = false;
+            }
+        }
+
+        const normItemCat = itemCat.toLowerCase().replace(/[\s-_]/g, '');
         const normActiveCat = (AppState.activeCategory || '').toLowerCase().replace(/[\s-_]/g, '');
         const matchesCat = AppState.activeCategory === 'all' || 
                            normItemCat === normActiveCat || 
@@ -997,25 +1007,25 @@ function isBundlingFoodItem(name) {
 
 function isDrinkBeverage(name) {
     if (!name) return false;
-    return /latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano/i.test(String(name));
+    return /latte|frappe|coffee|kopi|espresso|americano|cappuccino|macchiato|tea|matcha|shake|freeze|lemonade|chocolate|choco|boba|drink|susu|avocado|hibiscus|babyccino|cold\s*brew|bluebericano|strawbericano|cheesecake|cheesycake|chiller|speculoos|cloud|float|blend|shaken/i.test(String(name));
 }
 
 function isFoodItem(item) {
     if (!item) return false;
-    if (typeof item === 'string') {
-        const n = item.toLowerCase().trim();
-        if (/puff|croissant|panini|toast|bread|roti|donut|bagel|cookie|bungeoppang|nugget|nasi|chicken|spaghetti|pasta|danish|snack|pie|bolognese|carbonara|aglio/i.test(n)) return true;
-        if (isDrinkBeverage(n)) return false;
-        if (BUNDLING_FOOD_ITEMS.has(n)) return true;
-        return /cheesycake|\bcake\b|chiller|meal/i.test(n);
-    }
-    const name = (item.name || item.key || '').toLowerCase();
-    if (/puff|croissant|panini|toast|bread|roti|donut|bagel|cookie|bungeoppang|nugget|nasi|chicken|spaghetti|pasta|danish|snack|pie|bolognese|carbonara|aglio/i.test(name)) return true;
+    const name = (typeof item === 'string' ? item : (item.name || item.key || '')).toLowerCase().trim();
+    // 1. Any drink/beverage is 100% NEVER a food item!
     if (isDrinkBeverage(name)) return false;
-    if (item.isFood) return true;
-    const cat = (item.category || '').toLowerCase();
-    if (cat.includes('food') || cat.includes('toast') || cat.includes('roti') || cat.includes('snack') || cat.includes('boulangerie') || cat.includes('pastry') || cat.includes('bakery')) return true;
-    return /cheesycake|\bcake\b|chiller|meal/i.test(name);
+    // 2. Specific bundling food items
+    if (BUNDLING_FOOD_ITEMS.has(name)) return true;
+    // 3. Definite food/bakery/meals
+    if (/puff|croissant|panini|toast|bread|roti|donut|bagel|bungeoppang|nugget|nasi|chicken|spaghetti|pasta|danish|snack|pie|bolognese|carbonara|aglio|meal/i.test(name)) return true;
+    if (/cookie|soft\s*bake/i.test(name) && !/frappe|shake|drink|latte/i.test(name)) return true;
+    if (typeof item !== 'string') {
+        if (item.isFood) return true;
+        const cat = (item.category || '').toLowerCase();
+        if (cat.includes('food') || cat.includes('toast') || cat.includes('roti') || cat.includes('snack') || cat.includes('boulangerie') || cat.includes('pastry') || cat.includes('bakery')) return true;
+    }
+    return false;
 }
 
 function isSingleItemSoldOut(name) {
