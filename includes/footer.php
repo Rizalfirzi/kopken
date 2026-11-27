@@ -56,7 +56,7 @@ window.INITIAL_DATA = {
 <!-- Native App Script with Cache Buster -->
 <?php
 $jsFile = __DIR__ . '/../assets/js/app.js';
-$jsVer = config('version', '2.2.0') . '.' . (file_exists($jsFile) ? substr(md5_file($jsFile), 0, 8) : time());
+$jsVer = config('version', '2.3.1') . '.' . (file_exists($jsFile) ? substr(md5_file($jsFile), 0, 8) : time());
 ?>
 <script src="assets/js/app.js?v=<?= $jsVer ?>"></script>
 

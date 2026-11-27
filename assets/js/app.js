@@ -658,6 +658,17 @@ function fetchMenu(outletCode, forceRefresh = false) {
                 }
             }
 
+            if (data && Array.isArray(data.items)) {
+                data.items.forEach(item => {
+                    if (isDrinkBeverage(item.name)) {
+                        if (item.category === 'Food' || item.isFood) {
+                            item.category = item.name.toLowerCase().includes('frappe') ? 'Frappe' : 'Coffee';
+                            item.isFood = false;
+                        }
+                    }
+                });
+            }
+
             AppState.menu = data;
 
             // Sync closed status if data indicates isClosed
@@ -926,7 +937,7 @@ function renderMenu() {
                             ${item.tag ? `<span class="promo-tag">${item.tag}</span>` : ''}
                         </div>
                         <h4 class="product-name">${item.name}</h4>
-                        <div class="product-cat">${item.category || 'Minuman'}</div>
+                        <div class="product-cat">${isDrinkBeverage(item.name) ? (item.category === 'Food' ? (item.name.toLowerCase().includes('frappe') ? 'Frappe' : 'Coffee') : (item.category || 'Minuman')) : (item.category || 'Minuman')}</div>
                         <div class="product-price-row">
                             <span class="product-price">${item.priceLabel ? item.priceLabel : formatRp(item.price)}</span>
                             ${!isFoodItem(item) && item.normalPrice && item.normalPrice > item.price ? `<span class="product-normal-price">${formatRp(item.normalPrice)}</span>` : ''}
@@ -4717,6 +4728,17 @@ function fetchReviews() {
 
 // Initial Boot
 document.addEventListener('DOMContentLoaded', () => {
+    // Sanitize any initial menu items to ensure beverages are never categorized as Food
+    if (AppState.menu && Array.isArray(AppState.menu.items)) {
+        AppState.menu.items.forEach(item => {
+            if (isDrinkBeverage(item.name)) {
+                if (item.category === 'Food' || item.isFood) {
+                    item.category = item.name.toLowerCase().includes('frappe') ? 'Frappe' : 'Coffee';
+                    item.isFood = false;
+                }
+            }
+        });
+    }
     updateOutletHeader();
     renderMenu();
     updateCartUI();
